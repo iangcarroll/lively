@@ -5,7 +5,12 @@ import Observation
 import UIKit
 #endif
 
-/// Drives a live conversation: mic → Voxtral Realtime → turns → translation.
+/// Drives a live conversation: mic → speech engine → turns → translation.
+///
+/// The engine comes from the provider chosen in Settings. Engines that only
+/// transcribe report deltas and turn boundaries, and turns are translated
+/// here with a `TranslationService`. Engines that translate by themselves
+/// report whole segments, which map one-to-one onto utterances.
 @Observable
 final class ConversationStore {
     enum ConnectionStatus: Equatable {
@@ -27,30 +32,26 @@ final class ConversationStore {
 
     private let settings: AppSettings
     private let mic = MicCapture()
-    private let transcriber = RealtimeTranscriber()
+    private var engine: SpeechEngine?
     private let pathMonitor = NWPathMonitor()
-    private var translator: TranslationService
+    private var translator: TranslationService?
 
     /// The turn currently receiving transcript text.
     private var current: Utterance?
     private var translations: [UUID: Task<Void, Never>] = [:]
     private var debounces: [UUID: Task<Void, Never>] = [:]
     private var silenceTimer: Task<Void, Never>?
-    private var transcriberStatus: RealtimeTranscriber.Status = .idle
+    private var transcriberStatus: SpeechEngineStatus = .idle
+    /// Utterances of recent segments from a translating engine, by segment id.
+    private var segmentUtterances: [Int: Utterance] = [:]
     private var demo: DemoConversation?
     private var audioPump: Task<Void, Never>?
 
     init(settings: AppSettings = .shared, demo: Bool = false) {
         self.settings = settings
-        self.translator = demo
-            ? DemoTranslator()
-            : MistralTranslator(apiKey: settings.apiKey, model: settings.translationModel)
-        if demo { self.demo = DemoConversation() }
-
-        transcriber.onEvent = { [weak self] in self?.handle($0) }
-        transcriber.onStatus = { [weak self] status in
-            self?.transcriberStatus = status
-            self?.refreshStatus()
+        if demo {
+            self.demo = DemoConversation()
+            self.translator = DemoTranslator()
         }
 
         // One stream keeps chunks in order on their way from the audio thread.
@@ -60,7 +61,7 @@ final class ConversationStore {
             for await (chunk, level) in chunks {
                 guard let self else { return }
                 guard self.isListening else { continue }
-                self.transcriber.send(chunk)
+                self.engine?.send(chunk)
                 self.level = self.level * 0.6 + level * 0.4
             }
         }
@@ -93,8 +94,10 @@ final class ConversationStore {
             demo.play(into: self)
             return
         }
-        guard settings.hasAPIKey else {
-            alert = "Add your Mistral API key in Settings to start."
+        let provider = settings.provider
+        guard settings.hasCredentials else {
+            let names = provider.credentials.map(\.name).formatted(.list(type: .and))
+            alert = "Add your \(names) in Settings to start."
             return
         }
         Task {
@@ -102,7 +105,6 @@ final class ConversationStore {
                 alert = "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone."
                 return
             }
-            translator = MistralTranslator(apiKey: settings.apiKey, model: settings.translationModel)
             do {
                 try mic.start()
             } catch {
@@ -111,8 +113,22 @@ final class ConversationStore {
             }
             isListening = true
             Self.keepScreenAwake(true)
-            transcriber.start(.init(apiKey: settings.apiKey, streamingDelayMs: settings.latency.milliseconds))
+            startEngine(provider)
         }
+    }
+
+    private func startEngine(_ provider: SpeechProvider) {
+        let pipeline = provider.makePipeline(settings)
+        translator = pipeline.translator
+        let engine = pipeline.engine
+        engine.onEvent = { [weak self] in self?.handle($0) }
+        engine.onStatus = { [weak self] status in
+            self?.transcriberStatus = status
+            self?.refreshStatus()
+        }
+        engine.networkAvailable = isOnline
+        self.engine = engine
+        engine.start()
     }
 
     func stopListening() {
@@ -120,7 +136,8 @@ final class ConversationStore {
         isListening = false
         demo?.stop()
         mic.stop()
-        transcriber.stop()
+        engine?.stop()
+        engine = nil
         level = 0
         Self.keepScreenAwake(false)
         finalizeCurrent()
@@ -134,6 +151,7 @@ final class ConversationStore {
         translations.removeAll()
         debounces.removeAll()
         current = nil
+        segmentUtterances.removeAll()
         utterances.removeAll()
     }
 
@@ -144,16 +162,11 @@ final class ConversationStore {
 
     // MARK: - Transcript events
 
-    /// Turn events arrive as soon as the audio is heard, but transcript text
-    /// lags by the streaming delay. A boundary always follows at least
-    /// `min_silence_ms` (350 ms) of silence, so the previous turn's last words
-    /// arrive within (delay - 350 ms) of it. Waiting about that long keeps
-    /// trailing words in their turn without swallowing the next speaker's first.
-    private var boundaryDelay: Duration {
-        demo == nil ? .milliseconds(max(60, settings.latency.milliseconds - 250)) : .zero
-    }
+    /// Wait this long after a turn boundary so the turn's trailing words,
+    /// which lag behind the boundary event, stay in it.
+    private var boundaryDelay: Duration { engine?.textLag ?? .zero }
 
-    func handle(_ event: RealtimeTranscriber.Event) {
+    func handle(_ event: SpeechEvent) {
         switch event {
         case .text(let delta):
             let utterance: Utterance
@@ -190,8 +203,44 @@ final class ConversationStore {
                 self.finalizeCurrent()
             }
 
+        case .segment(let segment):
+            apply(segment)
+
         case .sessionReset:
             finalizeCurrent()
+        }
+    }
+
+    /// Shows a segment from an engine that translates by itself. Its
+    /// translation fills `Utterance.translation` directly.
+    private func apply(_ segment: SpeechSegment) {
+        let utterance: Utterance
+        if let existing = segmentUtterances[segment.id] {
+            utterance = existing
+        } else {
+            guard !segment.source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            finalizeCurrent()
+            // Earlier segments' translations are complete once a new one starts.
+            for older in segmentUtterances.values where older.translationState == .working {
+                older.translationState = .current
+            }
+            segmentUtterances = segmentUtterances.filter { $0.key >= segment.id - 1 }
+            utterance = Utterance()
+            utterances.append(utterance)
+            segmentUtterances[segment.id] = utterance
+        }
+
+        let script = settings.chineseScript
+        utterance.setSource(script.convert(segment.source.trimmingLeadingWhitespace()), language: segment.language)
+        utterance.translation = script.convert(segment.translation.trimmingCharacters(in: .whitespacesAndNewlines))
+        utterance.translatedSource = utterance.trimmedSource
+        utterance.translationState = segment.isClosed && !utterance.translation.isEmpty ? .current : .working
+
+        if segment.isClosed {
+            if current === utterance { finalizeCurrent() } else { utterance.isFinal = true }
+        } else if !utterance.isFinal {
+            current = utterance
+            armSilenceFallback()
         }
     }
 
@@ -202,6 +251,7 @@ final class ConversationStore {
         silenceTimer = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }
+            self?.engine?.endTurn()
             self?.finalizeCurrent()
         }
     }
@@ -238,12 +288,11 @@ final class ConversationStore {
 
     private func translate(_ utterance: Utterance) {
         let text = utterance.trimmedSource
-        guard !text.isEmpty, translations[utterance.id] == nil else { return }
+        guard !text.isEmpty, translations[utterance.id] == nil, let translator else { return }
 
         let language = utterance.language
         let context = Array(utterances.prefix { $0 !== utterance }.filter(\.isFinal).suffix(3))
         let script = settings.chineseScript
-        let translator = self.translator
 
         utterance.translationState = .working
         translations[utterance.id] = Task { [weak self] in
@@ -296,7 +345,7 @@ final class ConversationStore {
     private func setOnline(_ online: Bool) {
         guard online != isOnline else { return }
         isOnline = online
-        transcriber.networkAvailable = online
+        engine?.networkAvailable = online
         refreshStatus()
     }
 

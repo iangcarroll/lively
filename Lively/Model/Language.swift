@@ -44,6 +44,13 @@ enum ChineseScript: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
     var label: String { self == .simplified ? "简体" : "繁體" }
     var promptName: String { self == .simplified ? "Simplified Chinese" : "Traditional Chinese" }
+
+    /// Rewrites Simplified Chinese in this script, for engines that only
+    /// output Simplified. Other text passes through unchanged.
+    func convert(_ text: String) -> String {
+        guard self == .traditional else { return text }
+        return text.applyingTransform(StringTransform("Hans-Hant"), reverse: false) ?? text
+    }
 }
 
 /// Streaming delay for Voxtral Realtime. Lower is faster, higher is more accurate.

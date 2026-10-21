@@ -40,6 +40,12 @@ final class Utterance: Identifiable {
         if let detected = Language.detect(source) { language = detected }
     }
 
+    /// Replaces the transcript, for engines that revise provisional words.
+    func setSource(_ text: String, language: Language?) {
+        source = text
+        if let language { self.language = language } else if let detected = Language.detect(source) { self.language = detected }
+    }
+
     var trimmedSource: String { source.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var needsTranslation: Bool { translatedSource != trimmedSource }

@@ -7,9 +7,15 @@ final class AppSettings {
 
     private let defaults = UserDefaults.standard
 
-    var apiKey: String {
-        didSet { Keychain.write(apiKey.isEmpty ? nil : apiKey, account: "mistral-api-key") }
+    /// `SpeechProvider.id` of the chosen engine.
+    var providerID: String {
+        didSet { defaults.set(providerID, forKey: "speechProvider") }
     }
+
+    var provider: SpeechProvider { SpeechProvider.with(id: providerID) }
+
+    /// API keys by `ProviderCredential.id`, mirrored to the Keychain.
+    private var credentials: [String: String] = [:]
 
     var latency: Latency {
         didSet { defaults.set(latency.rawValue, forKey: "latency") }
@@ -26,12 +32,28 @@ final class AppSettings {
     static let defaultTranslationModel = "mistral-small-latest"
     static let transcriptionModel = "voxtral-mini-transcribe-realtime-3"
 
-    var hasAPIKey: Bool { !apiKey.trimmingCharacters(in: .whitespaces).isEmpty }
+    func credential(_ credential: ProviderCredential) -> String {
+        credentials[credential.id] ?? ""
+    }
+
+    func setCredential(_ value: String, for credential: ProviderCredential) {
+        guard credentials[credential.id] != value else { return }
+        credentials[credential.id] = value
+        Keychain.write(value.isEmpty ? nil : value, account: credential.id)
+    }
+
+    /// The chosen provider has every key it needs.
+    var hasCredentials: Bool {
+        provider.credentials.allSatisfy { !credential($0).trimmingCharacters(in: .whitespaces).isEmpty }
+    }
 
     private init() {
-        apiKey = Keychain.read(account: "mistral-api-key") ?? ""
+        providerID = defaults.string(forKey: "speechProvider") ?? SpeechProvider.fallback.id
         latency = Latency(rawValue: defaults.integer(forKey: "latency")) ?? .fastest
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel
+        for credential in SpeechProvider.allCredentials {
+            credentials[credential.id] = Keychain.read(account: credential.id) ?? ""
+        }
     }
 }

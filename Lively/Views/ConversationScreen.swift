@@ -40,7 +40,7 @@ struct ConversationScreen: View {
             SettingsView(settings: settings) { store.clear() }
         }
         .alert("Lively", isPresented: alertBinding) {
-            if !settings.hasAPIKey { Button("Open Settings") { showSettings = true } }
+            if !settings.hasCredentials { Button("Open Settings") { showSettings = true } }
             Button("OK", role: .cancel) {}
         } message: {
             Text(store.alert ?? "")
@@ -52,7 +52,7 @@ struct ConversationScreen: View {
             #endif
         }
         .onAppear {
-            if !settings.hasAPIKey && !isDemo { showSettings = true }
+            if !settings.hasCredentials && !isDemo { showSettings = true }
         }
     }
 
