@@ -22,6 +22,9 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Sign-in codes. The sender's domain must be onboarded under Email Service
+  // › Sending in the dashboard.
+  "send_email": [{ "name": "EMAIL" }],
   // Keys live KEY_TTL_SECONDS, so the app's spare key survives a few minutes
   // of broker trouble; the app replaces it a minute before it expires.
   // Every key is charged KEY_CHARGE_SECONDS of listening: about half the
@@ -32,10 +35,21 @@
     "KEY_CHARGE_SECONDS": "120",
     "PER_INSTALL_KEYS_PER_MINUTE": "6",
     "PER_INSTALL_MINUTES_PER_DAY": "240",
+    // Signed-in accounts get these instead of the per-install limits.
+    "PER_USER_KEYS_PER_MINUTE": "10",
+    "PER_USER_MINUTES_PER_DAY": "600",
     "PER_IP_KEYS_PER_MINUTE": "30",
     "PER_IP_MINUTES_PER_DAY": "1440",
     "GLOBAL_KEYS_PER_DAY": "100000",
     // Comma-separated hashed install IDs. The D1 `denylist` table works too.
-    "DENYLIST": ""
+    "DENYLIST": "",
+    // Email sign-in.
+    "EMAIL_FROM": "login@ian.sh",
+    "CODE_TTL_SECONDS": "600",
+    "CODE_MAX_ATTEMPTS": "5",
+    "CODES_PER_EMAIL_PER_HOUR": "5",
+    "CODES_PER_EMAIL_PER_DAY": "10",
+    "CODES_PER_IP_PER_HOUR": "20",
+    "SESSION_DAYS": "365"
   }
 }

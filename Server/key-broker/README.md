@@ -56,20 +56,30 @@ it, then `npx wrangler secret put SONIOX_API_KEY_JP` with that project's key.
 
 ## Who gets keys
 
-Callers are anonymous. The app makes up a random UUID on first launch, keeps it
-in the Keychain, and sends it as `Lively-Install-ID`. There's no App Attest or
-sign-in, so anyone who copies the request can get keys. These limits cap what
-that costs:
+Callers can be anonymous. The app makes up a random UUID on first launch, keeps
+it in the Keychain, and sends it as `Lively-Install-ID`. There's no App Attest,
+so anyone who copies the request can get keys. A caller that has signed in
+(see [Sign-in](#sign-in)) also sends `Authorization: Bearer <token>`. These
+limits cap what that costs:
 
 | Variable | Default | Limit |
 |---|---|---|
 | `PER_INSTALL_KEYS_PER_MINUTE` | 6 | keys per install per minute |
 | `PER_INSTALL_MINUTES_PER_DAY` | 240 | listening minutes per install per UTC day |
 | `PER_IP_KEYS_PER_MINUTE` | 30 | keys per IP per minute (IPv6 by /64) |
-| `PER_IP_MINUTES_PER_DAY` | 1440 | listening minutes per IP per UTC day |
+| `PER_IP_MINUTES_PER_DAY` | 1440 | listening minutes per IP per UTC day (anonymous only) |
+| `PER_USER_KEYS_PER_MINUTE` | 10 | keys per account per minute |
+| `PER_USER_MINUTES_PER_DAY` | 600 | listening minutes per account per UTC day |
 | `GLOBAL_KEYS_PER_DAY` | 100000 | keys for everyone per UTC day |
 | `KEY_CHARGE_SECONDS` | 120 | listening time charged per key |
 | `DENYLIST` | empty | comma-separated install hashes to refuse |
+
+A signed-in caller is charged per account instead of per install, so its budget
+follows it across devices. It isn't held to the per-IP daily budget, since
+people behind one carrier NAT would use up each other's time. The per-IP
+per-minute limit and the global cap still apply. Its keys carry the account's
+hash as `client_reference_id`. A token that isn't valid gets 401
+`signed_out`; the app then drops it and asks again anonymously.
 
 Listening time is estimated from keys. Keys live 5 minutes, so the app's
 spare key outlasts a few minutes of broker trouble (common on mainland China
@@ -80,7 +90,7 @@ takes a key, and those shouldn't use up a day's budget. A client that skips the
 refresh and holds one session open is still bounded, because each key's
 `max_session_duration_seconds` is capped at what's left of the day's budget.
 
-To cut off one install without a redeploy, add its hash (the
+To cut off one install or account without a redeploy, add its hash (the
 `client_reference_id` in Soniox's usage logs) to the D1 table:
 
 ```bash
@@ -95,9 +105,47 @@ Errors are JSON `{error, message}`. A per-minute 429 carries a short
 `Retry-After`, and the app retries it. A daily 429 (`Retry-After` over 60 s),
 403 (denied) and 503 (global cap) stop listening and show `message`.
 
+## Sign-in
+
+Sign-in is optional, with a 6-digit code sent by email.
+
+```
+POST /v1/auth/email/start   {"email": "a@example.com"}
+200 {"ok": true, "expires_in_seconds": 600}
+
+POST /v1/auth/email/verify  {"email": "a@example.com", "code": "123456"}
+200 {"token": "<43 chars>", "user": {"id": "<uuid>", "email": "a@example.com"}}
+
+GET  /v1/auth/me            Authorization: Bearer <token>   → {"user": {...}}
+POST /v1/auth/logout        Authorization: Bearer <token>   → {"ok": true}
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `EMAIL_FROM` | `login@ian.sh` | sender address |
+| `CODE_TTL_SECONDS` | 600 | how long a code works |
+| `CODE_MAX_ATTEMPTS` | 5 | guesses per code |
+| `CODES_PER_EMAIL_PER_HOUR` | 5 | codes sent to one address per hour |
+| `CODES_PER_EMAIL_PER_DAY` | 10 | codes sent to one address per UTC day |
+| `CODES_PER_IP_PER_HOUR` | 20 | codes requested from one IP per hour |
+| `SESSION_DAYS` | 365 | how long a session token lasts |
+
+A new code replaces the last one, and a code works once. With the defaults,
+someone guessing at an account gets 50 guesses a day, about a 1 in 20,000
+chance. Emails are lowercased and trimmed; one email is one account. Codes are
+stored as SHA-256 of the email and code, and sessions as SHA-256 of the token,
+so a copy of the database can't sign anyone in.
+
+Mail goes out through [Cloudflare Email
+Service](https://developers.cloudflare.com/email-service/) via the
+`send_email` binding `EMAIL`. Sending to any address needs the Workers Paid
+plan, and `EMAIL_FROM`'s domain must be onboarded under Email Service ›
+Sending in the dashboard, which adds its SPF and DKIM records. `wrangler dev`
+doesn't send: it logs each message and saves its text under `.wrangler/tmp/email/`.
+
 Counters live in D1. Each request makes one batched, transactional upsert, so
 concurrent requests can't both slip under a limit. Rejected and failed requests
-are refunded. A cron job at :17 every hour deletes expired counters.
+are refunded. A cron job at :17 every hour deletes expired counters, codes and sessions.
 
 ## Develop
 

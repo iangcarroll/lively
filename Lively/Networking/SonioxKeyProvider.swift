@@ -7,7 +7,7 @@ import Foundation
 /// network never waits on the broker. Keys live 5 min and the spare is
 /// replaced after 4, so it outlasts minutes of broker trouble.
 /// The broker identifies this install by a random ID kept in the Keychain and
-/// rate-limits by it.
+/// rate-limits by it, or by the account when signed in (`Account`).
 ///
 /// Keys are region-scoped: each works only on its own region's WebSocket
 /// host, which comes with it. `regions` picks the region to ask for, and the
@@ -17,7 +17,7 @@ final class SonioxKeyProvider {
     /// entered in Settings.
     static let shared: SonioxKeyProvider? = brokerURL.map { SonioxKeyProvider(brokerURL: $0) }
 
-    private static var brokerURL: URL? {
+    static var brokerURL: URL? {
         guard let string = Bundle.main.object(forInfoDictionaryKey: "LivelyKeyBrokerURL") as? String,
               !string.isEmpty else { return nil }
         return URL(string: string)
@@ -132,10 +132,18 @@ final class SonioxKeyProvider {
         request.setValue(Self.installID, forHTTPHeaderField: "Lively-Install-ID")
         let requestedRegion = regions.choice
         if let requestedRegion { request.setValue(requestedRegion, forHTTPHeaderField: "Lively-Region") }
+        let token = Account.shared?.token
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
 
         let started = Date.now
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+
+        // A signed-out or expired session: drop it and ask again anonymously.
+        if http.statusCode == 401, let token {
+            Account.shared?.tokenWasRejected(token)
+            return try await requestKey()
+        }
 
         guard http.statusCode == 200 else {
             let message = (try? JSONDecoder().decode(BrokerError.self, from: data))?.message

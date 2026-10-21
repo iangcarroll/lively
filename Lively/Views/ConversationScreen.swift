@@ -5,6 +5,8 @@ struct ConversationScreen: View {
     @Bindable var settings: AppSettings = .shared
 
     @State private var showSettings = false
+    @State private var showAccount = false
+    @AppStorage(AccountSheet.shownKey) private var accountSheetShown = false
     /// On phones, face-to-face is the main layout; the transcript is an alternative.
     @AppStorage("phoneShowsTranscript") private var phoneShowsTranscript = false
     @AppStorage("nearLanguage") private var nearLanguage: Language = .english
@@ -39,6 +41,9 @@ struct ConversationScreen: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(settings: settings) { store.clear() }
         }
+        .sheet(isPresented: $showAccount) {
+            if let account = Account.shared { AccountSheet(account: account) }
+        }
         .alert("Lively", isPresented: alertBinding) {
             if !settings.hasCredentials { Button("Open Settings") { showSettings = true } }
             Button("OK", role: .cancel) {}
@@ -53,7 +58,13 @@ struct ConversationScreen: View {
             #endif
         }
         .onAppear {
-            if !settings.hasCredentials && !isDemo { showSettings = true }
+            guard !isDemo else { return }
+            if !accountSheetShown, Account.shared != nil {
+                accountSheetShown = true
+                showAccount = true
+            } else if !settings.hasCredentials {
+                showSettings = true
+            }
         }
     }
 

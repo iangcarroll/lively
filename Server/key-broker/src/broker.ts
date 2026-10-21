@@ -5,6 +5,7 @@
  *   POST /v1/soniox/key
  *   Lively-Install-ID: <random UUID the app keeps in its Keychain>
  *   Lively-Region: us | jp   (optional; the app's measured best region)
+ *   Authorization: Bearer <session token>   (optional; see auth.ts)
  *   → 200 {api_key, expires_at, expires_in_seconds, max_session_seconds,
  *          region, websocket_url, regions}
  *
@@ -15,12 +16,20 @@
  * Keys are single-use and live KEY_TTL_SECONDS (300 s), so the spare key the
  * app holds still works after a few minutes of broker trouble.
  *
- * Callers are anonymous. Abuse is bounded by per-install and per-IP limits, a
- * global daily cap and a denylist, all set in wrangler.jsonc.
+ * Callers may be anonymous. Abuse is bounded by per-install and per-IP limits,
+ * a global daily cap and a denylist, all set in wrangler.jsonc. A signed-in
+ * caller is limited per account instead of per install, with a bigger daily
+ * budget, and isn't held to the per-IP daily budget, so people behind one
+ * carrier NAT don't use up each other's time.
  */
+
+import { authenticate, unauthorized } from "./auth";
 
 export interface Env {
   DB: D1Database;
+  /** Cloudflare Email Service, for sign-in codes. */
+  EMAIL: SendEmail;
+  EMAIL_FROM: string;
   /** Master keys per region. A region without a key is never offered. */
   SONIOX_API_KEY_US?: string;
   SONIOX_API_KEY_JP?: string;
@@ -31,10 +40,18 @@ export interface Env {
   KEY_CHARGE_SECONDS: string;
   PER_INSTALL_KEYS_PER_MINUTE: string;
   PER_INSTALL_MINUTES_PER_DAY: string;
+  PER_USER_KEYS_PER_MINUTE: string;
+  PER_USER_MINUTES_PER_DAY: string;
   PER_IP_KEYS_PER_MINUTE: string;
   PER_IP_MINUTES_PER_DAY: string;
   GLOBAL_KEYS_PER_DAY: string;
   DENYLIST: string;
+  CODE_TTL_SECONDS: string;
+  CODE_MAX_ATTEMPTS: string;
+  CODES_PER_EMAIL_PER_HOUR: string;
+  CODES_PER_EMAIL_PER_DAY: string;
+  CODES_PER_IP_PER_HOUR: string;
+  SESSION_DAYS: string;
 }
 
 export type Region = "us" | "jp";
@@ -78,10 +95,14 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
   if (!INSTALL_ID.test(installID)) {
     return error(400, "bad_install_id", "Send a UUID in the Lively-Install-ID header.");
   }
+  const auth = await authenticate(request, env, now);
+  // The app drops its token on 401 and asks again anonymously.
+  if (auth.state === "invalid") return unauthorized();
   const installHash = await hash(`install:${installID.toLowerCase()}`);
+  const userHash = auth.state === "signed_in" ? await hash(`user:${auth.user.id}`) : undefined;
   const ipHash = await hash(`ip:${networkOf(request.headers.get("CF-Connecting-IP") ?? "local")}`);
 
-  if (await isDenied(env, installHash)) {
+  if (await isDenied(env, installHash) || (userHash && (await isDenied(env, userHash)))) {
     return error(403, "denied", "This install can't get keys.");
   }
 
@@ -92,11 +113,19 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
   const dayExpiry = nowSeconds(nextUTCMidnight(now)) + 3600;
 
   // Keys per minute count 1; minutes per day are tracked in charged seconds.
+  const subject: Charge[] = userHash
+    ? [
+        { key: `user:${userHash}:min:${minute}`, amount: 1, limit: limits.userKeysPerMinute, expiresAt: minuteExpiry, window: "minute" },
+        { key: `user:${userHash}:day:${day}`, amount: limits.chargeSeconds, limit: limits.userSecondsPerDay, expiresAt: dayExpiry, window: "day" },
+      ]
+    : [
+        { key: `install:${installHash}:min:${minute}`, amount: 1, limit: limits.installKeysPerMinute, expiresAt: minuteExpiry, window: "minute" },
+        { key: `install:${installHash}:day:${day}`, amount: limits.chargeSeconds, limit: limits.installSecondsPerDay, expiresAt: dayExpiry, window: "day" },
+        { key: `ip:${ipHash}:day:${day}`, amount: limits.chargeSeconds, limit: limits.ipSecondsPerDay, expiresAt: dayExpiry, window: "day" },
+      ];
   const charges: Charge[] = [
-    { key: `install:${installHash}:min:${minute}`, amount: 1, limit: limits.installKeysPerMinute, expiresAt: minuteExpiry, window: "minute" },
+    ...subject,
     { key: `ip:${ipHash}:min:${minute}`, amount: 1, limit: limits.ipKeysPerMinute, expiresAt: minuteExpiry, window: "minute" },
-    { key: `install:${installHash}:day:${day}`, amount: limits.chargeSeconds, limit: limits.installSecondsPerDay, expiresAt: dayExpiry, window: "day" },
-    { key: `ip:${ipHash}:day:${day}`, amount: limits.chargeSeconds, limit: limits.ipSecondsPerDay, expiresAt: dayExpiry, window: "day" },
     { key: `global:day:${day}`, amount: 1, limit: limits.globalKeysPerDay, expiresAt: dayExpiry, window: "global" },
   ];
 
@@ -132,7 +161,7 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
     expires_in_seconds: limits.keyTTLSeconds,
     single_use: true,
     max_session_duration_seconds: maxSession,
-    client_reference_id: installHash,
+    client_reference_id: userHash ?? installHash,
   });
   if (!minted.ok) {
     await refund(env, charges);
@@ -221,6 +250,8 @@ function readLimits(env: Env) {
     chargeSeconds: int(env.KEY_CHARGE_SECONDS, "KEY_CHARGE_SECONDS"),
     installKeysPerMinute: int(env.PER_INSTALL_KEYS_PER_MINUTE, "PER_INSTALL_KEYS_PER_MINUTE"),
     installSecondsPerDay: int(env.PER_INSTALL_MINUTES_PER_DAY, "PER_INSTALL_MINUTES_PER_DAY") * 60,
+    userKeysPerMinute: int(env.PER_USER_KEYS_PER_MINUTE, "PER_USER_KEYS_PER_MINUTE"),
+    userSecondsPerDay: int(env.PER_USER_MINUTES_PER_DAY, "PER_USER_MINUTES_PER_DAY") * 60,
     ipKeysPerMinute: int(env.PER_IP_KEYS_PER_MINUTE, "PER_IP_KEYS_PER_MINUTE"),
     ipSecondsPerDay: int(env.PER_IP_MINUTES_PER_DAY, "PER_IP_MINUTES_PER_DAY") * 60,
     globalKeysPerDay: int(env.GLOBAL_KEYS_PER_DAY, "GLOBAL_KEYS_PER_DAY"),

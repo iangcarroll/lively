@@ -60,6 +60,16 @@ struct SettingsView: View {
                         : "Changes apply the next time you start listening.")
                 }
 
+                if let account = Account.shared {
+                    Section {
+                        NavigationLink {
+                            AccountView(account: account)
+                        } label: {
+                            LabeledContent("Account", value: account.email ?? "Sign In")
+                        }
+                    }
+                }
+
                 Section {
                     Button("Clear Conversation", role: .destructive) {
                         onClear()
