@@ -27,6 +27,10 @@ final class Utterance: Identifiable {
     /// True once the speaker's turn has ended and the transcript won't change.
     var isFinal = false
 
+    /// Spoken during a network dropout and transcribed after it, so it may
+    /// show up after later turns' translations.
+    var isLate = false
+
     /// The transcript the current `translation` was produced from.
     var translatedSource: String?
 

@@ -22,12 +22,14 @@
       "migrations_dir": "migrations"
     }
   ],
-  // Limits. Every key is charged KEY_CHARGE_SECONDS of listening, because the
-  // app fetches a fresh spare key about every 50 s while it listens.
+  // Keys live KEY_TTL_SECONDS, so the app's spare key survives a few minutes
+  // of broker trouble; the app replaces it a minute before it expires.
+  // Every key is charged KEY_CHARGE_SECONDS of listening: about half the
+  // ~240 s refresh, since reconnects on flaky networks take extra keys.
   "vars": {
-    "KEY_TTL_SECONDS": "60",
+    "KEY_TTL_SECONDS": "300",
     "MAX_SESSION_SECONDS": "7200",
-    "KEY_CHARGE_SECONDS": "50",
+    "KEY_CHARGE_SECONDS": "120",
     "PER_INSTALL_KEYS_PER_MINUTE": "6",
     "PER_INSTALL_MINUTES_PER_DAY": "240",
     "PER_IP_KEYS_PER_MINUTE": "30",

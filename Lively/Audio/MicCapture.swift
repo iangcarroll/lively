@@ -53,11 +53,21 @@ nonisolated final class MicCapture: @unchecked Sendable {
 
     func start() throws {
         state.withLock { $0.wantsRunning = true }
+        #if DEBUG
+        if let path = UserDefaults.standard.string(forKey: "LivelyAudioFile") {
+            try startFile(URL(filePath: path))
+            return
+        }
+        #endif
         try configureSession()
         try startEngine()
     }
 
     func stop() {
+        #if DEBUG
+        fileTimer?.cancel()
+        fileTimer = nil
+        #endif
         state.withLock {
             $0.wantsRunning = false
             $0.pending.removeAll(keepingCapacity: true)
@@ -133,6 +143,55 @@ nonisolated final class MicCapture: @unchecked Sendable {
         }
         for chunk in chunks { onChunk?(Data(chunk), level) }
     }
+
+    #if DEBUG
+    private var fileTimer: DispatchSourceTimer?
+
+    /// `-LivelyAudioFile PATH` plays an audio file into the app in real time
+    /// instead of the microphone, once, then silence. For testing without a
+    /// speaker or a quiet room.
+    private func startFile(_ url: URL) throws {
+        let file = try AVAudioFile(forReading: url)
+        let format = file.processingFormat
+        guard let input = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length)),
+              let converter = AVAudioConverter(from: format, to: outputFormat) else { throw CaptureError.noInput }
+        try file.read(into: input)
+        let capacity = AVAudioFrameCount(Double(input.frameLength) * sampleRatio(format)) + 32
+        guard let out = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { throw CaptureError.noInput }
+        var consumed = false
+        var error: NSError?
+        converter.convert(to: out, error: &error) { _, status in
+            if consumed {
+                status.pointee = .endOfStream
+                return nil
+            }
+            consumed = true
+            status.pointee = .haveData
+            return input
+        }
+        if let error { throw error }
+        let pcm = Data(bytes: out.int16ChannelData![0], count: Int(out.frameLength) * MemoryLayout<Int16>.size)
+
+        var offset = 0
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "lively.file-audio", qos: .userInteractive))
+        timer.schedule(deadline: .now(), repeating: Self.chunkDuration, leeway: .milliseconds(2))
+        timer.setEventHandler { [weak self] in
+            var chunk = Data(count: Self.chunkBytes)
+            if offset < pcm.count {
+                let piece = pcm[offset..<min(offset + Self.chunkBytes, pcm.count)]
+                chunk.replaceSubrange(0..<piece.count, with: piece)
+                offset += Self.chunkBytes
+            }
+            self?.onChunk?(chunk, 0.5)
+        }
+        fileTimer = timer
+        timer.resume()
+    }
+
+    private func sampleRatio(_ format: AVAudioFormat) -> Double {
+        outputFormat.sampleRate / format.sampleRate
+    }
+    #endif
 
     #if os(iOS)
     private func handleInterruption(_ note: Notification) {

@@ -96,7 +96,11 @@ struct UtteranceBubble: View {
             .buttonStyle(.borderless)
             .tint(.orange)
         default:
-            EmptyView()
+            if utterance.isLate {
+                Label("Caught up after a dropout", systemImage: "clock.arrow.circlepath")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

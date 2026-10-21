@@ -10,7 +10,7 @@ Lively-Install-ID: 3F2C9A3E-6B1D-4C55-9A0E-2D7E8F1B4C6A
 Lively-Region: jp                      (optional)
 
 200 {"api_key": "...", "expires_at": "2026-10-21T01:00:34.125Z",
-     "expires_in_seconds": 60, "max_session_seconds": 7200,
+     "expires_in_seconds": 300, "max_session_seconds": 7200,
      "region": "jp",
      "websocket_url": "wss://stt-rt.jp.soniox.com/transcribe-websocket",
      "regions": {"us": "wss://stt-rt.soniox.com/transcribe-websocket",
@@ -23,7 +23,7 @@ For each request the Worker calls Soniox's
 | Field | Value |
 |---|---|
 | `usage_type` | `transcribe_websocket` |
-| `expires_in_seconds` | `KEY_TTL_SECONDS` (60) |
+| `expires_in_seconds` | `KEY_TTL_SECONDS` (300) |
 | `single_use` | `true` |
 | `max_session_duration_seconds` | `MAX_SESSION_SECONDS` (7200), or less near the day's limit |
 | `client_reference_id` | first 128 bits of SHA-256 of the install ID, hex |
@@ -68,11 +68,15 @@ that costs:
 | `PER_IP_KEYS_PER_MINUTE` | 30 | keys per IP per minute (IPv6 by /64) |
 | `PER_IP_MINUTES_PER_DAY` | 1440 | listening minutes per IP per UTC day |
 | `GLOBAL_KEYS_PER_DAY` | 100000 | keys for everyone per UTC day |
-| `KEY_CHARGE_SECONDS` | 50 | listening time charged per key |
+| `KEY_CHARGE_SECONDS` | 120 | listening time charged per key |
 | `DENYLIST` | empty | comma-separated install hashes to refuse |
 
-Listening time is estimated from keys. While listening, the app replaces its
-spare key every ~50 s, so each key counts as 50 s. A client that skips the
+Listening time is estimated from keys. Keys live 5 minutes, so the app's
+spare key outlasts a few minutes of broker trouble (common on mainland China
+networks), and the app replaces it a minute before it expires, about every
+240 s. Each key counts as 120 s: steady listening is undercounted about 2×,
+but each reconnect, catch-up or handover session on a flaky network also
+takes a key, and those shouldn't use up a day's budget. A client that skips the
 refresh and holds one session open is still bounded, because each key's
 `max_session_duration_seconds` is capped at what's left of the day's budget.
 

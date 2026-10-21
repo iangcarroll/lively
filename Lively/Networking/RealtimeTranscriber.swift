@@ -77,11 +77,11 @@ final class RealtimeTranscriber: SpeechEngine, SocketDialect {
     var readyWhenOpen: Bool { false }
     var rejectedKeyMessage: String { "Your Mistral API key was rejected. Check it in Settings." }
 
-    func sessionDidReset() {
+    func sessionDidReset(_ stream: SocketStream) {
         onEvent(.sessionReset)
     }
 
-    func receive(_ message: URLSessionWebSocketTask.Message) -> SocketSignal {
+    func receive(_ message: URLSessionWebSocketTask.Message, on stream: SocketStream) -> SocketSignal {
         guard let json = message.jsonObject, let type = json["type"] as? String else { return .none }
 
         switch type {

@@ -12,6 +12,9 @@
  * one master key per region, and a temporary key works only on its region's
  * WebSocket host.
  *
+ * Keys are single-use and live KEY_TTL_SECONDS (300 s), so the spare key the
+ * app holds still works after a few minutes of broker trouble.
+ *
  * Callers are anonymous. Abuse is bounded by per-install and per-IP limits, a
  * global daily cap and a denylist, all set in wrangler.jsonc.
  */

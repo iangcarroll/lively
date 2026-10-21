@@ -47,17 +47,24 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         var language: Language?
         var isClosed = false
 
-        var event: SpeechSegment {
-            SpeechSegment(id: id, source: source, translation: translation, language: language, isClosed: isClosed)
+        func event(isCatchUp: Bool) -> SpeechSegment {
+            SpeechSegment(id: id, source: source, translation: translation, language: language, isClosed: isClosed, isCatchUp: isCatchUp)
         }
     }
 
+    /// The segments of one server session. Sessions overlap during a
+    /// handover and while a catch-up session replays held speech.
+    private struct StreamState {
+        var isCatchUp: Bool
+        /// The segment receiving spoken words. Nil after an endpoint until
+        /// someone speaks again.
+        var open: Segment?
+        /// The last closed segment. Its translation can still be arriving.
+        var previous: Segment?
+    }
+
     private var nextSegmentID = 0
-    /// The segment receiving spoken words. Nil after an endpoint until
-    /// someone speaks again.
-    private var open: Segment?
-    /// The last closed segment. Its translation can still be arriving.
-    private var previous: Segment?
+    private var streams: [Int: StreamState] = [:]
     /// Temporary keys rejected in a row. A temporary key that has expired is
     /// rejected like a bad one, so a few rejections just mean "get a new key".
     private var rejectedTemporaryKeys = 0
@@ -80,13 +87,15 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     func stop() {
         if case .broker(let provider) = config.credential { provider.stopRefreshing() }
         socket.stop()
-        closeOpenSegment()
-        previous = nil
+        for id in streams.keys { closeOpenSegment(in: id) }
+        streams.removeAll()
     }
 
     func endTurn() {
-        closeOpenSegment()
+        for (id, state) in streams where !state.isCatchUp { closeOpenSegment(in: id) }
     }
+
+    func networkPathChanged() { socket.networkPathChanged() }
 
     // MARK: - SocketDialect
 
@@ -140,6 +149,14 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     /// Soniox only replies when it has tokens, so there's no session ack.
     var readyWhenOpen: Bool { true }
     var rejectedKeyMessage: String { "Your Soniox API key was rejected. Check it in Settings." }
+    /// Soniox replies about every 0.12 s while audio flows, and within 1.1 s
+    /// at worst (Tools/probe/ASIA_LATENCY.md §2).
+    var stallTimeout: Duration? { .milliseconds(2500) }
+    var supportsSideStreams: Bool { true }
+
+    func isMidUtterance(on stream: SocketStream) -> Bool {
+        streams[stream.id]?.open != nil
+    }
 
     /// Soniox rejects expired and reused temporary keys with 401, so a
     /// rejected broker key means fetching a new one and reconnecting.
@@ -152,14 +169,19 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         return .retry("Temporary key rejected")
     }
 
-    func sessionDidReset() {
+    func sessionDidReset(_ stream: SocketStream) {
         // A new session starts a new segment; late tokens from the old one won't come.
-        closeOpenSegment()
-        previous = nil
+        closeOpenSegment(in: stream.id)
+        streams[stream.id] = nil
         onEvent(.sessionReset)
     }
 
-    func receive(_ message: URLSessionWebSocketTask.Message) -> SocketSignal {
+    func sideStreamDidEnd(_ stream: SocketStream) {
+        closeOpenSegment(in: stream.id)
+        streams[stream.id] = nil
+    }
+
+    func receive(_ message: URLSessionWebSocketTask.Message, on stream: SocketStream) -> SocketSignal {
         guard let json = message.jsonObject else { return .none }
 
         if let code = json["error_code"] as? Int {
@@ -168,7 +190,9 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
             case 401, 403: return keyRejected()
             case 402: return .fail("Your Soniox balance or budget is used up.")
             case 400: return .fail("Soniox rejected the request: \(text)")
-            // 408, 413 (session too long), 429, 5xx: start a fresh session.
+            // Too many sessions or requests: back off for longer.
+            case 429: return .retry(text, throttled: true)
+            // 408, 413 (session too long), 5xx: start a fresh session.
             default: return .retry(text)
             }
         }
@@ -176,49 +200,56 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         // The key worked.
         rejectedTemporaryKeys = 0
 
+        var endedUtterance = false
         if let tokens = json["tokens"] as? [[String: Any]], !tokens.isEmpty {
-            apply(tokens)
+            var state = streams[stream.id] ?? StreamState(isCatchUp: stream.isCatchUp)
+            endedUtterance = apply(tokens, to: &state)
+            streams[stream.id] = state
         }
 
         // The server closes after `finished`; we only stop on purpose, so reconnect.
         if json["finished"] as? Bool == true { return .retry("Session finished") }
-        return .none
+        return endedUtterance ? .boundary : .none
     }
 
     // MARK: - Tokens
 
     /// Final tokens are sent once and kept. Non-final tokens are a guess at
     /// what follows and are replaced by every response, so they're shown but
-    /// never stored.
-    private func apply(_ tokens: [[String: Any]]) {
+    /// never stored. Returns true when an utterance ended.
+    private func apply(_ tokens: [[String: Any]], to state: inout StreamState) -> Bool {
         var touched = Set<Int>()
+        var endedUtterance = false
 
         for token in tokens where token["is_final"] as? Bool == true {
             guard let text = token["text"] as? String else { continue }
             if text == "<end>" || text == "<fin>" {
-                guard let id = open?.id else { continue }
+                guard let id = state.open?.id else { continue }
                 // Report the segment this one replaces as `previous` before it's dropped.
-                if let older = previous, touched.remove(older.id) != nil { onEvent(.segment(older.event)) }
+                if let older = state.previous, touched.remove(older.id) != nil {
+                    onEvent(.segment(older.event(isCatchUp: state.isCatchUp)))
+                }
                 touched.insert(id)
-                closeOpenSegment(notify: false)
+                closeOpenSegment(&state, notify: false)
+                endedUtterance = true
                 continue
             }
             if token["translation_status"] as? String == "translation" {
                 let source = (token["source_language"] as? String).flatMap(Language.init(rawValue:))
-                if translationTargetIsOpen(sourceLanguage: source, extraText: "") {
-                    open?.translation += text
-                    if let id = open?.id { touched.insert(id) }
-                } else if previous != nil {
-                    previous?.translation += text
-                    if let id = previous?.id { touched.insert(id) }
+                if Self.translationTargetIsOpen(state, sourceLanguage: source, extraText: "") {
+                    state.open?.translation += text
+                    if let id = state.open?.id { touched.insert(id) }
+                } else if state.previous != nil {
+                    state.previous?.translation += text
+                    if let id = state.previous?.id { touched.insert(id) }
                 }
             } else {
-                openSegmentIfNeeded()
-                open?.source += text
+                openSegmentIfNeeded(&state)
+                state.open?.source += text
                 if let language = (token["language"] as? String).flatMap(Language.init(rawValue:)) {
-                    open?.language = language
+                    state.open?.language = language
                 }
-                if let id = open?.id { touched.insert(id) }
+                if let id = state.open?.id { touched.insert(id) }
             }
         }
 
@@ -231,7 +262,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
             guard let text = token["text"] as? String, text != "<end>", text != "<fin>" else { continue }
             if token["translation_status"] as? String == "translation" {
                 let source = (token["source_language"] as? String).flatMap(Language.init(rawValue:))
-                if translationTargetIsOpen(sourceLanguage: source, extraText: pendingSource) {
+                if Self.translationTargetIsOpen(state, sourceLanguage: source, extraText: pendingSource) {
                     pendingOpenTranslation += text
                 } else {
                     pendingPreviousTranslation += text
@@ -243,43 +274,50 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
                 }
             }
         }
-        if !pendingSource.isEmpty { openSegmentIfNeeded() }
-        if !pendingSource.isEmpty || !pendingOpenTranslation.isEmpty, let id = open?.id { touched.insert(id) }
-        if !pendingPreviousTranslation.isEmpty, let id = previous?.id { touched.insert(id) }
+        if !pendingSource.isEmpty { openSegmentIfNeeded(&state) }
+        if !pendingSource.isEmpty || !pendingOpenTranslation.isEmpty, let id = state.open?.id { touched.insert(id) }
+        if !pendingPreviousTranslation.isEmpty, let id = state.previous?.id { touched.insert(id) }
 
-        if var segment = previous, touched.contains(segment.id) {
+        if var segment = state.previous, touched.contains(segment.id) {
             segment.translation += pendingPreviousTranslation
-            onEvent(.segment(segment.event))
+            onEvent(.segment(segment.event(isCatchUp: state.isCatchUp)))
         }
-        if var segment = open, touched.contains(segment.id) {
+        if var segment = state.open, touched.contains(segment.id) {
             segment.source += pendingSource
             segment.translation += pendingOpenTranslation
             segment.language = segment.language ?? pendingLanguage
-            onEvent(.segment(segment.event))
+            onEvent(.segment(segment.event(isCatchUp: state.isCatchUp)))
         }
+        return endedUtterance
     }
 
     /// Translation follows the words it translates, so it belongs to the open
     /// segment once that has words in the translation's source language, and
     /// to the previous one until then.
-    private func translationTargetIsOpen(sourceLanguage: Language?, extraText: String) -> Bool {
-        guard let open, !(open.source + extraText).isEmpty else { return false }
+    private static func translationTargetIsOpen(_ state: StreamState, sourceLanguage: Language?, extraText: String) -> Bool {
+        guard let open = state.open, !(open.source + extraText).isEmpty else { return false }
         guard let sourceLanguage, let language = open.language else { return true }
-        return sourceLanguage == language || previous == nil
+        return sourceLanguage == language || state.previous == nil
     }
 
-    private func openSegmentIfNeeded() {
-        guard open == nil else { return }
-        open = Segment(id: nextSegmentID)
+    private func openSegmentIfNeeded(_ state: inout StreamState) {
+        guard state.open == nil else { return }
+        state.open = Segment(id: nextSegmentID)
         nextSegmentID += 1
     }
 
-    private func closeOpenSegment(notify: Bool = true) {
-        guard var segment = open else { return }
+    private func closeOpenSegment(in stream: Int) {
+        guard var state = streams[stream] else { return }
+        closeOpenSegment(&state)
+        streams[stream] = state
+    }
+
+    private func closeOpenSegment(_ state: inout StreamState, notify: Bool = true) {
+        guard var segment = state.open else { return }
         segment.isClosed = true
-        open = nil
-        previous = segment
-        if notify { onEvent(.segment(segment.event)) }
+        state.open = nil
+        state.previous = segment
+        if notify { onEvent(.segment(segment.event(isCatchUp: state.isCatchUp))) }
     }
 }
 

@@ -20,11 +20,15 @@ protocol SpeechEngine: AnyObject {
     func send(_ chunk: Data)
     /// The store ended the current turn on its own after a silence.
     func endTurn()
+    /// The device moved to a different network interface, such as from
+    /// Wi-Fi to cellular, while staying online.
+    func networkPathChanged()
 }
 
 extension SpeechEngine {
     var textLag: Duration { .zero }
     func endTurn() {}
+    func networkPathChanged() {}
 }
 
 enum SpeechEvent {
@@ -48,6 +52,9 @@ struct SpeechSegment {
     var translation: String
     var language: Language?
     var isClosed: Bool
+    /// Speech held during a dropout and transcribed late, on its own session,
+    /// while live speech carried on.
+    var isCatchUp = false
 }
 
 enum SpeechEngineStatus: Equatable {

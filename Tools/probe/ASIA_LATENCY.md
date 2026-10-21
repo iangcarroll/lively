@@ -158,3 +158,31 @@ Deploy the broker on a custom domain (a Cloudflare route on a domain you own), n
 - `soniox_probe.py` is unchanged; I ran it as `python soniox_probe.py 1000`.
 - The regional key checks, connect/TTFT loop and burst-replay test were one-off scratch scripts, not committed. Each one opens `wss://stt-rt[.<region>].soniox.com/transcribe-websocket` with the same config as `soniox_probe.py`. The burst test sends the first N seconds at once, then real time.
 - HTTPS timings came from `curl -w '%{time_connect} %{time_appconnect} %{time_starttransfer}'` against each host's `/`.
+
+## 7. §6.3 implemented (2026-10-20)
+
+Implemented: 6.3.1 (stall watchdog), 6.3.2 (catch-up socket), 6.3.3 (make-before-break), 6.3.4 (300 s keys) and the 429 backoff from 6.3.6. Pre-connect (6.3.5) is not done.
+
+- **Stall watchdog.** `ResilientSocket` reconnects when audio has gone out and nothing has come back for `SocketDialect.stallTimeout` (2.5 s for Soniox, off for Voxtral). The handshake timeout is now 5 s.
+- **Backlog.** On reconnect, an energy gate trims silence out of the backlog (`ResilientSocket.trimSilence`). It keeps 240 ms of padding and pauses up to 800 ms. More than 3 s of remaining speech goes to a separate catch-up session, which replays it, ends, and is dropped after 30 s. Live audio goes straight to the fresh session. Catch-up utterances are inserted where the dropout began and labelled "Caught up after a dropout". Engines without side streams (Voxtral) replay at most the last 5 s.
+- **Make-before-break.** `ConversationStore` reports a change of the network interface type. The socket then opens a standby session and moves audio to it at the next `<end>`, or after 8 s, or at once if no utterance is open. The old session gets `""` and 10 s to finish. If the old socket dies first, the standby takes over immediately.
+- **Keys.** The broker mints 300 s keys (`KEY_TTL_SECONDS`), still single-use. The app replaces its spare at 80% of the key's life (240 s). `KEY_CHARGE_SECONDS` is 120. See the broker README.
+- **429.** Soniox `429` (including `max_concurrent_connections_reached`) and HTTP 429 at the handshake back off from 5 s up to 30 s, instead of 0.3 s up to 6 s. A catch-up or standby session that hits any error is dropped, never retried.
+
+**Dropout probe** (`python dropout_probe.py 11.5 9`, **measured**, LA). The connection is cut 11.5 s into the conversation for 9 s. The table shows final translation time minus end of speech for the live turns after recovery:
+
+| Strategy | Mean | Worst | Turns lost |
+|---|---|---|---|
+| no dropout | +0.28 s | +0.36 s | — |
+| replay all (old) | +5.58 s | +6.41 s | 0 |
+| **catch-up socket (new)** | **+0.26 s** | **+0.60 s** | 0 |
+| trim + cap 5 s | +1.44 s | +2.33 s | 1 |
+
+The held turns themselves arrived +6–8 s late with both replay and catch-up. That is expected: they could not be sent sooner.
+
+**In the app** (Debug builds only, iPhone 18 Pro simulator):
+- `-LivelyAudioFile PATH` feeds a WAV in place of the mic, with no sound.
+- `-LivelyDropout "12,9"` blackholes the sockets for 9 s, starting 12 s in.
+- `-LivelyPathChange 34` reports an interface change at 34 s.
+
+Watch the result with `xcrun simctl spawn booted log stream --level debug --predicate 'subsystem == "aero.seats.lively"'`. With all three: the stall was detected 2.8 s into the dropout. 8.3 s of held speech went to a catch-up session that finished in 5.8 s. The path change handed over to a new session 2 s later, and the old one drained in 0.1 s.

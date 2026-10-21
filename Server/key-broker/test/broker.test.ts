@@ -54,7 +54,7 @@ describe("POST /v1/soniox/key", () => {
     expect(body.api_key).toMatch(/^temp:/);
     expect(body.expires_at).toBe("2026-10-20T12:01:30Z");
     expect(body.max_session_seconds).toBe(7200);
-    expect(body.expires_in_seconds).toBe(60);
+    expect(body.expires_in_seconds).toBe(300);
 
     expect(soniox).toHaveBeenCalledOnce();
     const [url, init] = soniox.mock.calls[0] as [string, RequestInit];
@@ -62,7 +62,7 @@ describe("POST /v1/soniox/key", () => {
     expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-master-key");
     expect(JSON.parse(init.body as string)).toEqual({
       usage_type: "transcribe_websocket",
-      expires_in_seconds: 60,
+      expires_in_seconds: 300,
       single_use: true,
       max_session_duration_seconds: 7200,
       client_reference_id: await hash(`install:${installID}`),
@@ -199,14 +199,14 @@ describe("rate limits", () => {
 
   it("charges listening time per day and caps the session to what's left", async () => {
     const id = crypto.randomUUID();
-    const local = withEnv({ PER_INSTALL_MINUTES_PER_DAY: "2", PER_INSTALL_KEYS_PER_MINUTE: "100" });
+    const local = withEnv({ PER_INSTALL_MINUTES_PER_DAY: "4", PER_INSTALL_KEYS_PER_MINUTE: "100" });
 
     const first = await issueSonioxKey(keyRequest(id), local, NOW);
-    expect((await first.json<{ max_session_seconds: number }>()).max_session_seconds).toBe(120);
+    expect((await first.json<{ max_session_seconds: number }>()).max_session_seconds).toBe(240);
     const second = await issueSonioxKey(keyRequest(id), local, NOW);
-    expect((await second.json<{ max_session_seconds: number }>()).max_session_seconds).toBe(70);
+    expect((await second.json<{ max_session_seconds: number }>()).max_session_seconds).toBe(120);
     const lastBody = JSON.parse((soniox.mock.calls[1] as [string, RequestInit])[1].body as string);
-    expect(lastBody.max_session_duration_seconds).toBe(70);
+    expect(lastBody.max_session_duration_seconds).toBe(120);
 
     const third = await issueSonioxKey(keyRequest(id), local, NOW);
     expect(third.status).toBe(429);
@@ -246,14 +246,14 @@ describe("rate limits", () => {
 
   it("refunds a rejected request so it doesn't use up other budgets", async () => {
     const id = crypto.randomUUID();
-    const local = withEnv({ PER_INSTALL_KEYS_PER_MINUTE: "1", PER_INSTALL_MINUTES_PER_DAY: "2" });
+    const local = withEnv({ PER_INSTALL_KEYS_PER_MINUTE: "1", PER_INSTALL_MINUTES_PER_DAY: "4" });
     expect((await issueSonioxKey(keyRequest(id), local, NOW)).status).toBe(200);
     for (let i = 0; i < 5; i++) {
       expect((await issueSonioxKey(keyRequest(id), local, NOW)).status).toBe(429);
     }
-    // 50 s of the 120 s budget was used; the five rejections cost nothing.
+    // 120 s of the 240 s budget was used; the five rejections cost nothing.
     const next = await issueSonioxKey(keyRequest(id), local, NOW + 60_000);
-    expect((await next.json<{ max_session_seconds: number }>()).max_session_seconds).toBe(70);
+    expect((await next.json<{ max_session_seconds: number }>()).max_session_seconds).toBe(120);
   });
 });
 

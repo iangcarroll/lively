@@ -44,6 +44,12 @@ final class ConversationStore {
     private var transcriberStatus: SpeechEngineStatus = .idle
     /// Utterances of recent segments from a translating engine, by segment id.
     private var segmentUtterances: [Int: Utterance] = [:]
+    /// Utterances of segments from a catch-up session, by segment id.
+    private var catchUpUtterances: [Int: Utterance] = [:]
+    /// Where speech from the last dropout belongs in `utterances`.
+    private var dropoutIndex: Int?
+    /// The interface the network path last used, to spot handoffs.
+    private var interface: NWInterface.InterfaceType?
     private var demo: DemoConversation?
     private var audioPump: Task<Void, Never>?
 
@@ -74,8 +80,9 @@ final class ConversationStore {
 
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
+            let interface = path.availableInterfaces.first?.type
             Task { @MainActor in
-                self?.setOnline(online)
+                self?.setPath(online: online, interface: interface)
                 // A new interface or route can change which region is closest.
                 if online { self?.regionProber?.probe(minimumInterval: 5) }
             }
@@ -169,6 +176,8 @@ final class ConversationStore {
         debounces.removeAll()
         current = nil
         segmentUtterances.removeAll()
+        catchUpUtterances.removeAll()
+        dropoutIndex = nil
         utterances.removeAll()
     }
 
@@ -225,12 +234,17 @@ final class ConversationStore {
 
         case .sessionReset:
             finalizeCurrent()
+            dropoutIndex = utterances.count
         }
     }
 
     /// Shows a segment from an engine that translates by itself. Its
     /// translation fills `Utterance.translation` directly.
     private func apply(_ segment: SpeechSegment) {
+        if segment.isCatchUp {
+            applyCatchUp(segment)
+            return
+        }
         let utterance: Utterance
         if let existing = segmentUtterances[segment.id] {
             utterance = existing
@@ -241,7 +255,10 @@ final class ConversationStore {
             for older in segmentUtterances.values where older.translationState == .working {
                 older.translationState = .current
             }
-            segmentUtterances = segmentUtterances.filter { $0.key >= segment.id - 1 }
+            // Keep the last one: its translation can still arrive. Catch-up
+            // segments share the id sequence, so ids can skip.
+            let last = segmentUtterances.keys.max()
+            segmentUtterances = segmentUtterances.filter { $0.key == last }
             utterance = Utterance()
             utterances.append(utterance)
             segmentUtterances[segment.id] = utterance
@@ -259,6 +276,35 @@ final class ConversationStore {
             current = utterance
             armSilenceFallback()
         }
+    }
+
+    /// Shows a segment of speech from a dropout where the dropout happened,
+    /// ahead of whatever was said since.
+    private func applyCatchUp(_ segment: SpeechSegment) {
+        let utterance: Utterance
+        if let existing = catchUpUtterances[segment.id] {
+            utterance = existing
+        } else {
+            guard !segment.source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            for older in catchUpUtterances.values where older.translationState == .working {
+                older.translationState = .current
+            }
+            let last = catchUpUtterances.keys.max()
+            catchUpUtterances = catchUpUtterances.filter { $0.key == last }
+            utterance = Utterance()
+            utterance.isLate = true
+            let index = min(dropoutIndex ?? utterances.count, utterances.count)
+            utterances.insert(utterance, at: index)
+            dropoutIndex = index + 1
+            catchUpUtterances[segment.id] = utterance
+        }
+
+        let script = settings.chineseScript
+        utterance.setSource(script.convert(segment.source.trimmingLeadingWhitespace()), language: segment.language)
+        utterance.translation = script.convert(segment.translation.trimmingCharacters(in: .whitespacesAndNewlines))
+        utterance.translatedSource = utterance.trimmedSource
+        utterance.translationState = segment.isClosed && !utterance.translation.isEmpty ? .current : .working
+        utterance.isFinal = segment.isClosed
     }
 
     /// Ends the turn if no text and no turn events have arrived for a while,
@@ -359,7 +405,10 @@ final class ConversationStore {
 
     // MARK: - Status
 
-    private func setOnline(_ online: Bool) {
+    private func setPath(online: Bool, interface: NWInterface.InterfaceType?) {
+        let handoff = online && isOnline && interface != self.interface && self.interface != nil && interface != nil
+        if online { self.interface = interface }
+        if handoff { engine?.networkPathChanged() }
         guard online != isOnline else { return }
         isOnline = online
         engine?.networkAvailable = online

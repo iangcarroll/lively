@@ -3,8 +3,9 @@ import Foundation
 /// Gets short-lived, single-use Soniox keys from Lively's key broker
 /// (`Server/key-broker`), so the app never holds a long-lived key.
 ///
-/// One spare key is kept ready and replaced about every 50 s while
-/// listening, so a reconnect on a flaky network never waits on the broker.
+/// One spare key is kept ready while listening, so a reconnect on a flaky
+/// network never waits on the broker. Keys live 5 min and the spare is
+/// replaced after 4, so it outlasts minutes of broker trouble.
 /// The broker identifies this install by a random ID kept in the Keychain and
 /// rate-limits by it.
 ///
@@ -39,9 +40,14 @@ final class SonioxKeyProvider {
 
         /// Soniox needs the key only to open the socket, so a few seconds is enough.
         var isFresh: Bool { expiresAt.timeIntervalSinceNow > 5 }
+
+        /// Four fifths of the way through its life: 240 s for a 300 s key,
+        /// leaving a minute for a broker hiccup to clear.
+        var refreshAt: Date {
+            fetchedAt.addingTimeInterval(expiresAt.timeIntervalSince(fetchedAt) * 0.8)
+        }
     }
 
-    private static let refreshInterval: TimeInterval = 50
     /// For a broker that doesn't send `websocket_url` yet.
     private static let usWebsocketURL = URL(string: "wss://stt-rt.soniox.com/transcribe-websocket")!
 
@@ -74,7 +80,7 @@ final class SonioxKeyProvider {
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                let due = self.spare.map { $0.fetchedAt.addingTimeInterval(Self.refreshInterval) } ?? .now
+                let due = self.spare?.refreshAt ?? .now
                 if due > .now {
                     try? await Task.sleep(for: .seconds(due.timeIntervalSinceNow))
                     continue
