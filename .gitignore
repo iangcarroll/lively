@@ -5,3 +5,6 @@ DerivedData/
 build/
 .build/
 *.xcscmblueprint
+Tools/probe/out/
+Tools/probe/.env.local
+__pycache__/
