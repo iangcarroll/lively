@@ -63,7 +63,7 @@ describe("email sign-in", () => {
     expect(send).toHaveBeenCalledOnce();
     const message = send.mock.calls[0][0] as EmailMessageBuilder;
     expect(message.to).toBe(email);
-    expect(message.from).toEqual({ email: "login@ian.sh", name: "Lively" });
+    expect(message.from).toEqual({ email: "login@x.ian.sh", name: "Lively" });
     const code = sentCode();
     expect(message.text).toContain(code);
 

@@ -44,7 +44,7 @@
     // Comma-separated hashed install IDs. The D1 `denylist` table works too.
     "DENYLIST": "",
     // Email sign-in.
-    "EMAIL_FROM": "login@ian.sh",
+    "EMAIL_FROM": "login@x.ian.sh",
     "CODE_TTL_SECONDS": "600",
     "CODE_MAX_ATTEMPTS": "5",
     "CODES_PER_EMAIL_PER_HOUR": "5",

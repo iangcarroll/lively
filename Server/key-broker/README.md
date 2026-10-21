@@ -122,7 +122,7 @@ POST /v1/auth/logout        Authorization: Bearer <token>   → {"ok": true}
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `EMAIL_FROM` | `login@ian.sh` | sender address |
+| `EMAIL_FROM` | `login@x.ian.sh` | sender address |
 | `CODE_TTL_SECONDS` | 600 | how long a code works |
 | `CODE_MAX_ATTEMPTS` | 5 | guesses per code |
 | `CODES_PER_EMAIL_PER_HOUR` | 5 | codes sent to one address per hour |
@@ -139,7 +139,7 @@ so a copy of the database can't sign anyone in.
 Mail goes out through [Cloudflare Email
 Service](https://developers.cloudflare.com/email-service/) via the
 `send_email` binding `EMAIL`. Sending to any address needs the Workers Paid
-plan, and `EMAIL_FROM`'s domain must be onboarded under Email Service ›
+plan, and `EMAIL_FROM`'s domain (`x.ian.sh`) must be onboarded under Email Service ›
 Sending in the dashboard, which adds its SPF and DKIM records. `wrangler dev`
 doesn't send: it logs each message and saves its text under `.wrangler/tmp/email/`.
 
