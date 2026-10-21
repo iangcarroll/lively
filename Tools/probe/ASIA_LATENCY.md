@@ -185,4 +185,4 @@ The held turns themselves arrived +6–8 s late with both replay and catch-up. T
 - `-LivelyDropout "12,9"` blackholes the sockets for 9 s, starting 12 s in.
 - `-LivelyPathChange 34` reports an interface change at 34 s.
 
-Watch the result with `xcrun simctl spawn booted log stream --level debug --predicate 'subsystem == "aero.seats.lively"'`. With all three: the stall was detected 2.8 s into the dropout. 8.3 s of held speech went to a catch-up session that finished in 5.8 s. The path change handed over to a new session 2 s later, and the old one drained in 0.1 s.
+Watch the result with `xcrun simctl spawn booted log stream --level debug --predicate 'subsystem == "sh.ian.lively"'`. With all three: the stall was detected 2.8 s into the dropout. 8.3 s of held speech went to a catch-up session that finished in 5.8 s. The path change handed over to a new session 2 s later, and the old one drained in 0.1 s.

@@ -187,6 +187,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lively;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = "Config/Lively-Info.plist";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Lively listens to your conversation so it can transcribe and translate it live.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -200,7 +201,7 @@
 				);
 				LIVELY_KEY_BROKER_URL = "https://lively.ian.sh";
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = aero.seats.lively;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.ian.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -228,6 +229,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lively;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = "Config/Lively-Info.plist";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Lively listens to your conversation so it can transcribe and translate it live.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -241,7 +243,7 @@
 				);
 				LIVELY_KEY_BROKER_URL = "https://lively.ian.sh";
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = aero.seats.lively;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.ian.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
