@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyLists/1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged into the generated Info.plist. Set LIVELY_KEY_BROKER_URL in the build settings. -->
+	<key>LivelyKeyBrokerURL</key>
+	<string>$(LIVELY_KEY_BROKER_URL)</string>
+</dict>
+</plist>

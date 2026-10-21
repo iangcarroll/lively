@@ -39,6 +39,8 @@ struct ProviderCredential: Identifiable, Hashable {
     let id: String
     let name: String
     let help: String
+    /// Settings may leave it empty, because the app can get keys another way.
+    var isOptional = false
 }
 
 enum ProviderOption: Hashable {

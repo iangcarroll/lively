@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lively-key-broker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  // Deletes expired rate-limit counters.
+  "triggers": { "crons": ["17 * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lively-key-broker",
+      // Replace with the ID `wrangler d1 create lively-key-broker` prints.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Limits. Every key is charged KEY_CHARGE_SECONDS of listening, because the
+  // app fetches a fresh spare key about every 50 s while it listens.
+  "vars": {
+    "KEY_TTL_SECONDS": "60",
+    "MAX_SESSION_SECONDS": "7200",
+    "KEY_CHARGE_SECONDS": "50",
+    "PER_INSTALL_KEYS_PER_MINUTE": "6",
+    "PER_INSTALL_MINUTES_PER_DAY": "240",
+    "PER_IP_KEYS_PER_MINUTE": "30",
+    "PER_IP_MINUTES_PER_DAY": "1440",
+    "GLOBAL_KEYS_PER_DAY": "100000",
+    // Comma-separated hashed install IDs. The D1 `denylist` table works too.
+    "DENYLIST": ""
+  }
+}

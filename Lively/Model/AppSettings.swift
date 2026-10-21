@@ -44,7 +44,7 @@ final class AppSettings {
 
     /// The chosen provider has every key it needs.
     var hasCredentials: Bool {
-        provider.credentials.allSatisfy { !credential($0).trimmingCharacters(in: .whitespaces).isEmpty }
+        provider.credentials.allSatisfy { $0.isOptional || !credential($0).trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
     private init() {

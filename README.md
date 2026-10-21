@@ -7,11 +7,13 @@ and the turn boundaries, and each turn is translated as it's spoken.
 
 ## Engines
 
-Pick one in Settings › Engine. Each has its own API key, stored in the Keychain.
+Pick one in Settings › Engine. Soniox gets temporary keys from Lively's key
+broker, so it needs no setup. Voxtral needs your own Mistral key. Keys entered in
+Settings are stored in the Keychain.
 
 | Engine | How it works | Key |
 |---|---|---|
-| **Soniox** (default) | `stt-rt-v5` transcribes and translates both ways (`two_way`, en ⇄ zh) in one stream, so there's no second request per turn | console.soniox.com |
+| **Soniox** (default) | `stt-rt-v5` transcribes and translates both ways (`two_way`, en ⇄ zh) in one stream, so there's no second request per turn | from the [key broker](#soniox-keys), or your own from console.soniox.com |
 | **Voxtral + Mistral** | `voxtral-mini-transcribe-realtime-3` transcribes and detects turns, then a Mistral chat model translates each turn | console.mistral.ai |
 
 Soniox is the default because it won the [benchmark](Tools/probe/RESULTS.md).
@@ -22,7 +24,12 @@ converts its output on the device.
 ## Run
 
 Open `Lively.xcodeproj` and run the **Lively** scheme on an iPhone, iPad
-simulator, or **My Mac**. Choose an engine and add its API key in Settings.
+simulator, or **My Mac**.
+
+Debug builds get Soniox keys from a broker at `http://localhost:8787`. Start it
+with `cd Server/key-broker && npm install && npm run dev` (see its
+[README](Server/key-broker/README.md)), or enter your own Soniox key in
+Settings. For Voxtral, add a Mistral key in Settings.
 
 To try the UI without a key, add the launch argument `-LivelyDemo YES` and tap the
 mic. It plays a scripted conversation through the real turn and translation logic.
@@ -38,6 +45,8 @@ mic. It plays a scripted conversation through the real turn and translation logi
 | Voxtral: WebSocket to `voxtral-mini-transcribe-realtime-3`, language auto-detected, turn detection on | `Networking/RealtimeTranscriber.swift` |
 | Voxtral: streaming translation over Mistral chat completions | `Networking/Translator.swift` |
 | Soniox: WebSocket to `stt-rt-v5` with two-way translation and endpoint detection | `Networking/SonioxTranscriber.swift` |
+| Soniox: temporary keys from the broker, with one spare kept ready | `Networking/SonioxKeyProvider.swift` |
+| Key broker: Cloudflare Worker that mints temporary Soniox keys | `Server/key-broker/` |
 | Turns, utterances, translation scheduling | `Model/ConversationStore.swift` |
 
 Engines report events in one of two ways:
@@ -62,16 +71,35 @@ Either way, a turn that goes 3 s without any events is closed.
 
 Settings, Keychain storage and the conversation pipeline pick it up from there.
 
-### Soniox API keys on devices
+### Soniox keys
 
-The app stores a long-lived Soniox key on the device, the same as the Mistral key.
-For a shipped app, Soniox supports temporary keys: a backend holding the real
-key calls `POST https://api.soniox.com/v1/auth/temporary-api-key` with
-`usage_type: "transcribe_websocket"` and `expires_in_seconds` (1–3600), plus
-optional `single_use` and `max_session_duration_seconds`, and hands the result to
-the app. When a temporary key expires mid-session, Soniox returns 403. Lively has
-no backend, so this isn't wired up. Adding it means fetching a key in
-`SonioxTranscriber.makeRequest()` before each connection.
+The app never ships a long-lived Soniox key. It gets one from Lively's key
+broker, a Cloudflare Worker in `Server/key-broker/`:
+
+1. On first launch the app makes a random install ID and keeps it in the
+   Keychain.
+2. `SonioxKeyProvider` posts it to the broker's `/v1/soniox/key`. The broker
+   checks its rate limits and denylist, then calls Soniox's
+   `POST /v1/auth/temporary-api-key` with the real key and returns a
+   single-use key that expires in 60 s.
+3. `SonioxTranscriber.makeRequest()` takes a key for each connection and
+   opens the WebSocket to Soniox directly. Audio never goes through the broker.
+4. While listening, the provider keeps one spare key and replaces it about
+   every 50 s, so a reconnect on a flaky network doesn't wait on the broker.
+   Taking the spare starts fetching the next one.
+5. Soniox rejects an expired or reused temporary key with `error_code` 401 in
+   its first message. The transcriber then reconnects with a fresh key. After 3
+   rejections in a row it gives up and says so, instead of blaming a key in
+   Settings.
+
+The broker URL comes from the `LIVELY_KEY_BROKER_URL` build setting, through
+the `LivelyKeyBrokerURL` key in `Config/Lively-Info.plist`. It's
+`http://localhost:8787` for Debug and empty for Release until the Worker is
+deployed. With no URL, Soniox needs a key in Settings. A key entered in Settings
+always overrides the broker, for development.
+
+Mistral has no temporary keys, so Voxtral is a developer option and always needs
+a key in Settings.
 
 To keep latency low:
 
@@ -91,7 +119,10 @@ On a bad network (all engines, via `ResilientSocket`):
 - Reconnects use jittered backoff, and a ping every 4 s detects dead sockets.
 - `NWPathMonitor` triggers an immediate retry when the network comes back.
 - Mistral translations wait for the network, then retry with backoff.
-- A rejected key stops listening and says which provider's key to fix.
+- A rejected key stops listening and says which provider's key to fix. A
+  rejected temporary Soniox key just gets replaced.
+- Broker hiccups are retried with the same backoff. Daily limits and denials
+  stop listening with the broker's message.
 
 ## Layouts
 

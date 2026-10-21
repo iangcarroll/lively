@@ -187,6 +187,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lively;
+				INFOPLIST_FILE = "Config/Lively-Info.plist";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Lively listens to your conversation so it can transcribe and translate it live.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -197,6 +198,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIVELY_KEY_BROKER_URL = "http://localhost:8787";
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = aero.seats.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -226,6 +228,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lively;
+				INFOPLIST_FILE = "Config/Lively-Info.plist";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Lively listens to your conversation so it can transcribe and translate it live.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -236,6 +239,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIVELY_KEY_BROKER_URL = "";
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = aero.seats.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";

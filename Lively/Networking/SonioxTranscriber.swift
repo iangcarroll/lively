@@ -7,8 +7,15 @@ import Foundation
 /// Protocol: https://soniox.com/docs/stt/rt/real-time-translation and
 /// https://soniox.com/docs/stt/api-reference/websocket-api
 final class SonioxTranscriber: SpeechEngine, SocketDialect {
+    enum Credential {
+        /// A long-lived key entered in Settings, for development.
+        case apiKey(String)
+        /// Temporary keys from Lively's key broker.
+        case broker(SonioxKeyProvider)
+    }
+
     struct Configuration {
-        var apiKey: String
+        var credential: Credential
         var model = "stt-rt-v5"
         var languageA: Language = .english
         var languageB: Language = .chinese
@@ -50,15 +57,24 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     private var open: Segment?
     /// The last closed segment. Its translation can still be arriving.
     private var previous: Segment?
+    /// Temporary keys rejected in a row. A temporary key that has expired is
+    /// rejected like a bad one, so a few rejections just mean "get a new key".
+    private var rejectedTemporaryKeys = 0
 
     init(_ configuration: Configuration) {
         config = configuration
     }
 
-    func start() { socket.start() }
+    func start() {
+        rejectedTemporaryKeys = 0
+        if case .broker(let provider) = config.credential { provider.startRefreshing() }
+        socket.start()
+    }
+
     func send(_ chunk: Data) { socket.send(chunk) }
 
     func stop() {
+        if case .broker(let provider) = config.credential { provider.stopRefreshing() }
         socket.stop()
         closeOpenSegment()
         previous = nil
@@ -70,9 +86,13 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
 
     // MARK: - SocketDialect
 
-    func makeRequest() -> URLRequest {
+    func makeRequest() async throws -> URLRequest {
+        let key = switch config.credential {
+        case .apiKey(let key): key
+        case .broker(let provider): try await provider.takeKey()
+        }
         var request = URLRequest(url: Self.endpoint)
-        request.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         return request
     }
 
@@ -102,6 +122,17 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     var readyWhenOpen: Bool { true }
     var rejectedKeyMessage: String { "Your Soniox API key was rejected. Check it in Settings." }
 
+    /// Soniox rejects expired and reused temporary keys with 401, so a
+    /// rejected broker key means fetching a new one and reconnecting.
+    func keyRejected() -> SocketSignal {
+        guard case .broker = config.credential else { return .fail(rejectedKeyMessage) }
+        rejectedTemporaryKeys += 1
+        guard rejectedTemporaryKeys < 3 else {
+            return .fail("Soniox is rejecting Lively's temporary keys. Try again in a few minutes.")
+        }
+        return .retry("Temporary key rejected")
+    }
+
     func sessionDidReset() {
         // A new session starts a new segment; late tokens from the old one won't come.
         closeOpenSegment()
@@ -115,13 +146,16 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         if let code = json["error_code"] as? Int {
             let text = json["error_message"] as? String ?? "Soniox error \(code)"
             switch code {
-            case 401, 403: return .fail(rejectedKeyMessage)
+            case 401, 403: return keyRejected()
             case 402: return .fail("Your Soniox balance or budget is used up.")
             case 400: return .fail("Soniox rejected the request: \(text)")
             // 408, 413 (session too long), 429, 5xx: start a fresh session.
             default: return .retry(text)
             }
         }
+
+        // The key worked.
+        rejectedTemporaryKeys = 0
 
         if let tokens = json["tokens"] as? [[String: Any]], !tokens.isEmpty {
             apply(tokens)
@@ -231,11 +265,18 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
 }
 
 extension ProviderCredential {
-    static let soniox = ProviderCredential(
-        id: "soniox-api-key",
-        name: "Soniox API key",
-        help: "Create a key at console.soniox.com."
-    )
+    static let soniox = SonioxKeyProvider.shared == nil
+        ? ProviderCredential(
+            id: "soniox-api-key",
+            name: "Soniox API key",
+            help: "Create a key at console.soniox.com."
+        )
+        : ProviderCredential(
+            id: "soniox-api-key",
+            name: "Soniox API key (optional)",
+            help: "Lively gets short-lived Soniox keys from its key service. For development, a key from console.soniox.com overrides it.",
+            isOptional: true
+        )
 }
 
 extension SpeechProvider {
@@ -246,7 +287,14 @@ extension SpeechProvider {
         credentials: [.soniox],
         options: [],
         makePipeline: { settings in
-            SpeechPipeline(engine: SonioxTranscriber(.init(apiKey: settings.credential(.soniox))), translator: nil)
+            let key = settings.credential(.soniox)
+            // A key entered in Settings overrides the broker.
+            let credential: SonioxTranscriber.Credential = if key.isEmpty, let broker = SonioxKeyProvider.shared {
+                .broker(broker)
+            } else {
+                .apiKey(key)
+            }
+            return SpeechPipeline(engine: SonioxTranscriber(.init(credential: credential)), translator: nil)
         }
     )
 }

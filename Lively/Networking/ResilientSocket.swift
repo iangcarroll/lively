@@ -3,7 +3,9 @@ import Foundation
 /// The provider-specific half of a realtime speech WebSocket: how to open a
 /// session, frame audio, and read the server's messages.
 protocol SocketDialect: AnyObject {
-    func makeRequest() -> URLRequest
+    /// Called before every connection. Throw `SocketSetupError.fail` to stop;
+    /// any other error reconnects with backoff.
+    func makeRequest() async throws -> URLRequest
     /// Sent first on every new connection, before any audio.
     func openingMessages() -> [URLSessionWebSocketTask.Message]
     func audioMessage(_ chunk: Data) -> URLSessionWebSocketTask.Message
@@ -14,9 +16,21 @@ protocol SocketDialect: AnyObject {
     var readyWhenOpen: Bool { get }
     /// Shown when the server rejects the API key.
     var rejectedKeyMessage: String { get }
+    /// The server rejected the key, during the handshake or in a message.
+    /// Return `.fail` to stop, or `.retry` to reconnect with a new request.
+    func keyRejected() -> SocketSignal
     func receive(_ message: URLSessionWebSocketTask.Message) -> SocketSignal
     /// The session was torn down after it had started.
     func sessionDidReset()
+}
+
+extension SocketDialect {
+    func keyRejected() -> SocketSignal { .fail(rejectedKeyMessage) }
+}
+
+enum SocketSetupError: Error {
+    /// Permanent: stop and report.
+    case fail(String)
 }
 
 enum SocketSignal {
@@ -108,7 +122,23 @@ final class ResilientSocket {
         let gen = generation
         status = failures == 0 ? .connecting : .reconnecting
 
-        var request = dialect.makeRequest()
+        connectionTasks.append(Task { [weak self] in
+            guard let self else { return }
+            do {
+                let request = try await self.dialect.makeRequest()
+                guard gen == self.generation, !Task.isCancelled else { return }
+                self.open(request, generation: gen)
+            } catch SocketSetupError.fail(let message) {
+                guard gen == self.generation else { return }
+                self.fail(message)
+            } catch {
+                self.handleFailure(generation: gen)
+            }
+        })
+    }
+
+    private func open(_ request: URLRequest, generation gen: Int) {
+        var request = request
         request.timeoutInterval = 10
         let socket = session.webSocketTask(with: request)
         socket.maximumMessageSize = 4 * 1024 * 1024
@@ -202,8 +232,9 @@ final class ResilientSocket {
         guard gen == generation, isRunning else { return }
 
         if let response = socket?.response as? HTTPURLResponse,
-           response.statusCode == 401 || response.statusCode == 403 {
-            fail(dialect.rejectedKeyMessage)
+           response.statusCode == 401 || response.statusCode == 403,
+           case .fail(let message) = dialect.keyRejected() {
+            fail(message)
             return
         }
 
