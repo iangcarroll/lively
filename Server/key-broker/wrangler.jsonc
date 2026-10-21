@@ -9,6 +9,9 @@
   // Run near D1 and Soniox's API rather than near the caller, so a far-away
   // caller pays one long round trip instead of one per upstream call.
   "placement": { "mode": "smart" },
+  // The app uses this rather than *.workers.dev, which is often blocked in
+  // mainland China.
+  "routes": [{ "pattern": "lively.ian.sh", "custom_domain": true }],
   // Deletes expired rate-limit counters.
   "triggers": { "crons": ["17 * * * *"] },
   "d1_databases": [

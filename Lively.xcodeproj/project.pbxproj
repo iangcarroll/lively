@@ -198,7 +198,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIVELY_KEY_BROKER_URL = "https://lively-key-broker.ian-102.workers.dev";
+				LIVELY_KEY_BROKER_URL = "https://lively.ian.sh";
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = aero.seats.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -239,7 +239,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIVELY_KEY_BROKER_URL = "https://lively-key-broker.ian-102.workers.dev";
+				LIVELY_KEY_BROKER_URL = "https://lively.ian.sh";
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = aero.seats.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";

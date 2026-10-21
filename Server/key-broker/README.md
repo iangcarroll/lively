@@ -85,8 +85,8 @@ Cloudflare's bot check turns away some generic clients, such as Python's
 
 ## Deploy
 
-The broker runs at **https://lively-key-broker.ian-102.workers.dev** on the
-Cloudflare account for ian@cautela.us (account
+The broker runs at **https://lively.ian.sh**, a Workers custom domain on the
+`ian.sh` zone, on the Cloudflare account for ian@cautela.us (account
 `1020dc9a8bd7a82cd0801975a100d3ee`). The D1 database `lively-key-broker` is in
 WNAM. Smart Placement runs the Worker near D1 and Soniox's API, so a caller in
 Asia makes one long round trip instead of one per upstream call.
@@ -127,9 +127,10 @@ The app reads the URL from `LIVELY_KEY_BROKER_URL` in `Lively.xcodeproj`
 
 ### China
 
-`*.workers.dev` is often blocked or slow in mainland China. Before launching
-there, add a custom domain on a zone in this account (`routes` in
-`wrangler.jsonc`) and switch `LIVELY_KEY_BROKER_URL` to it.
+`*.workers.dev` is often blocked or slow in mainland China, so the app uses the
+custom domain (`routes` in `wrangler.jsonc`). Once a route is set, the
+`workers.dev` URL is turned off. Whether `ian.sh` is reachable from mainland
+China hasn't been tested.
 
 In the Soniox console, set a budget on the account that owns the key. It's the
 last backstop if the limits above are set too loosely.

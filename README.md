@@ -27,7 +27,7 @@ Open `Lively.xcodeproj` and run the **Lively** scheme on an iPhone, iPad
 simulator, or **My Mac**.
 
 Soniox works without any setup. Builds get temporary keys from the deployed
-broker at `https://lively-key-broker.ian-102.workers.dev` (see
+broker at `https://lively.ian.sh` (see
 [Server/key-broker](Server/key-broker/README.md)). For Voxtral, add a Mistral
 key in Settings.
 
