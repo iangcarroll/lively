@@ -26,10 +26,10 @@ converts its output on the device.
 Open `Lively.xcodeproj` and run the **Lively** scheme on an iPhone, iPad
 simulator, or **My Mac**.
 
-Debug builds get Soniox keys from a broker at `http://localhost:8787`. Start it
-with `cd Server/key-broker && npm install && npm run dev` (see its
-[README](Server/key-broker/README.md)), or enter your own Soniox key in
-Settings. For Voxtral, add a Mistral key in Settings.
+Soniox works without any setup. Builds get temporary keys from the deployed
+broker at `https://lively-key-broker.ian-102.workers.dev` (see
+[Server/key-broker](Server/key-broker/README.md)). For Voxtral, add a Mistral
+key in Settings.
 
 To try the UI without a key, add the launch argument `-LivelyDemo YES` and tap the
 mic. It plays a scripted conversation through the real turn and translation logic.
@@ -93,10 +93,11 @@ broker, a Cloudflare Worker in `Server/key-broker/`:
    Settings.
 
 The broker URL comes from the `LIVELY_KEY_BROKER_URL` build setting, through
-the `LivelyKeyBrokerURL` key in `Config/Lively-Info.plist`. It's
-`http://localhost:8787` for Debug and empty for Release until the Worker is
-deployed. With no URL, Soniox needs a key in Settings. A key entered in Settings
-always overrides the broker, for development.
+the `LivelyKeyBrokerURL` key in `Config/Lively-Info.plist`, and points at the
+deployed Worker for Debug and Release. With no URL, Soniox needs a key in
+Settings. A key entered in Settings always overrides the broker, for
+development. Pushes to `main` that touch `Server/key-broker/` run its tests and
+deploy it through GitHub Actions.
 
 Mistral has no temporary keys, so Voxtral is a developer option and always needs
 a key in Settings.

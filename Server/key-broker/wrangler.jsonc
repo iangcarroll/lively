@@ -1,17 +1,21 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lively-key-broker",
+  // ian@cautela.us
+  "account_id": "1020dc9a8bd7a82cd0801975a100d3ee",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "observability": { "enabled": true },
+  // Run near D1 and Soniox's API rather than near the caller, so a far-away
+  // caller pays one long round trip instead of one per upstream call.
+  "placement": { "mode": "smart" },
   // Deletes expired rate-limit counters.
   "triggers": { "crons": ["17 * * * *"] },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "lively-key-broker",
-      // Replace with the ID `wrangler d1 create lively-key-broker` prints.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "89f13305-9c44-48d3-ac0c-8c24c805555a",
       "migrations_dir": "migrations"
     }
   ],

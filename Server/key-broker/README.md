@@ -75,41 +75,61 @@ npm test                              # vitest in workerd, Soniox mocked
 npm run typecheck
 ```
 
-Debug builds of the app use `http://localhost:8787` as the broker, so the
-simulator and the Mac app work against `npm run dev`. A physical device can't
-reach your Mac's localhost. Enter a Soniox key in Settings, or point
-`LIVELY_KEY_BROKER_URL` at a deployed Worker.
+App builds use the deployed broker. To try local changes in the simulator or
+the Mac app, set the Debug `LIVELY_KEY_BROKER_URL` to `http://localhost:8787`
+for the session, and don't commit it.
+
+Cloudflare's bot check turns away some generic clients, such as Python's
+`urllib` default user agent (error 1010). curl and the app get through. Set a
+`User-Agent` in scripts.
 
 ## Deploy
 
-Use the Cloudflare account for **ian@cautela.us**. None of this has been run
-yet.
+The broker runs at **https://lively-key-broker.ian-102.workers.dev** on the
+Cloudflare account for ian@cautela.us (account
+`1020dc9a8bd7a82cd0801975a100d3ee`). The D1 database `lively-key-broker` is in
+WNAM. Smart Placement runs the Worker near D1 and Soniox's API, so a caller in
+Asia makes one long round trip instead of one per upstream call.
+
+### Automatic
+
+`.github/workflows/deploy-key-broker.yml` runs the type check and tests on every
+push and pull request that touches `Server/key-broker/`. On `main` it then
+applies D1 migrations and runs `wrangler deploy`. It needs one repository
+secret, `CLOUDFLARE_API_TOKEN`:
+
+1. In the Cloudflare dashboard, go to My Profile › API Tokens › Create Token
+   and use the **Edit Cloudflare Workers** template. Add **Account › D1 ›
+   Edit**. Limit it to the ian@cautela.us account.
+2. `gh secret set CLOUDFLARE_API_TOKEN --repo iangcarroll/lively` and paste
+   it.
+
+To deploy without a push, use Actions › Deploy key broker › Run workflow.
+
+### By hand
 
 ```bash
 cd Server/key-broker
-npm install
-npx wrangler login                   # sign in as ian@cautela.us
-npx wrangler whoami                  # check the account
-npx wrangler d1 create lively-key-broker
-# Paste the printed database_id into wrangler.jsonc → d1_databases[0].database_id
+npx wrangler login                   # as ian@cautela.us
 npm run db:migrate                   # applies migrations/ to the remote D1
-npx wrangler secret put SONIOX_API_KEY
 npm run deploy
 ```
 
-If the login can see more than one account, add `"account_id"` to
-`wrangler.jsonc`.
+To rotate the Soniox key, run `npx wrangler secret put SONIOX_API_KEY`. It
+isn't in the repo or in CI, and the deploy workflow leaves it alone.
 
-`wrangler deploy` prints the URL, for example
-`https://lively-key-broker.<subdomain>.workers.dev`. Check it:
+To set the broker up from scratch on another account, run `npx wrangler d1
+create lively-key-broker`, then put the new `database_id` and `account_id` in
+`wrangler.jsonc`. Next run `npm run db:migrate`, set the secret, and deploy.
 
-```bash
-curl -X POST -H "Lively-Install-ID: $(uuidgen)" https://lively-key-broker.<subdomain>.workers.dev/v1/soniox/key
-```
+The app reads the URL from `LIVELY_KEY_BROKER_URL` in `Lively.xcodeproj`
+(target › Build Settings), for both Debug and Release.
 
-Then set `LIVELY_KEY_BROKER_URL` for the Release configuration in
-`Lively.xcodeproj` (target › Build Settings, currently empty) and archive. If
-it's empty, Release builds need a Soniox key in Settings, as before.
+### China
+
+`*.workers.dev` is often blocked or slow in mainland China. Before launching
+there, add a custom domain on a zone in this account (`routes` in
+`wrangler.jsonc`) and switch `LIVELY_KEY_BROKER_URL` to it.
 
 In the Soniox console, set a budget on the account that owns the key. It's the
 last backstop if the limits above are set too loosely.
