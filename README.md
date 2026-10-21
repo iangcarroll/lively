@@ -33,6 +33,8 @@ key in Settings.
 
 To try the UI without a key, add the launch argument `-LivelyDemo YES` and tap the
 mic. It plays a scripted conversation through the real turn and translation logic.
+For unattended screenshots, also pass `-LivelyDemoAutoPlay YES` to start the demo
+when the conversation screen appears.
 
 ## How it works
 

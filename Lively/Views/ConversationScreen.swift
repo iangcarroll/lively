@@ -7,6 +7,7 @@ struct ConversationScreen: View {
     @State private var showSettings = false
     @State private var showAccount = false
     @AppStorage(AccountSheet.shownKey) private var accountSheetShown = false
+    @State private var didStartDemoAutomatically = false
     /// On phones, face-to-face is the main layout; the transcript is an alternative.
     @AppStorage("phoneShowsTranscript") private var phoneShowsTranscript = false
     @AppStorage("nearLanguage") private var nearLanguage: Language = .english
@@ -58,7 +59,13 @@ struct ConversationScreen: View {
             #endif
         }
         .onAppear {
-            guard !isDemo else { return }
+            if isDemo {
+                if isDemoAutoPlay && !didStartDemoAutomatically {
+                    didStartDemoAutomatically = true
+                    store.toggleListening()
+                }
+                return
+            }
             if !accountSheetShown, Account.shared != nil {
                 accountSheetShown = true
                 showAccount = true
@@ -69,6 +76,9 @@ struct ConversationScreen: View {
     }
 
     private var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }
+    private var isDemoAutoPlay: Bool {
+        UserDefaults.standard.bool(forKey: "LivelyDemoAutoPlay")
+    }
 
     private func topBar(wide: Bool) -> some View {
         HStack(spacing: 10) {
