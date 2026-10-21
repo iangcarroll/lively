@@ -5,5 +5,8 @@
 	<!-- Merged into the generated Info.plist. Set LIVELY_KEY_BROKER_URL in the build settings. -->
 	<key>LivelyKeyBrokerURL</key>
 	<string>$(LIVELY_KEY_BROKER_URL)</string>
+	<!-- Lively only uses exempt encryption supplied by the operating system (for example, HTTPS). -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

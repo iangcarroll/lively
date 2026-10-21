@@ -100,6 +100,18 @@ describe("POST /v1/soniox/key", () => {
     expect((await worker.fetch(new Request("https://broker.test/v1/other", { method: "POST" }), env)).status).toBe(404);
     expect((await worker.fetch(new Request("https://broker.test/healthz"), env)).status).toBe(200);
   });
+
+  it.each([
+    ["/privacy", "Privacy Policy"],
+    ["/support", "Support"],
+  ])("serves the public %s page", async (path, heading) => {
+    const response = await worker.fetch(new Request(`https://broker.test${path}`), env);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
+    expect(response.headers.get("Content-Security-Policy")).toContain("default-src 'none'");
+    expect(await response.text()).toContain(`<h1>${heading}</h1>`);
+    expect(soniox).not.toHaveBeenCalled();
+  });
 });
 
 describe("regions", () => {
