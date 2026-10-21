@@ -1,0 +1,111 @@
+import SwiftUI
+
+struct ConversationScreen: View {
+    @State var store: ConversationStore
+    @Bindable var settings: AppSettings = .shared
+
+    @State private var showSettings = false
+    /// On phones, face-to-face is the main layout; the transcript is an alternative.
+    @AppStorage("phoneShowsTranscript") private var phoneShowsTranscript = false
+    @AppStorage("nearLanguage") private var nearLanguage: Language = .english
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Unfolded iPhone Duo, landscape phones, iPad and Mac get side-by-side columns.
+    private static let wideBreakpoint: CGFloat = 640
+
+    var body: some View {
+        GeometryReader { geometry in
+            let wide = geometry.size.width >= Self.wideBreakpoint
+            ZStack {
+                Color(.canvas).ignoresSafeArea()
+
+                if !wide && !phoneShowsTranscript {
+                    FaceToFaceScreen(
+                        store: store,
+                        nearLanguage: $nearLanguage,
+                        onShowTranscript: { withAnimation(.snappy) { phoneShowsTranscript = true } },
+                        onShowSettings: { showSettings = true }
+                    )
+                    .transition(.opacity)
+                } else {
+                    transcript(wide: wide)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .safeAreaBar(edge: .top) { topBar(wide: wide) }
+                        .safeAreaBar(edge: .bottom) { controls }
+                        .transition(.opacity)
+                }
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(settings: settings) { store.clear() }
+        }
+        .alert("Lively", isPresented: alertBinding) {
+            if !settings.hasAPIKey { Button("Open Settings") { showSettings = true } }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(store.alert ?? "")
+        }
+        .onChange(of: scenePhase) { _, phase in
+            #if os(iOS)
+            // iOS takes the mic away in the background anyway; stop cleanly.
+            if phase == .background { store.stopListening() }
+            #endif
+        }
+        .onAppear {
+            if !settings.hasAPIKey && !isDemo { showSettings = true }
+        }
+    }
+
+    private var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }
+
+    private func topBar(wide: Bool) -> some View {
+        HStack(spacing: 10) {
+            StatusPill(status: store.status, isListening: store.isListening)
+            Spacer()
+            if !wide {
+                GlassIconButton(systemImage: "rectangle.split.1x2", label: "Face-to-face mode") {
+                    withAnimation(.snappy) { phoneShowsTranscript = false }
+                }
+            }
+            GlassIconButton(systemImage: "gearshape", label: "Settings") { showSettings = true }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+    }
+
+    @ViewBuilder
+    private func transcript(wide: Bool) -> some View {
+        if store.utterances.isEmpty {
+            EmptyConversation()
+        } else if wide {
+            ParallelTranscript(store: store)
+        } else {
+            ChatTranscript(store: store)
+        }
+    }
+
+    private var controls: some View {
+        HStack {
+            GlassIconButton(systemImage: "trash", label: "Clear conversation") {
+                withAnimation(.snappy) { store.clear() }
+            }
+            .disabled(store.utterances.isEmpty)
+            .opacity(store.utterances.isEmpty ? 0.4 : 1)
+            Spacer()
+            MicButton(isListening: store.isListening, level: store.level) {
+                store.toggleListening()
+            }
+            Spacer()
+            // Balances the left button so the mic stays centered.
+            Color.clear.frame(width: 40, height: 40)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+    }
+
+    private var alertBinding: Binding<Bool> {
+        Binding(get: { store.alert != nil }, set: { if !$0 { store.alert = nil } })
+    }
+}

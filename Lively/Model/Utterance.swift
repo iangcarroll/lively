@@ -1,0 +1,52 @@
+import Foundation
+import Observation
+
+/// One turn of speech and its translation.
+@Observable
+final class Utterance: Identifiable {
+    enum TranslationState: Equatable {
+        /// Nothing translated yet.
+        case idle
+        /// A request is running.
+        case working
+        /// The translation matches the current transcript.
+        case current
+        /// Waiting for the network to come back.
+        case waitingForNetwork
+        case failed(String)
+    }
+
+    let id = UUID()
+    let createdAt = Date()
+
+    private(set) var source: String = ""
+    private(set) var language: Language = .english
+    var translation: String = ""
+    var translationState: TranslationState = .idle
+
+    /// True once the speaker's turn has ended and the transcript won't change.
+    var isFinal = false
+
+    /// The transcript the current `translation` was produced from.
+    var translatedSource: String?
+
+    init(source: String = "", language: Language? = nil) {
+        if !source.isEmpty { append(source) }
+        if let language { self.language = language }
+    }
+
+    func append(_ delta: String) {
+        source += delta
+        if let detected = Language.detect(source) { language = detected }
+    }
+
+    var trimmedSource: String { source.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var needsTranslation: Bool { translatedSource != trimmedSource }
+
+    /// Text to show for a given language: the transcript if that's what was
+    /// spoken, otherwise the translation.
+    func text(in lang: Language) -> String {
+        lang == language ? trimmedSource : translation
+    }
+}
