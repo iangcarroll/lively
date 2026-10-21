@@ -11,8 +11,10 @@ Pick one in Settings › Engine. Each has its own API key, stored in the Keychai
 
 | Engine | How it works | Key |
 |---|---|---|
-| **Voxtral + Mistral** (default) | `voxtral-mini-transcribe-realtime-3` transcribes and detects turns, then a Mistral chat model translates each turn | console.mistral.ai |
-| **Soniox** | `stt-rt-v5` transcribes and translates both ways (`two_way`, en ⇄ zh) in one stream, so there's no second request per turn | console.soniox.com |
+| **Soniox** (default) | `stt-rt-v5` transcribes and translates both ways (`two_way`, en ⇄ zh) in one stream, so there's no second request per turn | console.soniox.com |
+| **Voxtral + Mistral** | `voxtral-mini-transcribe-realtime-3` transcribes and detects turns, then a Mistral chat model translates each turn | console.mistral.ai |
+
+Soniox is the default because it won the [benchmark](Tools/probe/RESULTS.md).
 
 Soniox only outputs Simplified Chinese. When Settings › Chinese is 繁體, Lively
 converts its output on the device.

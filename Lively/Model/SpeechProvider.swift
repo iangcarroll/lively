@@ -16,8 +16,10 @@ struct SpeechProvider: Identifiable {
     let options: Set<ProviderOption>
     let makePipeline: (AppSettings) -> SpeechPipeline
 
-    static let all: [SpeechProvider] = [.voxtralMistral, .soniox]
-    static let fallback = SpeechProvider.voxtralMistral
+    static let all: [SpeechProvider] = [.soniox, .voxtralMistral]
+    /// Soniox won the 2026-10-20 benchmark (Tools/probe/RESULTS.md): every
+    /// turn translated, no leaks, lowest cost.
+    static let fallback = SpeechProvider.soniox
 
     static func with(id: String) -> SpeechProvider {
         all.first { $0.id == id } ?? fallback
