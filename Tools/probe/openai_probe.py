@@ -31,6 +31,7 @@ URL = "wss://api.openai.com/v1/realtime/translations?model=gpt-realtime-translat
 CHUNK_S = 0.04
 TAIL_SILENCE_S = 6.0
 SEGMENT_GAP_S = 0.7
+PREDICT_PAUSE_S = 0.9
 
 
 def api_key():
@@ -174,8 +175,39 @@ async def run(mode):
                 await s.set_target("en" if lang == "zh" else "zh")
 
         s.on_input = on_input
+    elif mode == "predict":
+        # Like switch, but conversations alternate: once the speaker pauses,
+        # pre-flip the target so the next person's first words already go
+        # the right way. The transcript check still corrects a wrong guess.
+        sessions = [Session("single", "zh", key, clock, log)]
+        s = sessions[0]
+        state = {"text": "", "last": -1.0, "lang": None}
+
+        async def on_input(delta):
+            now = clock()
+            if now - state["last"] > SEGMENT_GAP_S:
+                state["text"] = ""
+            state["last"] = now
+            state["text"] += delta
+            lang = script_lang(state["text"])
+            if lang:
+                state["lang"] = lang
+                if lang == s.target:
+                    await s.set_target("en" if lang == "zh" else "zh")
+
+        async def predictor():
+            while True:
+                await asyncio.sleep(0.05)
+                lang = state["lang"]
+                # The speaker paused: expect the other person next.
+                if lang and clock() - state["last"] > PREDICT_PAUSE_S and s.target != lang:
+                    await s.set_target(lang)
+                    state["lang"] = None
+
+        s.on_input = on_input
+        asyncio.get_event_loop().call_soon(lambda: asyncio.ensure_future(predictor()))
     else:
-        sys.exit("mode must be dual or switch")
+        sys.exit("mode must be dual, switch or predict")
 
     t0[0] = time.monotonic()
     connect_started = clock()
