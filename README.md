@@ -46,6 +46,7 @@ mic. It plays a scripted conversation through the real turn and translation logi
 | Voxtral: streaming translation over Mistral chat completions | `Networking/Translator.swift` |
 | Soniox: WebSocket to `stt-rt-v5` with two-way translation and endpoint detection | `Networking/SonioxTranscriber.swift` |
 | Soniox: temporary keys from the broker, with one spare kept ready | `Networking/SonioxKeyProvider.swift` |
+| Soniox: picks the region (US or Japan) with the shortest round trip | `Networking/RegionProber.swift` |
 | Key broker: Cloudflare Worker that mints temporary Soniox keys | `Server/key-broker/` |
 | Turns, utterances, translation scheduling | `Model/ConversationStore.swift` |
 
@@ -81,9 +82,9 @@ broker, a Cloudflare Worker in `Server/key-broker/`:
 2. `SonioxKeyProvider` posts it to the broker's `/v1/soniox/key`. The broker
    checks its rate limits and denylist, then calls Soniox's
    `POST /v1/auth/temporary-api-key` with the real key and returns a
-   single-use key that expires in 60 s.
+   single-use key that expires in 60 s, with its region's WebSocket URL.
 3. `SonioxTranscriber.makeRequest()` takes a key for each connection and
-   opens the WebSocket to Soniox directly. Audio never goes through the broker.
+   opens the WebSocket to that URL directly. Audio never goes through the broker.
 4. While listening, the provider keeps one spare key and replaces it about
    every 50 s, so a reconnect on a flaky network doesn't wait on the broker.
    Taking the spare starts fetching the next one.
@@ -91,6 +92,29 @@ broker, a Cloudflare Worker in `Server/key-broker/`:
    its first message. The transcriber then reconnects with a fresh key. After 3
    rejections in a row it gives up and says so, instead of blaming a key in
    Settings.
+
+### Soniox regions
+
+Soniox runs separate US and Japan regions. From East and Southeast Asia, Japan
+saves about 150–250 ms per translation ([measurements](Tools/probe/ASIA_LATENCY.md)).
+Each region is its own Soniox project, and a temporary key works only in the
+region that minted it.
+
+- `RegionProber` measures every region the broker lists. A probe is three
+  `GET https://stt-rt.<region>.soniox.com/` on one connection; the RTT is the
+  faster of the last two, so handshakes don't count.
+- It probes at launch, on foreground, when the network path changes, every
+  10 min while listening, and after 2 failed connects. It never probes on a
+  timer while idle.
+- Each region's score is a smoothed RTT plus up to 500 ms for failed probes and
+  connects. The choice moves only to a region at least 25% and 40 ms better.
+- The choice goes to the broker as `Lively-Region` and applies to the next
+  connection only. A live socket is never moved. A spare key from the old
+  region is dropped.
+- After 2 failed connects in a row in one region, the next connection goes to
+  the next-best region.
+- Before the first probe the app sends no region, and the broker picks one
+  from the caller's country.
 
 The broker URL comes from the `LIVELY_KEY_BROKER_URL` build setting, through
 the `LivelyKeyBrokerURL` key in `Config/Lively-Info.plist`, and points at the

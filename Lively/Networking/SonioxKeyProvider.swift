@@ -7,6 +7,10 @@ import Foundation
 /// listening, so a reconnect on a flaky network never waits on the broker.
 /// The broker identifies this install by a random ID kept in the Keychain and
 /// rate-limits by it.
+///
+/// Keys are region-scoped: each works only on its own region's WebSocket
+/// host, which comes with it. `regions` picks the region to ask for, and the
+/// spare is dropped when that changes.
 final class SonioxKeyProvider {
     /// Nil when the build has no `LivelyKeyBrokerURL`, so Soniox needs a key
     /// entered in Settings.
@@ -18,8 +22,18 @@ final class SonioxKeyProvider {
         return URL(string: string)
     }
 
-    private struct TemporaryKey {
+    /// A key and where to use it.
+    struct Key {
         let value: String
+        let region: String
+        let websocketURL: URL
+    }
+
+    private struct TemporaryKey {
+        let key: Key
+        /// The region asked for, or nil to let the broker pick. The broker
+        /// may hand out another region if it can't mint in this one.
+        let requestedRegion: String?
         let fetchedAt: Date
         let expiresAt: Date
 
@@ -28,6 +42,10 @@ final class SonioxKeyProvider {
     }
 
     private static let refreshInterval: TimeInterval = 50
+    /// For a broker that doesn't send `websocket_url` yet.
+    private static let usWebsocketURL = URL(string: "wss://stt-rt.soniox.com/transcribe-websocket")!
+
+    let regions = RegionProber()
 
     private let endpoint: URL
     private let session: URLSession
@@ -41,10 +59,17 @@ final class SonioxKeyProvider {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 10
         session = URLSession(configuration: configuration)
+        regions.onChoiceChange = { [weak self] in
+            guard let self else { return }
+            // A spare minted for the old region won't work in the new one.
+            self.spare = nil
+            if self.refreshTask != nil { Task { try? await self.fillSpare() } }
+        }
     }
 
     /// Keeps a fresh spare key while listening.
     func startRefreshing() {
+        regions.startPeriodicProbing()
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -65,18 +90,19 @@ final class SonioxKeyProvider {
     }
 
     func stopRefreshing() {
+        regions.stopPeriodicProbing()
         refreshTask?.cancel()
         refreshTask = nil
     }
 
     /// A key for one connection. Keys are single-use, so each call returns a
     /// different one and starts fetching the next spare.
-    func takeKey() async throws -> String {
+    func takeKey() async throws -> Key {
         for _ in 0..<3 {
-            if let key = spare, key.isFresh {
+            if let key = spare, key.isFresh, key.requestedRegion == regions.choice {
                 spare = nil
                 Task { try? await fillSpare() }
-                return key.value
+                return key.key
             }
             // Another caller can take the key this fill brings, so check again.
             try await fillSpare()
@@ -98,6 +124,8 @@ final class SonioxKeyProvider {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue(Self.installID, forHTTPHeaderField: "Lively-Install-ID")
+        let requestedRegion = regions.choice
+        if let requestedRegion { request.setValue(requestedRegion, forHTTPHeaderField: "Lively-Region") }
 
         let started = Date.now
         let (data, response) = try await session.data(for: request)
@@ -116,9 +144,15 @@ final class SonioxKeyProvider {
         }
 
         let body = try JSONDecoder().decode(BrokerKey.self, from: data)
+        regions.update(regions: (body.regions ?? [:]).compactMapValues(URL.init(string:)))
         // Time the key by this device's clock, from when it was requested.
         return TemporaryKey(
-            value: body.api_key,
+            key: Key(
+                value: body.api_key,
+                region: body.region ?? "us",
+                websocketURL: body.websocket_url.flatMap(URL.init(string:)) ?? Self.usWebsocketURL
+            ),
+            requestedRegion: requestedRegion,
             fetchedAt: started,
             expiresAt: started.addingTimeInterval(TimeInterval(body.expires_in_seconds))
         )
@@ -137,6 +171,10 @@ final class SonioxKeyProvider {
     private struct BrokerKey: Decodable {
         let api_key: String
         let expires_in_seconds: Int
+        let region: String?
+        let websocket_url: String?
+        /// Every region the broker can mint in, with its WebSocket URL.
+        let regions: [String: String]?
     }
 
     private struct BrokerError: Decodable {

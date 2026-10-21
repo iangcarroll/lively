@@ -4,7 +4,13 @@
  *
  *   POST /v1/soniox/key
  *   Lively-Install-ID: <random UUID the app keeps in its Keychain>
- *   → 200 {api_key, expires_at, expires_in_seconds, max_session_seconds}
+ *   Lively-Region: us | jp   (optional; the app's measured best region)
+ *   → 200 {api_key, expires_at, expires_in_seconds, max_session_seconds,
+ *          region, websocket_url, regions}
+ *
+ * Soniox regions are separate projects with region-scoped keys, so there is
+ * one master key per region, and a temporary key works only on its region's
+ * WebSocket host.
  *
  * Callers are anonymous. Abuse is bounded by per-install and per-IP limits, a
  * global daily cap and a denylist, all set in wrangler.jsonc.
@@ -12,7 +18,11 @@
 
 export interface Env {
   DB: D1Database;
-  SONIOX_API_KEY: string;
+  /** Master keys per region. A region without a key is never offered. */
+  SONIOX_API_KEY_US?: string;
+  SONIOX_API_KEY_JP?: string;
+  /** The US key's name before regions existed. */
+  SONIOX_API_KEY?: string;
   KEY_TTL_SECONDS: string;
   MAX_SESSION_SECONDS: string;
   KEY_CHARGE_SECONDS: string;
@@ -24,7 +34,38 @@ export interface Env {
   DENYLIST: string;
 }
 
-export const SONIOX_TEMPORARY_KEY_URL = "https://api.soniox.com/v1/auth/temporary-api-key";
+export type Region = "us" | "jp";
+
+/** Hostnames per region, from https://soniox.com/docs/data-residency. */
+export const REGIONS: Record<Region, { api: string; websocket: string }> = {
+  us: { api: "https://api.soniox.com", websocket: "wss://stt-rt.soniox.com/transcribe-websocket" },
+  jp: { api: "https://api.jp.soniox.com", websocket: "wss://stt-rt.jp.soniox.com/transcribe-websocket" },
+};
+
+/** Countries closer to Tokyo than to Virginia (§4 of Tools/probe/ASIA_LATENCY.md). */
+const JP_COUNTRIES = new Set(["JP", "KR", "TW", "HK", "MO", "CN", "MN", "SG", "MY", "TH", "VN", "PH", "ID", "KH", "LA", "MM", "BN", "TL", "AU", "NZ", "GU", "MP", "PW", "FM"]);
+
+export function temporaryKeyURL(region: Region): string {
+  return `${REGIONS[region].api}/v1/auth/temporary-api-key`;
+}
+
+function masterKey(env: Env, region: Region): string | undefined {
+  const key = region === "us" ? (env.SONIOX_API_KEY_US ?? env.SONIOX_API_KEY) : env.SONIOX_API_KEY_JP;
+  return key?.trim() || undefined;
+}
+
+/**
+ * Regions to try, best first: the app's pick if it's one we have a key for,
+ * otherwise the default for the caller's country, then the rest.
+ */
+export function regionOrder(request: Request, env: Env): Region[] {
+  const configured = (Object.keys(REGIONS) as Region[]).filter((r) => masterKey(env, r));
+  const asked = request.headers.get("Lively-Region")?.trim().toLowerCase() ?? "";
+  const country = (request.cf?.country as string | undefined)?.toUpperCase() ?? "";
+  const geo: Region = JP_COUNTRIES.has(country) ? "jp" : "us";
+  const first = configured.find((r) => r === asked) ?? configured.find((r) => r === geo) ?? configured[0];
+  return first ? [first, ...configured.filter((r) => r !== first)] : [];
+}
 
 const INSTALL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -82,45 +123,66 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
     .reduce((a, b) => Math.min(a, b));
   const maxSession = Math.max(1, Math.min(limits.maxSessionSeconds, remaining));
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(SONIOX_TEMPORARY_KEY_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${env.SONIOX_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        usage_type: "transcribe_websocket",
-        expires_in_seconds: limits.keyTTLSeconds,
-        single_use: true,
-        max_session_duration_seconds: maxSession,
-        client_reference_id: installHash,
-      }),
-    });
-  } catch (e) {
+  const regions = regionOrder(request, env);
+  const minted = await mint(env, regions, {
+    usage_type: "transcribe_websocket",
+    expires_in_seconds: limits.keyTTLSeconds,
+    single_use: true,
+    max_session_duration_seconds: maxSession,
+    client_reference_id: installHash,
+  });
+  if (!minted.ok) {
     await refund(env, charges);
-    console.error("Soniox request failed", e);
-    return error(502, "upstream", "Couldn't reach Soniox.", 2);
-  }
-
-  if (!upstream.ok) {
-    await refund(env, charges);
-    console.error("Soniox returned", upstream.status, await upstream.text());
-    return error(502, "upstream", "Soniox didn't issue a key.", 5);
-  }
-
-  const body = (await upstream.json()) as { api_key?: unknown; expires_at?: unknown };
-  if (typeof body.api_key !== "string" || typeof body.expires_at !== "string") {
-    await refund(env, charges);
-    console.error("Unexpected Soniox response shape", Object.keys(body));
-    return error(502, "upstream", "Soniox didn't issue a key.", 5);
+    return error(502, "upstream", minted.unreachable ? "Couldn't reach Soniox." : "Soniox didn't issue a key.", minted.unreachable ? 2 : 5);
   }
 
   // `expires_in_seconds` lets the app time the key by its own clock.
+  // `regions` lists every region the app may probe and ask for.
   return json(200, {
-    api_key: body.api_key,
-    expires_at: body.expires_at,
+    api_key: minted.apiKey,
+    expires_at: minted.expiresAt,
     expires_in_seconds: limits.keyTTLSeconds,
     max_session_seconds: maxSession,
+    region: minted.region,
+    websocket_url: REGIONS[minted.region].websocket,
+    regions: Object.fromEntries(regions.map((r) => [r, REGIONS[r].websocket])),
   });
+}
+
+type Minted =
+  | { ok: true; region: Region; apiKey: string; expiresAt: string }
+  | { ok: false; unreachable: boolean };
+
+/** Mints in the first region that issues a key, so one region's outage doesn't stop everyone. */
+async function mint(env: Env, regions: Region[], body: object): Promise<Minted> {
+  let unreachable = false;
+  for (const region of regions) {
+    let upstream: Response;
+    try {
+      upstream = await fetch(temporaryKeyURL(region), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${masterKey(env, region)}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      console.error("Soniox request failed", region, e);
+      unreachable = true;
+      continue;
+    }
+    unreachable = false;
+    if (!upstream.ok) {
+      console.error("Soniox returned", region, upstream.status, await upstream.text());
+      continue;
+    }
+    const json = (await upstream.json()) as { api_key?: unknown; expires_at?: unknown };
+    if (typeof json.api_key !== "string" || typeof json.expires_at !== "string") {
+      console.error("Unexpected Soniox response shape", region, Object.keys(json));
+      continue;
+    }
+    return { ok: true, region, apiKey: json.api_key, expiresAt: json.expires_at };
+  }
+  if (regions.length === 0) console.error("No Soniox master key is set");
+  return { ok: false, unreachable };
 }
 
 interface Charge {

@@ -7,13 +7,18 @@ with them, so audio never passes through the Worker.
 ```
 POST /v1/soniox/key
 Lively-Install-ID: 3F2C9A3E-6B1D-4C55-9A0E-2D7E8F1B4C6A
+Lively-Region: jp                      (optional)
 
 200 {"api_key": "...", "expires_at": "2026-10-21T01:00:34.125Z",
-     "expires_in_seconds": 60, "max_session_seconds": 7200}
+     "expires_in_seconds": 60, "max_session_seconds": 7200,
+     "region": "jp",
+     "websocket_url": "wss://stt-rt.jp.soniox.com/transcribe-websocket",
+     "regions": {"us": "wss://stt-rt.soniox.com/transcribe-websocket",
+                 "jp": "wss://stt-rt.jp.soniox.com/transcribe-websocket"}}
 ```
 
 For each request the Worker calls Soniox's
-`POST https://api.soniox.com/v1/auth/temporary-api-key` with:
+`POST https://api[.<region>].soniox.com/v1/auth/temporary-api-key` with:
 
 | Field | Value |
 |---|---|
@@ -22,6 +27,32 @@ For each request the Worker calls Soniox's
 | `single_use` | `true` |
 | `max_session_duration_seconds` | `MAX_SESSION_SECONDS` (7200), or less near the day's limit |
 | `client_reference_id` | first 128 bits of SHA-256 of the install ID, hex |
+
+## Regions
+
+Each Soniox region is a separate project with its own master key, and a
+temporary key works only on its own region's WebSocket host
+([data residency](https://soniox.com/docs/data-residency)).
+
+| Region | Secret | Mints at | WebSocket |
+|---|---|---|---|
+| `us` | `SONIOX_API_KEY_US` (or the older `SONIOX_API_KEY`) | `api.soniox.com` | `stt-rt.soniox.com` |
+| `jp` | `SONIOX_API_KEY_JP` | `api.jp.soniox.com` | `stt-rt.jp.soniox.com` |
+
+A region without a secret is never offered. To pick the region, the Worker
+tries these in order:
+
+1. `Lively-Region`, if it's a region with a key. Anything else is ignored. The
+   app sends the region its `RegionProber` measured as fastest.
+2. Japan for callers in East and Southeast Asia and Oceania
+   (`request.cf.country`), otherwise the US.
+3. If Soniox won't mint in that region, the next one.
+
+`regions` lists every region with a key, so the app knows what to probe.
+
+To add Japan: in the Soniox Console, request Japan under Security & compliance
+› Region access, wait for approval, create a project in Japan, set a budget on
+it, then `npx wrangler secret put SONIOX_API_KEY_JP` with that project's key.
 
 ## Who gets keys
 
@@ -68,7 +99,7 @@ are refunded. A cron job at :17 every hour deletes expired counters.
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars        # then put a real SONIOX_API_KEY in it
+cp .dev.vars.example .dev.vars        # then put a real SONIOX_API_KEY_US in it
 npm run db:migrate:local
 npm run dev                           # http://localhost:8787
 npm test                              # vitest in workerd, Soniox mocked
@@ -115,8 +146,10 @@ npm run db:migrate                   # applies migrations/ to the remote D1
 npm run deploy
 ```
 
-To rotate the Soniox key, run `npx wrangler secret put SONIOX_API_KEY`. It
-isn't in the repo or in CI, and the deploy workflow leaves it alone.
+To rotate a Soniox key, run `npx wrangler secret put SONIOX_API_KEY_US` (or
+`_JP`). The deployed US key is still named `SONIOX_API_KEY`, which works until
+`SONIOX_API_KEY_US` is set; delete it after. The keys aren't in the repo or in
+CI, and the deploy workflow leaves them alone.
 
 To set the broker up from scratch on another account, run `npx wrangler d1
 create lively-key-broker`, then put the new `database_id` and `account_id` in

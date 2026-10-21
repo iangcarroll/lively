@@ -74,9 +74,26 @@ final class ConversationStore {
 
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
-            Task { @MainActor in self?.setOnline(online) }
+            Task { @MainActor in
+                self?.setOnline(online)
+                // A new interface or route can change which region is closest.
+                if online { self?.regionProber?.probe(minimumInterval: 5) }
+            }
         }
         pathMonitor.start(queue: DispatchQueue(label: "lively.path"))
+        regionProber?.probe()
+    }
+
+    /// Re-measures Soniox regions when the app comes to the foreground.
+    func didBecomeActive() {
+        regionProber?.probe()
+    }
+
+    /// Set when Soniox keys come from the broker, which mints in any of its regions.
+    private var regionProber: RegionProber? {
+        guard demo == nil, settings.providerID == SpeechProvider.soniox.id,
+              settings.credential(.soniox).isEmpty else { return nil }
+        return SonioxKeyProvider.shared?.regions
     }
 
     // MARK: - Listening

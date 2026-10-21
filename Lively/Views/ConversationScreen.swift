@@ -46,6 +46,7 @@ struct ConversationScreen: View {
             Text(store.alert ?? "")
         }
         .onChange(of: scenePhase) { _, phase in
+            if phase == .active { store.didBecomeActive() }
             #if os(iOS)
             // iOS takes the mic away in the background anyway; stop cleanly.
             if phase == .background { store.stopListening() }

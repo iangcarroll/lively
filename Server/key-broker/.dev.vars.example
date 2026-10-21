@@ -1,2 +1,4 @@
 # Copy to .dev.vars (gitignored) for `npm run dev`.
-SONIOX_API_KEY=your-soniox-key
+SONIOX_API_KEY_US=your-us-project-soniox-key
+# Optional. Keys from a Japan-region Soniox project.
+SONIOX_API_KEY_JP=

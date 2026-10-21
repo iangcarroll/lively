@@ -33,7 +33,8 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         set { socket.networkAvailable = newValue }
     }
 
-    private static let endpoint = URL(string: "wss://stt-rt.soniox.com/transcribe-websocket")!
+    /// The US region, for keys entered in Settings. Broker keys bring their own region's URL.
+    private static let defaultEndpoint = URL(string: "wss://stt-rt.soniox.com/transcribe-websocket")!
 
     private let config: Configuration
     private lazy var socket = ResilientSocket(dialect: self)
@@ -60,6 +61,8 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     /// Temporary keys rejected in a row. A temporary key that has expired is
     /// rejected like a bad one, so a few rejections just mean "get a new key".
     private var rejectedTemporaryKeys = 0
+    /// The region of the latest connection attempt, until it opens.
+    private var connectingRegion: String?
 
     init(_ configuration: Configuration) {
         config = configuration
@@ -67,6 +70,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
 
     func start() {
         rejectedTemporaryKeys = 0
+        connectingRegion = nil
         if case .broker(let provider) = config.credential { provider.startRefreshing() }
         socket.start()
     }
@@ -87,13 +91,28 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     // MARK: - SocketDialect
 
     func makeRequest() async throws -> URLRequest {
-        let key = switch config.credential {
-        case .apiKey(let key): key
-        case .broker(let provider): try await provider.takeKey()
+        let key: String
+        let url: URL
+        switch config.credential {
+        case .apiKey(let value):
+            (key, url) = (value, Self.defaultEndpoint)
+        case .broker(let provider):
+            // The last attempt never opened.
+            if let region = connectingRegion { provider.regions.connectFailed(region: region) }
+            connectingRegion = nil
+            let temporary = try await provider.takeKey()
+            connectingRegion = temporary.region
+            (key, url) = (temporary.value, temporary.websocketURL)
         }
-        var request = URLRequest(url: Self.endpoint)
+        var request = URLRequest(url: url)
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         return request
+    }
+
+    func sessionDidOpen() {
+        guard case .broker(let provider) = config.credential, let region = connectingRegion else { return }
+        connectingRegion = nil
+        provider.regions.connectSucceeded(region: region)
     }
 
     func openingMessages() -> [URLSessionWebSocketTask.Message] {

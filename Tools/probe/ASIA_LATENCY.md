@@ -105,6 +105,8 @@ Each translation pays about one client→origin RTT: audio goes up, tokens come 
 ## 6. Recommendations (proposed; no app code changed)
 
 ### 6.1 Add the Japan region (largest win for East and Southeast Asia)
+**Implemented** in the broker and app. Step 1, the Japan project and `SONIOX_API_KEY_JP`, is still to do; until then the broker offers only the US.
+
 1. In the Soniox Console, request **Japan** region access and create a JP project. Approval is manual.
 2. Broker (`Server/key-broker/src/broker.ts`):
    - Store one master key per region (`SONIOX_API_KEY_US`, `SONIOX_API_KEY_JP`).
@@ -117,6 +119,8 @@ Each translation pays about one client→origin RTT: audio goes up, tokens come 
 4. Optionally add India later for South Asia. Singapore is 53 ms from Mumbai vs 65 ms from Tokyo, which is too small a gap to justify a third project now.
 
 ### 6.2 Periodic best-region probing (your suggestion; fits well)
+**Implemented** in `Lively/Networking/RegionProber.swift`, except persisting the choice per network. It keeps one choice for all networks, and a path change triggers a fresh probe.
+
 - **Probe.** Send an unauthenticated `GET https://stt-rt.<region>.soniox.com/` per candidate region. It returns a 404 from the regional origin through Cloudflare, which is the same path audio takes (§2). Make 3 requests on one HTTP/2 connection and take the min of the last two, which excludes handshakes. It is cheap, uses no key, and costs nothing at Soniox.
 - **When.** At launch and on foreground, on an `NWPathMonitor` interface or path change, every ~10 min while listening, and after 2 consecutive connect failures. Never probe on a timer while idle in the background.
 - **Choosing.** Keep a per-region EWMA RTT and success rate, and score as RTT plus a failure penalty. Switch only when a region is clearly better (≥25% **and** ≥40 ms) to avoid flapping. Persist the choice per network (SSID or cellular) so a reconnect starts warm.

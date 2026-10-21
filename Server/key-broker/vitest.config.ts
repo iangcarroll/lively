@@ -8,7 +8,7 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
-          bindings: { SONIOX_API_KEY: "test-master-key", TEST_MIGRATIONS: migrations },
+          bindings: { SONIOX_API_KEY_US: "test-master-key", SONIOX_API_KEY_JP: "test-jp-master-key", TEST_MIGRATIONS: migrations },
         },
       }),
     ],

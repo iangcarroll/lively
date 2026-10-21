@@ -1,6 +1,6 @@
 import { createScheduledController, env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { hash, issueSonioxKey, networkOf, SONIOX_TEMPORARY_KEY_URL, type Env } from "../src/broker";
+import { hash, issueSonioxKey, networkOf, REGIONS, temporaryKeyURL, type Env } from "../src/broker";
 import worker from "../src/index";
 
 const NOW = Date.UTC(2026, 9, 20, 12, 0, 30);
@@ -16,12 +16,23 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
-/** A request from a fresh install on a fresh IP, unless given. */
-function keyRequest(installID: string = crypto.randomUUID(), ip = randomIP()): Request {
+/** A request from a fresh install on a fresh IP in the US, unless given. */
+function keyRequest(
+  installID: string = crypto.randomUUID(),
+  ip = randomIP(),
+  { region, country = "US" }: { region?: string; country?: string } = {},
+): Request {
+  const headers: Record<string, string> = { "Lively-Install-ID": installID, "CF-Connecting-IP": ip };
+  if (region !== undefined) headers["Lively-Region"] = region;
   return new Request("https://broker.test/v1/soniox/key", {
     method: "POST",
-    headers: { "Lively-Install-ID": installID, "CF-Connecting-IP": ip },
-  });
+    headers,
+    cf: { country },
+  } as RequestInit);
+}
+
+function calledURLs(): string[] {
+  return soniox.mock.calls.map(([url]) => url as string);
 }
 
 function randomIP(): string {
@@ -47,7 +58,7 @@ describe("POST /v1/soniox/key", () => {
 
     expect(soniox).toHaveBeenCalledOnce();
     const [url, init] = soniox.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(SONIOX_TEMPORARY_KEY_URL);
+    expect(url).toBe("https://api.soniox.com/v1/auth/temporary-api-key");
     expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-master-key");
     expect(JSON.parse(init.body as string)).toEqual({
       usage_type: "transcribe_websocket",
@@ -88,6 +99,86 @@ describe("POST /v1/soniox/key", () => {
   it("404s other paths", async () => {
     expect((await worker.fetch(new Request("https://broker.test/v1/other", { method: "POST" }), env)).status).toBe(404);
     expect((await worker.fetch(new Request("https://broker.test/healthz"), env)).status).toBe(200);
+  });
+});
+
+describe("regions", () => {
+  type KeyBody = { region: string; websocket_url: string; regions: Record<string, string> };
+
+  it("uses the US project for US callers and lists every region", async () => {
+    const body = await (await issueSonioxKey(keyRequest(), env, NOW)).json<KeyBody>();
+    expect(body.region).toBe("us");
+    expect(body.websocket_url).toBe("wss://stt-rt.soniox.com/transcribe-websocket");
+    expect(body.regions).toEqual({
+      us: "wss://stt-rt.soniox.com/transcribe-websocket",
+      jp: "wss://stt-rt.jp.soniox.com/transcribe-websocket",
+    });
+    expect(calledURLs()).toEqual([temporaryKeyURL("us")]);
+  });
+
+  it.each(["JP", "TW", "SG", "CN"])("defaults callers in %s to Japan", async (country) => {
+    const body = await (await issueSonioxKey(keyRequest(undefined, undefined, { country }), env, NOW)).json<KeyBody>();
+    expect(body.region).toBe("jp");
+    expect(body.websocket_url).toBe(REGIONS.jp.websocket);
+    const [url, init] = soniox.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.jp.soniox.com/v1/auth/temporary-api-key");
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-jp-master-key");
+  });
+
+  it("honors Lively-Region over the caller's country", async () => {
+    const jp = await issueSonioxKey(keyRequest(undefined, undefined, { region: "JP", country: "US" }), env, NOW);
+    expect((await jp.json<KeyBody>()).region).toBe("jp");
+    const us = await issueSonioxKey(keyRequest(undefined, undefined, { region: "us", country: "JP" }), env, NOW);
+    expect((await us.json<KeyBody>()).region).toBe("us");
+  });
+
+  it.each(["eu", "in", "../us", "https://evil.test"])("ignores Lively-Region %j outside the allowlist", async (region) => {
+    const response = await issueSonioxKey(keyRequest(undefined, undefined, { region, country: "JP" }), env, NOW);
+    expect(response.status).toBe(200);
+    expect((await response.json<KeyBody>()).region).toBe("jp");
+    expect(calledURLs()).toEqual([temporaryKeyURL("jp")]);
+  });
+
+  it("offers only regions with a master key", async () => {
+    const local = withEnv({ SONIOX_API_KEY_JP: "" });
+    const response = await issueSonioxKey(keyRequest(undefined, undefined, { region: "jp", country: "JP" }), local, NOW);
+    const body = await response.json<KeyBody>();
+    expect(body.region).toBe("us");
+    expect(body.regions).toEqual({ us: REGIONS.us.websocket });
+  });
+
+  it("falls back to the old SONIOX_API_KEY for the US", async () => {
+    const local = withEnv({ SONIOX_API_KEY_US: undefined, SONIOX_API_KEY_JP: undefined, SONIOX_API_KEY: "legacy-key" });
+    const response = await issueSonioxKey(keyRequest(), local, NOW);
+    expect((await response.json<KeyBody>()).region).toBe("us");
+    const [, init] = soniox.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer legacy-key");
+  });
+
+  it("mints in the next region when the first one fails", async () => {
+    soniox.mockResolvedValueOnce(new Response("down", { status: 503 }));
+    const response = await issueSonioxKey(keyRequest(undefined, undefined, { country: "JP" }), env, NOW);
+    expect(response.status).toBe(200);
+    expect((await response.json<KeyBody>()).region).toBe("us");
+    expect(calledURLs()).toEqual([temporaryKeyURL("jp"), temporaryKeyURL("us")]);
+  });
+
+  it("returns 502 when every region fails", async () => {
+    soniox.mockRejectedValue(new TypeError("network down"));
+    const response = await issueSonioxKey(keyRequest(), env, NOW);
+    expect(response.status).toBe(502);
+    expect(calledURLs()).toHaveLength(2);
+  });
+
+  it("returns 502 without calling Soniox when no master key is set", async () => {
+    const local = withEnv({ SONIOX_API_KEY_US: undefined, SONIOX_API_KEY_JP: undefined, SONIOX_API_KEY: undefined });
+    expect((await issueSonioxKey(keyRequest(), local, NOW)).status).toBe(502);
+    expect(soniox).not.toHaveBeenCalled();
+  });
+
+  it("never returns a master key", async () => {
+    const text = await (await issueSonioxKey(keyRequest(undefined, undefined, { country: "JP" }), env, NOW)).text();
+    expect(text).not.toContain("master-key");
   });
 });
 
@@ -186,9 +277,12 @@ describe("denylist", () => {
 });
 
 describe("Soniox failures", () => {
+  // One region, so a failure isn't retried elsewhere.
+  const usOnly = withEnv({ SONIOX_API_KEY_JP: "" });
+
   it("returns 502 and refunds the charge when Soniox errors", async () => {
     const id = crypto.randomUUID();
-    const local = withEnv({ PER_INSTALL_KEYS_PER_MINUTE: "1" });
+    const local = withEnv({ PER_INSTALL_KEYS_PER_MINUTE: "1", SONIOX_API_KEY_JP: "" });
     soniox.mockResolvedValueOnce(new Response("nope", { status: 500 }));
     const failed = await issueSonioxKey(keyRequest(id), local, NOW);
     expect(failed.status).toBe(502);
@@ -198,12 +292,12 @@ describe("Soniox failures", () => {
 
   it("returns 502 when Soniox is unreachable", async () => {
     soniox.mockRejectedValueOnce(new TypeError("network down"));
-    expect((await issueSonioxKey(keyRequest(), env, NOW)).status).toBe(502);
+    expect((await issueSonioxKey(keyRequest(), usOnly, NOW)).status).toBe(502);
   });
 
   it("returns 502 on an unexpected response shape", async () => {
     soniox.mockResolvedValueOnce(Response.json({ key: "x" }));
-    expect((await issueSonioxKey(keyRequest(), env, NOW)).status).toBe(502);
+    expect((await issueSonioxKey(keyRequest(), usOnly, NOW)).status).toBe(502);
   });
 });
 

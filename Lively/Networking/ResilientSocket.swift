@@ -22,10 +22,13 @@ protocol SocketDialect: AnyObject {
     func receive(_ message: URLSessionWebSocketTask.Message) -> SocketSignal
     /// The session was torn down after it had started.
     func sessionDidReset()
+    /// The connection is up and can take audio.
+    func sessionDidOpen()
 }
 
 extension SocketDialect {
     func keyRejected() -> SocketSignal { .fail(rejectedKeyMessage) }
+    func sessionDidOpen() {}
 }
 
 enum SocketSetupError: Error {
@@ -218,6 +221,7 @@ final class ResilientSocket {
             isReady = true
             failures = 0
             status = .live
+            dialect.sessionDidOpen()
             let pending = backlog
             backlog.removeAll()
             pending.forEach(enqueueAudio)
