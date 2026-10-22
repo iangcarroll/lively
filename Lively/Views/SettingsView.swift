@@ -227,7 +227,7 @@ private struct AccountRow: View {
                     .font(.title3.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(email == nil ? "More translation time on every device" : "Account")
+                Text(email == nil ? "More translation time every day" : "Account")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
