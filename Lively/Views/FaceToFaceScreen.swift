@@ -128,13 +128,13 @@ private struct FaceToFaceHalf: View {
     private func statusLine(_ utterance: Utterance) -> some View {
         switch utterance.translationState {
         case .waitingForNetwork:
-            Label(language == .chinese ? "等待网络连接" : "Waiting for connection", systemImage: "wifi.slash")
+            Label(language.phrases.waitingForConnection, systemImage: "wifi.slash")
                 .font(.caption).foregroundStyle(.secondary)
         case .failed:
             Button {
                 store.retryTranslation(utterance)
             } label: {
-                Label(language == .chinese ? "翻译失败 · 重试" : "Translation failed · Retry", systemImage: "arrow.clockwise")
+                Label(language.phrases.translationFailed, systemImage: "arrow.clockwise")
                     .font(.caption)
             }
             .buttonStyle(.borderless)
@@ -146,17 +146,12 @@ private struct FaceToFaceHalf: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Text(store.isListening
-                 ? (language == .chinese ? "正在听，请直接说话" : "Listening. Go ahead and talk.")
-                 : (language == .chinese ? "点麦克风开始" : "Tap the mic to start"))
+            Text(store.isListening ? language.phrases.listening : language.phrases.tapToStart)
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(language.ink)
                 .contentTransition(.opacity)
                 .animation(.snappy, value: store.isListening)
-            // Other languages get English hints, naming the language to speak.
-            Text(language == .chinese
-                 ? "说中文就可以，Lively 会翻译给对方。"
-                 : "Speak \(language.englishName). Lively translates for the other person.")
+            Text(language.phrases.speakHint)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

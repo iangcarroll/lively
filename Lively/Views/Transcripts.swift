@@ -151,13 +151,11 @@ struct EmptyConversation: View {
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(.tertiary)
             VStack(spacing: 6) {
-                Text(isListening ? "Listening. Go ahead and talk." : "Tap the mic to start")
+                Text(prompt(in: languages.first))
                     .font(.title3.weight(.semibold))
-                if languages.contains(.chinese) {
-                    Text(isListening ? chineseListeningHint : "点麦克风开始")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Language.chinese.ink)
-                }
+                Text(prompt(in: languages.second))
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(languages.second.ink)
             }
             .contentTransition(.opacity)
             .animation(.snappy, value: isListening)
@@ -170,12 +168,7 @@ struct EmptyConversation: View {
         .padding(32)
     }
 
-    private var chineseListeningHint: String {
-        let other = languages.other(than: .chinese)
-        if other == .english { return "正在听，说中文或英文都可以" }
-        guard let name = Locale(identifier: "zh-Hans").localizedString(forLanguageCode: other.rawValue) else {
-            return "正在听，请直接说话"
-        }
-        return "正在听，说中文或\(name)都可以"
+    private func prompt(in language: Language) -> String {
+        isListening ? language.phrases.listening : language.phrases.tapToStart
     }
 }
