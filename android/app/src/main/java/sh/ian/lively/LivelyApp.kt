@@ -19,6 +19,7 @@ import sh.ian.lively.model.LanguageDetector
 import sh.ian.lively.model.Pro
 import sh.ian.lively.model.ScriptConverter
 import sh.ian.lively.model.SpeechProviders
+import sh.ian.lively.net.BrokerTranslator
 import sh.ian.lively.net.RegionProber
 import sh.ian.lively.net.SonioxKeyProvider
 import sh.ian.lively.support.DebugFlags
@@ -53,6 +54,14 @@ class LivelyApp : Application() {
          */
         private val installID: String = secrets.read(INSTALL_ID) ?: UUID.randomUUID().toString().also { secrets.write(it, INSTALL_ID) }
 
+        /** Who's asking, for the broker's limits. */
+        private val identity = object : SonioxKeyProvider.Identity {
+            override val accountToken get() = account?.token
+            override fun accountTokenRejected(token: String) { account?.tokenWasRejected(token) }
+            override val playPurchaseToken get() = pro.purchaseToken
+            override fun freeLimitReached() { pro.freeLimitReached = true }
+        }
+
         /** Null when the build has no key broker, so Soniox needs a key entered in Settings. */
         val keyProvider: SonioxKeyProvider? = brokerURL?.let { url ->
             SonioxKeyProvider(
@@ -60,14 +69,12 @@ class LivelyApp : Application() {
                 regions = RegionProber(prefs, scope),
                 scope = scope,
                 installID = installID,
-                identity = object : SonioxKeyProvider.Identity {
-                    override val accountToken get() = account?.token
-                    override fun accountTokenRejected(token: String) { account?.tokenWasRejected(token) }
-                    override val playPurchaseToken get() = pro.purchaseToken
-                    override fun freeLimitReached() { pro.freeLimitReached = true }
-                },
+                identity = identity,
             )
         }
+
+        /** Translates typed text; null when the build has no key broker. */
+        val brokerTranslator: BrokerTranslator? = brokerURL?.let { BrokerTranslator(it, installID, identity) }
 
         val settings = AppSettings(prefs, secrets, SpeechProviders.all(scope, keyProvider))
 

@@ -146,8 +146,8 @@ private fun TranscriptLayout(
         val utterances = store.visibleUtterances
         when {
             utterances.isEmpty() -> EmptyConversation(store.isListening, settings.languages, settings.chineseScript, Modifier.padding(barSpace))
-            wide -> ParallelTranscript(utterances, settings.languages, store::retryTranslation, contentPadding = barSpace)
-            else -> ChatTranscript(utterances, settings.languages, store::retryTranslation, contentPadding = barSpace)
+            wide -> ParallelTranscript(utterances, settings.languages, store::retryTranslation, store::delete, contentPadding = barSpace)
+            else -> ChatTranscript(utterances, settings.languages, store::retryTranslation, store::delete, contentPadding = barSpace)
         }
 
         // Top bar: status, then layout and settings.

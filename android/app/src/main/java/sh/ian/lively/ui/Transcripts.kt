@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
@@ -36,6 +37,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -97,6 +101,7 @@ fun ChatTranscript(
     utterances: List<Utterance>,
     pair: LanguagePair,
     onRetry: (Utterance) -> Unit,
+    onDelete: (Utterance) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
@@ -113,7 +118,9 @@ fun ChatTranscript(
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
     ) {
         items(utterances.asReversed(), key = { it.id }) { utterance ->
-            UtteranceBubble(utterance, pair, onRetry = { onRetry(utterance) }, modifier = Modifier.animateItem())
+            SwipeToDelete(onDelete = { onDelete(utterance) }, modifier = Modifier.animateItem()) {
+                UtteranceBubble(utterance, pair, onRetry = { onRetry(utterance) }, onDelete = { onDelete(utterance) })
+            }
         }
     }
 }
@@ -127,7 +134,13 @@ fun ChatTranscript(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun UtteranceBubble(utterance: Utterance, pair: LanguagePair, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun UtteranceBubble(
+    utterance: Utterance,
+    pair: LanguagePair,
+    onRetry: () -> Unit,
+    onDelete: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val spoken = utterance.language
     val leading = spoken == utterance.languages.first
     val ink = spoken.ink(pair)
@@ -151,7 +164,7 @@ fun UtteranceBubble(utterance: Utterance, pair: LanguagePair, onRetry: () -> Uni
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             menu = true
                         },
-                        onLongClickLabel = "Copy or share",
+                        onLongClickLabel = if (onDelete != null) "Copy, share or delete" else "Copy or share",
                     )
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -174,7 +187,7 @@ fun UtteranceBubble(utterance: Utterance, pair: LanguagePair, onRetry: () -> Uni
                     }
                 }
             }
-            CopyMenu(menu, onDismiss = { menu = false }, utterance)
+            CopyMenu(menu, onDismiss = { menu = false }, utterance, onDelete)
         }
     }
 }
@@ -224,7 +237,7 @@ fun RetryButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Utterance) {
+private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Utterance, onDelete: (() -> Unit)?) {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -255,7 +268,52 @@ private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Uttera
                 context.startActivity(Intent.createChooser(send, null))
             },
         )
+        if (onDelete != null) {
+            HorizontalDivider()
+            DeleteMenuItem { onDismiss(); onDelete() }
+        }
     }
+}
+
+@Composable
+private fun DeleteMenuItem(onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
+        onClick = onClick,
+    )
+}
+
+/** Swipe a transcript turn toward the start edge to delete it. */
+@Composable
+private fun SwipeToDelete(onDelete: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val state = rememberSwipeToDismissBoxState()
+    SwipeToDismissBox(
+        state = state,
+        modifier = modifier,
+        enableDismissFromStartToEnd = false,
+        onDismiss = { onDelete() },
+        backgroundContent = {
+            // Bubbles don't fill the row, so draw nothing until a swipe starts.
+            if (state.dismissDirection != SwipeToDismissBoxValue.EndToStart) return@SwipeToDismissBox
+            val armed = state.targetValue == SwipeToDismissBoxValue.EndToStart
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(if (armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Icon(
+                    Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    tint = if (armed) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+        },
+        content = { content() },
+    )
 }
 
 /**
@@ -268,6 +326,7 @@ fun ParallelTranscript(
     utterances: List<Utterance>,
     pair: LanguagePair,
     onRetry: (Utterance) -> Unit,
+    onDelete: (Utterance) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
@@ -285,7 +344,9 @@ fun ParallelTranscript(
         ) {
             items(utterances.asReversed(), key = { it.id }) { utterance ->
                 Column(Modifier.animateItem()) {
-                    ParallelRow(utterance, pair) { onRetry(utterance) }
+                    SwipeToDelete(onDelete = { onDelete(utterance) }) {
+                        ParallelRow(utterance, pair, onRetry = { onRetry(utterance) }, onDelete = { onDelete(utterance) })
+                    }
                     HorizontalDivider(Modifier.alpha(0.4f))
                 }
             }
@@ -302,42 +363,61 @@ private fun Header(language: Language, pair: LanguagePair, modifier: Modifier) {
 }
 
 @Composable
-private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () -> Unit) {
-    Row(Modifier.padding(vertical = 14.dp)) {
-        for (language in utterance.languages.all) {
-            val spoken = utterance.language == language
-            val text = utterance.text(language)
-            InLanguage(language) {
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .padding(horizontal = 4.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(if (spoken) language.ink(pair).copy(alpha = 0.06f) else Color.Transparent)
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    LanguageTag(language, pair, spoken = spoken)
-                    if (text.isEmpty()) {
-                        when (utterance.translationState) {
-                            TranslationState.WaitingForNetwork, is TranslationState.Failed -> StatusLine(utterance, onRetry)
-                            else -> TypingDots(language.ink(pair), Modifier.padding(top = 6.dp))
+private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () -> Unit, onDelete: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    Box {
+        Row(
+            Modifier
+                .background(MaterialTheme.colorScheme.background)
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        menu = true
+                    },
+                    onLongClickLabel = "Delete",
+                )
+                .padding(vertical = 14.dp),
+        ) {
+            for (language in utterance.languages.all) {
+                val spoken = utterance.language == language
+                val text = utterance.text(language)
+                InLanguage(language) {
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (spoken) language.ink(pair).copy(alpha = 0.06f) else Color.Transparent)
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        LanguageTag(language, pair, spoken = spoken)
+                        if (text.isEmpty()) {
+                            when (utterance.translationState) {
+                                TranslationState.WaitingForNetwork, is TranslationState.Failed -> StatusLine(utterance, onRetry)
+                                else -> TypingDots(language.ink(pair), Modifier.padding(top = 6.dp))
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text,
+                                    style = MaterialTheme.typography.titleLarge.copy(localeList = language.localeList()),
+                                    fontWeight = if (spoken) FontWeight.Normal else FontWeight.Medium,
+                                    color = if (spoken) MaterialTheme.colorScheme.onSurface else language.ink(pair),
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                                if (spoken && !utterance.isFinal) TypingDots(language.ink(pair), Modifier.padding(bottom = 8.dp))
+                            }
+                            if (!spoken) StatusLine(utterance, onRetry)
                         }
-                    } else {
-                        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text,
-                                style = MaterialTheme.typography.titleLarge.copy(localeList = language.localeList()),
-                                fontWeight = if (spoken) FontWeight.Normal else FontWeight.Medium,
-                                color = if (spoken) MaterialTheme.colorScheme.onSurface else language.ink(pair),
-                                modifier = Modifier.weight(1f, fill = false),
-                            )
-                            if (spoken && !utterance.isFinal) TypingDots(language.ink(pair), Modifier.padding(bottom = 8.dp))
-                        }
-                        if (!spoken) StatusLine(utterance, onRetry)
                     }
                 }
             }
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
+            DeleteMenuItem { menu = false; onDelete() }
         }
     }
 }

@@ -13,9 +13,10 @@ broker, account and Pro allowance:
   sessions after a dropout, make-before-break handover when the network
   changes, and a warm session for a quick resume. All of it is a port of the
   Swift code, file by file (see the table below).
-- Typing instead of speaking from the keyboard button, translated on the
-  device with ML Kit when there's no Mistral key (Apple's Translation
-  framework on iOS).
+- Typing instead of speaking from the keyboard button, translated by
+  DeepSeek through the key broker, falling back to ML Kit on the device
+  (Apple's Translation framework on iOS).
+- Swipe a turn in the transcript, or long-press it, to delete it.
 - Optional email sign-in, and Lively Pro through Google Play Billing. The
   broker checks Play purchases with the Play Developer API
   ([Server/key-broker](../Server/key-broker/README.md#google-play-subscriptions)).
@@ -101,7 +102,7 @@ draws the same bubbles as the iOS icon.
 | `Audio/MicCapture.swift` | `audio/MicCapture.kt` (AudioRecord, `VOICE_RECOGNITION`, 80 ms chunks) |
 | `Networking/ResilientSocket.swift` | `net/ResilientSocket.kt` (OkHttp WebSockets) |
 | `Networking/SonioxTranscriber.swift`, `SonioxKeyProvider.swift`, `RegionProber.swift` | `net/` files of the same names |
-| `Networking/RealtimeTranscriber.swift`, `Translator.swift` | `net/RealtimeTranscriber.kt`, `net/MistralTranslator.kt` |
+| `Networking/RealtimeTranscriber.swift`, `Translator.swift` | `net/RealtimeTranscriber.kt`, `net/MistralTranslator.kt`, `net/BrokerTranslator.kt`, `net/OnDeviceTranslator.kt` |
 | `Model/ConversationStore.swift` | `model/ConversationStore.kt` |
 | `Model/Account.swift`, `Pro.swift` | `model/Account.kt`, `model/Pro.kt` (Play Billing) |
 | `Support/Keychain.swift` | `support/Stores.kt` (Keystore-sealed preferences, kept out of backups) |

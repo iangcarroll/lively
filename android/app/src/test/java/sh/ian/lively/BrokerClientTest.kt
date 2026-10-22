@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -20,7 +21,12 @@ import org.junit.Test
 import sh.ian.lively.model.Account
 import sh.ian.lively.model.ChineseScript
 import sh.ian.lively.model.Language
+import sh.ian.lively.model.Utterance
+import sh.ian.lively.net.BrokerTranslationException
+import sh.ian.lively.net.BrokerTranslator
+import sh.ian.lively.net.FallbackTranslator
 import sh.ian.lively.net.MistralTranslator
+import sh.ian.lively.net.TranslationService
 import sh.ian.lively.net.RegionProber
 import sh.ian.lively.net.SocketSetupException
 import sh.ian.lively.net.SonioxKeyProvider
@@ -134,6 +140,63 @@ class BrokerClientTest {
         } catch (e: TranslationException) {
             assertTrue(e.isPermanent)
         }
+    }
+
+    private val stream = "data: {\"choices\":[{\"delta\":{\"content\":\"你\"}}]}\n\n" +
+        "data: {\"choices\":[{\"delta\":{\"content\":\"好\"}}]}\n\n" +
+        "data: [DONE]\n\n"
+
+    private fun events(body: String) = MockResponse.Builder().code(200).addHeader("Content-Type", "text/event-stream").body(body).build()
+
+    @Test fun brokerTranslatesTypedText() = runTest {
+        server.enqueue(events(stream))
+        val identity = Identity().apply { accountToken = "session"; playPurchaseToken = "play-token" }
+        val translator = BrokerTranslator(base, "install-1", identity)
+        val tokens = translator.translate("Hello", Language.ENGLISH, Language.CHINESE, emptyList(), ChineseScript.TRADITIONAL).toList()
+        assertEquals(listOf("你", "好"), tokens)
+        val request = server.takeRequest()
+        assertEquals("/v1/translate", request.url.encodedPath)
+        assertEquals("install-1", request.headers["Lively-Install-ID"])
+        assertEquals("Bearer session", request.headers["Authorization"])
+        assertEquals("play-token", request.headers["Lively-Play-Purchase"])
+        val body = request.body!!.utf8()
+        assertTrue(body.contains("\"text\":\"Hello\""))
+        assertTrue(body.contains("\"target\":\"zh\""))
+        assertTrue(body.contains("\"script\":\"traditional\""))
+    }
+
+    @Test fun brokerRetriesRejectedSessionsAnonymously() = runTest {
+        server.enqueue(json(401, """{"error":"unauthorized","message":"Signed out"}"""))
+        server.enqueue(events(stream))
+        val identity = Identity().apply { accountToken = "old" }
+        val tokens = BrokerTranslator(base, "install-1", identity)
+            .translate("Hello", Language.ENGLISH, Language.CHINESE, emptyList(), ChineseScript.SIMPLIFIED).toList()
+        assertEquals(listOf("你", "好"), tokens)
+        assertEquals(listOf("old"), identity.rejected)
+        server.takeRequest()
+        assertNull(server.takeRequest().headers["Authorization"])
+    }
+
+    @Test fun brokerLimitMessagesComeThrough() = runTest {
+        server.enqueue(json(429, """{"error":"limit","message":"Today's free translations are used up."}"""))
+        try {
+            BrokerTranslator(base, "install-1", Identity())
+                .translate("Hello", Language.ENGLISH, Language.CHINESE, emptyList(), ChineseScript.SIMPLIFIED).toList()
+            fail("expected an error")
+        } catch (e: BrokerTranslationException) {
+            assertEquals("Today's free translations are used up.", e.message)
+            assertTrue(e.isPermanent)
+        }
+    }
+
+    @Test fun fallbackStandsInWhenTheBrokerFails() = runTest {
+        server.enqueue(json(429, """{"message":"Used up"}"""))
+        val fallback = object : TranslationService {
+            override fun translate(text: String, from: Language, to: Language, context: List<Utterance>, script: ChineseScript) = flowOf("本地")
+        }
+        val tokens = FallbackTranslator(BrokerTranslator(base, "install-1", Identity()), fallback)
+            .translate("Hello", Language.ENGLISH, Language.CHINESE, emptyList(), ChineseScript.SIMPLIFIED).toList()
+        assertEquals(listOf("本地"), tokens)
     }
 
     @Test fun signInStoresTheSession() = runTest {

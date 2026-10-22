@@ -68,30 +68,40 @@ class MistralTranslator(
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
-        return flow {
-            val call = client.newCall(request)
-            try {
-                call.execute().use { response ->
-                    if (!response.isSuccessful) throw TranslationException(response.code)
-                    val source = response.body.source()
-                    while (true) {
-                        val line = source.readUtf8Line() ?: break
-                        if (!line.startsWith("data:")) continue
-                        val payload = line.removePrefix("data:").trim()
-                        if (payload == "[DONE]") break
-                        val json = runCatching { Json.parseToJsonElement(payload) as? JsonObject }.getOrNull() ?: continue
-                        val delta = ((json["choices"] as? JsonArray)?.firstOrNull() as? JsonObject)?.obj("delta")
-                        val content = delta?.string("content")
-                        if (!content.isNullOrEmpty()) emit(content)
-                    }
-                }
-            } finally {
-                call.cancel()
-            }
-        }.flowOn(Dispatchers.IO)
+        return chatCompletionStream(client, request) { code, _ -> TranslationException(code) }
     }
 
     companion object {
         const val ENDPOINT = "https://api.mistral.ai/v1/chat/completions"
     }
 }
+
+/**
+ * Streams the `content` of OpenAI-style chat completion chunks. [failure]
+ * turns a non-2xx status and its body into the exception to throw.
+ */
+internal fun chatCompletionStream(
+    client: OkHttpClient,
+    request: Request,
+    failure: (code: Int, body: String) -> Exception,
+): Flow<String> = flow {
+    val call = client.newCall(request)
+    try {
+        call.execute().use { response ->
+            if (!response.isSuccessful) throw failure(response.code, response.peekBody(4096).string())
+            val source = response.body.source()
+            while (true) {
+                val line = source.readUtf8Line() ?: break
+                if (!line.startsWith("data:")) continue
+                val payload = line.removePrefix("data:").trim()
+                if (payload == "[DONE]") break
+                val json = runCatching { Json.parseToJsonElement(payload) as? JsonObject }.getOrNull() ?: continue
+                val delta = ((json["choices"] as? JsonArray)?.firstOrNull() as? JsonObject)?.obj("delta")
+                val content = delta?.string("content")
+                if (!content.isNullOrEmpty()) emit(content)
+            }
+        }
+    } finally {
+        call.cancel()
+    }
+}.flowOn(Dispatchers.IO)

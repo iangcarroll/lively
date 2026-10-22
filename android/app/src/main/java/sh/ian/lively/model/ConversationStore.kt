@@ -14,6 +14,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import sh.ian.lively.net.BrokerTranslationException
+import sh.ian.lively.net.FallbackTranslator
 import sh.ian.lively.net.MistralTranslator
 import sh.ian.lively.net.OnDeviceTranslationException
 import sh.ian.lively.net.OnDeviceTranslator
@@ -61,6 +63,8 @@ class ConversationStore(
     private val scope: CoroutineScope,
     private val host: ConversationHost,
     private val keyProvider: SonioxKeyProvider? = null,
+    /** DeepSeek through the key broker, for typed text; null without a broker. */
+    private val brokerTranslator: TranslationService? = null,
     demo: Boolean = false,
     /** Builds the engine; tests swap in a fake. */
     private val makePipeline: (SpeechProvider) -> SpeechPipeline = { it.makePipeline(settings) },
@@ -304,6 +308,21 @@ class ConversationStore(
     }
 
     /**
+     * Removes one turn. A translating engine's later updates to that
+     * segment go to the removed utterance, so it stays gone; words still
+     * arriving for a removed transcript-only turn start a new one.
+     */
+    fun delete(utterance: Utterance) {
+        val index = utterances.indexOfFirst { it === utterance }
+        if (index < 0) return
+        translations.remove(utterance.id)?.cancel()
+        debounces.remove(utterance.id)?.cancel()
+        if (current === utterance) current = null
+        utterances.removeAt(index)
+        dropoutIndex?.let { if (index < it) dropoutIndex = it - 1 }
+    }
+
+    /**
      * Adds a typed turn and translates it. [language] is the typist's
      * language, used when the text doesn't say which of the pair it's in.
      */
@@ -320,12 +339,13 @@ class ConversationStore(
 
     /**
      * Translates typed turns. Engines that translate speech by themselves
-     * don't translate text, so this falls back to a Mistral key if there is
-     * one, then to on-device translation.
+     * don't translate text, so this uses the broker's DeepSeek, falling back
+     * to on-device translation; then a Mistral key if there is one.
      */
     private val textTranslator: TranslationService
         get() {
             translator?.let { return it }
+            brokerTranslator?.let { return FallbackTranslator(it, onDeviceTranslator) }
             val key = settings.credential(SpeechProviders.mistralCredential)
             if (key.isNotEmpty()) return MistralTranslator(key, settings.translationModel)
             return onDeviceTranslator
@@ -564,7 +584,9 @@ class ConversationStore(
                     throw e
                 } catch (e: Exception) {
                     attempt += 1
-                    val permanent = e is OnDeviceTranslationException || (e as? TranslationException)?.isPermanent == true
+                    val permanent = e is OnDeviceTranslationException ||
+                        (e as? BrokerTranslationException)?.isPermanent == true ||
+                        (e as? TranslationException)?.isPermanent == true
                     if (permanent || attempt >= 4) {
                         utterance.translationState = TranslationState.Failed(e.message ?: "Translation failed")
                         translations.remove(utterance.id)

@@ -270,6 +270,18 @@ final class ConversationStore {
         utterances.removeAll()
     }
 
+    /// Removes one turn. A translating engine's later updates to that
+    /// segment go to the removed utterance, so it stays gone; words still
+    /// arriving for a removed transcript-only turn start a new one.
+    func delete(_ utterance: Utterance) {
+        guard let index = utterances.firstIndex(where: { $0 === utterance }) else { return }
+        translations.removeValue(forKey: utterance.id)?.cancel()
+        debounces.removeValue(forKey: utterance.id)?.cancel()
+        if current === utterance { current = nil }
+        utterances.remove(at: index)
+        if let dropoutIndex, index < dropoutIndex { self.dropoutIndex = dropoutIndex - 1 }
+    }
+
     /// Adds a typed turn and translates it. `language` is the typist's
     /// language, used when the text doesn't say which of the pair it's in.
     func submitTyped(_ text: String, language: Language) {
