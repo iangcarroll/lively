@@ -14,6 +14,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import sh.ian.lively.net.MistralTranslator
+import sh.ian.lively.net.OnDeviceTranslationException
+import sh.ian.lively.net.OnDeviceTranslator
 import sh.ian.lively.net.RegionProber
 import sh.ian.lively.net.SonioxKeyProvider
 import sh.ian.lively.net.SpeechEngine
@@ -300,6 +303,46 @@ class ConversationStore(
         utterances.clear()
     }
 
+    /**
+     * Adds a typed turn and translates it. [language] is the typist's
+     * language, used when the text doesn't say which of the pair it's in.
+     */
+    fun submitTyped(text: String, language: Language) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        val detected = LanguageDetector.detect(trimmed, languages) ?: if (language in languages) language else languages.first
+        val utterance = Utterance(languages, trimmed, detected)
+        utterance.isTyped = true
+        utterance.isFinal = true
+        utterances += utterance
+        translate(utterance)
+    }
+
+    /**
+     * Translates typed turns. Engines that translate speech by themselves
+     * don't translate text, so this falls back to a Mistral key if there is
+     * one, then to on-device translation.
+     */
+    private val textTranslator: TranslationService
+        get() {
+            translator?.let { return it }
+            val key = settings.credential(SpeechProviders.mistralCredential)
+            if (key.isNotEmpty()) return MistralTranslator(key, settings.translationModel)
+            return onDeviceTranslator
+        }
+
+    private val onDeviceTranslator by lazy { OnDeviceTranslator() }
+
+    /** True when typed text needs on-device language models. */
+    val translatesTypedTextOnDevice: Boolean get() = textTranslator is OnDeviceTranslator
+
+    /** Downloads the on-device models typed text needs, if they aren't there yet. */
+    fun prepareTypedTranslation() {
+        if (!translatesTypedTextOnDevice) return
+        val pair = languages
+        scope.launch { runCatching { onDeviceTranslator.prepare(pair) } }
+    }
+
     fun retryTranslation(utterance: Utterance) {
         utterance.translatedSource = null
         translate(utterance)
@@ -481,7 +524,7 @@ class ConversationStore(
 
     private fun translate(utterance: Utterance) {
         val text = utterance.trimmedSource
-        val translator = translator ?: return
+        val translator = (if (utterance.isTyped) textTranslator else translator) ?: return
         if (text.isEmpty() || translations[utterance.id] != null) return
 
         val language = utterance.language
@@ -521,7 +564,7 @@ class ConversationStore(
                     throw e
                 } catch (e: Exception) {
                     attempt += 1
-                    val permanent = (e as? TranslationException)?.isPermanent ?: false
+                    val permanent = e is OnDeviceTranslationException || (e as? TranslationException)?.isPermanent == true
                     if (permanent || attempt >= 4) {
                         utterance.translationState = TranslationState.Failed(e.message ?: "Translation failed")
                         translations.remove(utterance.id)

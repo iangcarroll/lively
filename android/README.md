@@ -13,6 +13,9 @@ broker, account and Pro allowance:
   sessions after a dropout, make-before-break handover when the network
   changes, and a warm session for a quick resume. All of it is a port of the
   Swift code, file by file (see the table below).
+- Typing instead of speaking from the keyboard button, translated on the
+  device with ML Kit when there's no Mistral key (Apple's Translation
+  framework on iOS).
 - Optional email sign-in, and Lively Pro through Google Play Billing. The
   broker checks Play purchases with the Play Developer API
   ([Server/key-broker](../Server/key-broker/README.md#google-play-subscriptions)).

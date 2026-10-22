@@ -97,6 +97,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.billing)
+    implementation(libs.mlkit.translate)
     // Play Billing brings an old Fragment; ActivityResult needs 1.3 or later.
     implementation(libs.androidx.fragment)
     debugImplementation(libs.compose.ui.tooling)

@@ -18,6 +18,10 @@ Settings are stored in the Keychain.
 
 Soniox is the default because it won the [benchmark](Tools/probe/RESULTS.md).
 
+When speaking isn't practical, the keyboard button opens a text field: typed
+lines are translated by the engine's translator, a Mistral key if one is set, or
+on the device (Apple's Translation framework; ML Kit on Android).
+
 Soniox only outputs Simplified Chinese. When Settings › Chinese is 繁體, Lively
 converts its output on the device.
 

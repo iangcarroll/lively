@@ -1,6 +1,7 @@
 package sh.ian.lively.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -72,6 +73,8 @@ fun FaceToFaceScreen(
     /** Language of the person on the near (bottom) side. */
     nearLanguage: Language,
     onSwap: () -> Unit,
+    showsTextInput: Boolean,
+    onShowsTextInputChange: (Boolean) -> Unit,
     onShowTranscript: () -> Unit,
     onShowSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -87,8 +90,18 @@ fun FaceToFaceScreen(
             // Rotated, its bottom edge is the top of the screen.
             edgePadding = contentPadding.calculateTopPadding(),
         )
-        ControlStrip(store, onSwap, onShowTranscript, onShowSettings)
-        FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f), edgePadding = contentPadding.calculateBottomPadding())
+        ControlStrip(store, onSwap, showsTextInput, onShowsTextInputChange, onShowTranscript, onShowSettings)
+        val bottom = contentPadding.calculateBottomPadding()
+        FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f), edgePadding = if (showsTextInput) 0.dp else bottom)
+        // The near person types; the far side reads the translation. The
+        // bottom padding includes the keyboard, so the halves make room for it.
+        AnimatedVisibility(showsTextInput) {
+            TypeToTranslateBar(
+                store, nearLanguage,
+                onClose = { onShowsTextInputChange(false) },
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottom + 8.dp),
+            )
+        }
     }
 }
 
@@ -96,6 +109,8 @@ fun FaceToFaceScreen(
 private fun ControlStrip(
     store: ConversationStore,
     onSwap: () -> Unit,
+    showsTextInput: Boolean,
+    onShowsTextInputChange: (Boolean) -> Unit,
     onShowTranscript: () -> Unit,
     onShowSettings: () -> Unit,
 ) {
@@ -113,8 +128,13 @@ private fun ControlStrip(
                     .padding(horizontal = if (narrow) 12.dp else 16.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                Row(
+                    Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(if (narrow) 6.dp else 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     StatusPill(store.status, store.isListening, compact = true)
+                    TextInputToggle(showsTextInput, onShowsTextInputChange, size = buttonSize)
                 }
                 MicButton(store.isListening, store.level, onClick = store::toggleListening, size = if (narrow) 66.dp else 76.dp)
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(if (narrow) 6.dp else 10.dp, Alignment.End)) {

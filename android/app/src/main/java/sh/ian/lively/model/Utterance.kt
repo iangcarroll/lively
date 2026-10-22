@@ -43,6 +43,9 @@ class Utterance(
      */
     var isLate by mutableStateOf(false)
 
+    /** Typed instead of spoken. */
+    var isTyped = false
+
     /** The transcript the current [translation] was produced from. */
     var translatedSource: String? = null
 
