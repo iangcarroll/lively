@@ -1,6 +1,6 @@
 # Lively
 
-Live English ⇄ Chinese conversation translation for iOS and macOS.
+Live English ⇄ Chinese conversation translation for iOS, macOS and Android.
 
 Either person speaks whenever they want. The speech engine detects the language
 and the turn boundaries, and each turn is translated as it's spoken.
@@ -22,6 +22,9 @@ Soniox only outputs Simplified Chinese. When Settings › Chinese is 繁體, Liv
 converts its output on the device.
 
 ## Run
+
+The Android app lives in [`android/`](android/README.md). Everything below
+describes the iOS and macOS app; the Android app mirrors it file by file.
 
 Open `Lively.xcodeproj` and run the **Lively** scheme on an iPhone, iPad
 simulator, or **My Mac**.

@@ -7,6 +7,7 @@
  *   Lively-Region: us | jp   (optional; the app's measured best region)
  *   Authorization: Bearer <session token>   (optional; see auth.ts)
  *   Lively-Subscription: <signed App Store transaction>   (optional; see appstore.ts)
+ *   Lively-Play-Purchase: <Google Play purchase token>    (optional; see play.ts)
  *   → 200 {api_key, expires_at, expires_in_seconds, max_session_seconds,
  *          region, websocket_url, regions, plan}
  *
@@ -23,13 +24,14 @@
  * budget, and isn't held to the per-IP daily budget, so people behind one
  * carrier NAT don't use up each other's time.
  *
- * Pro callers, with an App Store subscription or an account with `free_pro`,
+ * Pro callers, with an App Store or Google Play subscription or an account with `free_pro`,
  * get the PRO_ limits. A subscription is charged per subscription, wherever
  * it's used, and like an account isn't held to the per-IP daily budget.
  */
 
 import { proSubscription } from "./appstore";
 import { authenticate, unauthorized } from "./auth";
+import { proPlayPurchase } from "./play";
 
 export interface Env {
   DB: D1Database;
@@ -67,6 +69,11 @@ export interface Env {
   APP_STORE_ENVIRONMENTS: string;
   /** Tests only: trust this root (base64 DER) instead of Apple's. */
   APP_STORE_TEST_ROOT?: string;
+  /** Google Play: the Android app's package name, and the JSON key of a service account that can read its purchases. */
+  PLAY_PACKAGE_NAME: string;
+  GOOGLE_PLAY_SERVICE_ACCOUNT?: string;
+  /** "true" to count Play's test purchases, as license testers and internal testing make. */
+  PLAY_ALLOW_TEST_PURCHASES: string;
 }
 
 export type Region = "us" | "jp";
@@ -115,10 +122,12 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
   if (auth.state === "invalid") return unauthorized();
   const installHash = await hash(`install:${installID.toLowerCase()}`);
   const userHash = auth.state === "signed_in" ? await hash(`user:${auth.user.id}`) : undefined;
-  const subscription = await proSubscription(request, env, now);
-  const subscriptionHash = subscription ? await hash(`subscription:${subscription.originalTransactionId}`) : undefined;
+  // Google is only asked when there's no App Store subscription. Play IDs start with `play:`.
+  const appStore = await proSubscription(request, env, now);
+  const subscriptionID = appStore?.originalTransactionId ?? (await proPlayPurchase(request, env, now))?.id;
+  const subscriptionHash = subscriptionID ? await hash(`subscription:${subscriptionID}`) : undefined;
   const ipHash = await hash(`ip:${networkOf(request.headers.get("CF-Connecting-IP") ?? "local")}`);
-  const plan = subscription || (auth.state === "signed_in" && auth.user.freePro) ? "pro" : "free";
+  const plan = subscriptionID || (auth.state === "signed_in" && auth.user.freePro) ? "pro" : "free";
 
   for (const subjectHash of [installHash, userHash, subscriptionHash]) {
     if (subjectHash && (await isDenied(env, subjectHash))) return error(403, "denied", "This install can't get keys.");

@@ -1,0 +1,35 @@
+name: Android
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "android/**"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: android
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      # Unit tests, lint, and a minified release build (debug-signed without
+      # the upload key), so R8 problems show up here rather than in Play.
+      - run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleRelease
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: android/app/build/reports

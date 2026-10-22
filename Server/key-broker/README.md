@@ -112,9 +112,10 @@ Errors are JSON `{error, message}`. A per-minute 429 carries a short
 ## Lively Pro
 
 Pro raises the daily budget to the `PRO_` limits. A caller is Pro if it sends
-an active subscription or is signed in to an account with `free_pro`.
+an active App Store or Google Play subscription or is signed in to an account
+with `free_pro`.
 
-### Subscriptions
+### App Store subscriptions
 
 The app sends its current StoreKit 2 transaction (`jwsRepresentation`) as
 `Lively-Subscription` with each key request. `src/appstore.ts` checks it
@@ -156,6 +157,57 @@ and `REVOKE` add the original transaction ID to `revoked_subscriptions`;
 acknowledged and ignored. In App Store Connect, set **App Information › App
 Store Server Notifications** to `https://lively.ian.sh/v1/appstore/notifications`,
 Version 2, for both Production and Sandbox.
+
+### Google Play subscriptions
+
+The Android app sells the same products (`PRO_PRODUCT_IDS`) through Play
+Billing and sends its current Pro purchase's token as `Lively-Play-Purchase`
+with each key request. It never sends `Lively-Subscription`. A token isn't
+signed data, so `src/play.ts` asks Google about it, but only when there's no
+valid App Store subscription:
+
+1. It signs an RS256 JWT as the service account in the
+   `GOOGLE_PLAY_SERVICE_ACCOUNT` secret and exchanges it at
+   `https://oauth2.googleapis.com/token` for an `androidpublisher` access
+   token, which it keeps until a minute before it expires.
+2. It gets `purchases/subscriptionsv2/tokens/{token}` for `PLAY_PACKAGE_NAME`
+   from the Google Play Developer API.
+3. The purchase counts if `subscriptionState` is `ACTIVE`, `IN_GRACE_PERIOD`
+   or `CANCELED` (cancelled but paid through), a line item's `productId` is in
+   `PRO_PRODUCT_IDS` with an `expiryTime` in the future, and it isn't a
+   `testPurchase` unless `PLAY_ALLOW_TEST_PURCHASES` is `true`.
+
+Each answer is kept in memory for 5 minutes per token (but never past the
+line item's expiry), bad tokens included, so a key every few minutes doesn't
+ask Google every time. Google answering 400, 404 or 410 means a bad token. If
+Google errors or can't be reached, the caller gets the plan it would have
+without the purchase, and Google is asked again after 30 seconds. Refunds and
+revocations expire the subscription at Google, so they take effect at the next
+check.
+
+A token can be copied too, so Pro usage is charged to
+`subscription:<hash of "play:" + hash of the token>`, which can't collide with
+an App Store original transaction ID. An upgrade or resubscription gets a new
+token, and so a fresh daily budget.
+
+`PLAY_ALLOW_TEST_PURCHASES` is `true` for now, like `Sandbox` for TestFlight:
+license testers and internal testing tracks buy for free.
+
+Without `GOOGLE_PLAY_SERVICE_ACCOUNT`, the header is ignored. To set it up once:
+
+1. In Google Cloud, pick or create a project, enable the **Google Play Android
+   Developer API**, and create a service account (IAM & Admin › Service
+   Accounts) with no project roles. Under its Keys tab, add a JSON key.
+2. In Play Console, go to **Users and permissions**, invite the service
+   account's email, and grant it **View financial data, orders and
+   cancellation survey responses** for Lively. It can take a while to work.
+3. Store the key file's whole contents as the secret:
+
+   ```bash
+   npx wrangler secret put GOOGLE_PLAY_SERVICE_ACCOUNT < service-account.json
+   ```
+
+   Then delete the downloaded key file.
 
 ### Free Pro accounts
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Secrets are sealed with a Keystore key that never leaves this device, so
+     they can't be restored elsewhere: leave them out of backups and transfers. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="lively.secrets.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="lively.secrets.xml" />
+    </device-transfer>
+</data-extraction-rules>

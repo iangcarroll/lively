@@ -59,6 +59,12 @@
     // Lively Pro. Sandbox is TestFlight's environment, where purchases are free.
     "APP_BUNDLE_ID": "sh.ian.lively",
     "PRO_PRODUCT_IDS": "sh.ian.lively.pro.monthly,sh.ian.lively.pro.yearly",
-    "APP_STORE_ENVIRONMENTS": "Production,Sandbox"
+    "APP_STORE_ENVIRONMENTS": "Production,Sandbox",
+    // Google Play. The service account's JSON key is the secret
+    // GOOGLE_PLAY_SERVICE_ACCOUNT; without it, Play purchases are ignored.
+    // Test purchases (license testers, internal testing) count for now, like
+    // TestFlight's Sandbox. Set "false" once Android testing is done.
+    "PLAY_PACKAGE_NAME": "sh.ian.lively",
+    "PLAY_ALLOW_TEST_PURCHASES": "true"
   }
 }
