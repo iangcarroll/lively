@@ -14,7 +14,13 @@ struct SpeechProvider: Identifiable {
     let credentials: [ProviderCredential]
     /// App settings that affect this provider, so Settings shows only those.
     let options: Set<ProviderOption>
+    /// Languages it can listen for, in any pair.
+    let languages: [Language]
     let makePipeline: (AppSettings) -> SpeechPipeline
+
+    func supports(_ pair: LanguagePair) -> Bool {
+        pair.all.allSatisfy(languages.contains)
+    }
 
     static let all: [SpeechProvider] = [.soniox, .voxtralMistral]
     /// Soniox won the 2026-10-20 benchmark (Tools/probe/RESULTS.md): every

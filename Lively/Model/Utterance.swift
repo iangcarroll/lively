@@ -19,8 +19,10 @@ final class Utterance: Identifiable {
     let id = UUID()
     let createdAt = Date()
 
+    /// The conversation's languages when this turn was spoken.
+    let languages: LanguagePair
     private(set) var source: String = ""
-    private(set) var language: Language = .english
+    private(set) var language: Language
     var translation: String = ""
     var translationState: TranslationState = .idle
 
@@ -34,24 +36,29 @@ final class Utterance: Identifiable {
     /// The transcript the current `translation` was produced from.
     var translatedSource: String?
 
-    init(source: String = "", language: Language? = nil) {
+    init(source: String = "", language: Language? = nil, languages: LanguagePair) {
+        self.languages = languages
+        self.language = languages.first
         if !source.isEmpty { append(source) }
         if let language { self.language = language }
     }
 
     func append(_ delta: String) {
         source += delta
-        if let detected = Language.detect(source) { language = detected }
+        if let detected = Language.detect(source, in: languages) { language = detected }
     }
 
     /// Replaces the transcript, for engines that revise provisional words.
     func setSource(_ text: String, language: Language?) {
         source = text
-        if let language { self.language = language } else if let detected = Language.detect(source) { self.language = detected }
+        if let language { self.language = language } else if let detected = Language.detect(source, in: languages) { self.language = detected }
     }
 
     /// The transcript without filler words. This is what's shown and translated.
-    var trimmedSource: String { Filler.strip(source) }
+    var trimmedSource: String { Filler.strip(source, in: language) }
+
+    /// The language the translation is in.
+    var target: Language { languages.other(than: language) }
 
     /// False while the turn is empty or only filler so far.
     var hasContent: Bool { !trimmedSource.isEmpty }

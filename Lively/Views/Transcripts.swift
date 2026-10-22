@@ -25,17 +25,18 @@ struct ChatTranscript: View {
     }
 }
 
-/// Wide layout (iPhone Duo unfolded, landscape, iPad, Mac): English and
-/// Chinese in side-by-side columns, one row per turn. Each person reads
+/// Wide layout (iPhone Duo unfolded, landscape, iPad, Mac): the two
+/// languages in side-by-side columns, one row per turn. Each person reads
 /// straight down their own column.
 struct ParallelTranscript: View {
     let store: ConversationStore
+    var languages: LanguagePair { AppSettings.shared.languages }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                header(.english)
-                header(.chinese)
+                header(languages.first)
+                header(languages.second)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
@@ -75,8 +76,8 @@ private struct ParallelRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            cell(.english)
-            cell(.chinese)
+            cell(utterance.languages.first)
+            cell(utterance.languages.second)
         }
         .padding(.vertical, 14)
         .animation(.snappy(duration: 0.25), value: utterance.translation)
@@ -142,6 +143,7 @@ private struct ParallelRow: View {
 
 struct EmptyConversation: View {
     var isListening: Bool
+    var languages: LanguagePair { AppSettings.shared.languages }
 
     var body: some View {
         VStack(spacing: 18) {
@@ -151,18 +153,29 @@ struct EmptyConversation: View {
             VStack(spacing: 6) {
                 Text(isListening ? "Listening. Go ahead and talk." : "Tap the mic to start")
                     .font(.title3.weight(.semibold))
-                Text(isListening ? "正在听，说中文或英文都可以" : "点麦克风开始")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Language.chinese.ink)
+                if languages.contains(.chinese) {
+                    Text(isListening ? chineseListeningHint : "点麦克风开始")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Language.chinese.ink)
+                }
             }
             .contentTransition(.opacity)
             .animation(.snappy, value: isListening)
-            Text("Lively hears English and Chinese and translates both ways. No need to say who's speaking.")
+            Text("Lively hears \(languages.first.englishName) and \(languages.second.englishName) and translates both ways. No need to say who's speaking.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 320)
         }
         .padding(32)
+    }
+
+    private var chineseListeningHint: String {
+        let other = languages.other(than: .chinese)
+        if other == .english { return "正在听，说中文或英文都可以" }
+        guard let name = Locale(identifier: "zh-Hans").localizedString(forLanguageCode: other.rawValue) else {
+            return "正在听，请直接说话"
+        }
+        return "正在听，说中文或\(name)都可以"
     }
 }

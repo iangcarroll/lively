@@ -3,7 +3,7 @@ import Foundation
 protocol TranslationService {
     /// Streams the translation of `text` token by token.
     func translate(
-        _ text: String, from source: Language, context: [Utterance], script: ChineseScript
+        _ text: String, from source: Language, to target: Language, context: [Utterance], script: ChineseScript
     ) -> AsyncThrowingStream<String, Error>
 }
 
@@ -15,12 +15,12 @@ struct MistralTranslator: TranslationService {
     private static let endpoint = URL(string: "https://api.mistral.ai/v1/chat/completions")!
 
     func translate(
-        _ text: String, from source: Language, context: [Utterance], script: ChineseScript
+        _ text: String, from source: Language, to target: Language, context: [Utterance], script: ChineseScript
     ) -> AsyncThrowingStream<String, Error> {
-        let target = source == .english ? script.promptName : "English"
+        func name(_ language: Language) -> String { language == .chinese ? script.promptName : language.englishName }
         let system = """
-        You are a live interpreter between English and \(script.promptName) in a spoken, face-to-face \
-        conversation. Translate the user's message into \(target). The text is a speech transcript and \
+        You are a live interpreter between \(name(source)) and \(name(target)) in a spoken, face-to-face \
+        conversation. Translate the user's message into \(name(target)). The text is a speech transcript and \
         may be unpunctuated or end mid-sentence; translate it naturally, as a person would say it, and \
         don't complete unfinished thoughts. Keep names, numbers and units exact. Reply with the \
         translation only: no quotes, notes or romanization.

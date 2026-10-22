@@ -22,8 +22,12 @@ enum Filler {
     /// Doubled spaces and spaces before punctuation, left where a filler was.
     private static let looseSpace = try! NSRegularExpression(pattern: #"(?<= ) +| +(?=[,.!?])"#)
 
-    static func strip(_ text: String) -> String {
+    /// Only English and Chinese fillers are known. Other languages pass
+    /// through, since "er" or "um" can be real words in them.
+    static func strip(_ text: String, in language: Language) -> String {
+        guard language == .english || language == .chinese else { return text }
         var result = text
+        // Both, since English and Chinese mix: "um 我们去" or "呃, the station".
         result = replace(english, in: result, with: " ")
         result = replace(chinese, in: result, with: "$1")
         result = replace(leadingPunctuation, in: result, with: "")

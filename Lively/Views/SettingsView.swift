@@ -19,6 +19,20 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    languagePicker("First language", selection: \.first)
+                    languagePicker("Second language", selection: \.second)
+                    if settings.languages.contains(.chinese) {
+                        Picker("Chinese script", selection: $settings.chineseScript) {
+                            ForEach(ChineseScript.allCases) { Text($0.label).tag($0) }
+                        }
+                    }
+                } header: {
+                    Text("Languages")
+                } footer: {
+                    Text("Lively listens for both languages and translates each into the other. \(provider.name) supports \(provider.languages.count) languages.")
+                }
+
+                Section {
                     ForEach(provider.credentials) { credential in
                         SecureField(credential.name, text: draft(for: credential))
                             .textContentType(.password)
@@ -34,30 +48,29 @@ struct SettingsView: View {
                     Text((["Stored in the Keychain on this device."] + provider.credentials.map(\.help)).joined(separator: " "))
                 }
 
-                Section {
-                    if provider.options.contains(.speed) {
-                        Picker("Speed", selection: $settings.latency) {
-                            ForEach(Latency.allCases) { latency in
-                                Text("\(latency.label) · \(latency.milliseconds) ms").tag(latency)
+                if !provider.options.isEmpty {
+                    Section {
+                        if provider.options.contains(.speed) {
+                            Picker("Speed", selection: $settings.latency) {
+                                ForEach(Latency.allCases) { latency in
+                                    Text("\(latency.label) · \(latency.milliseconds) ms").tag(latency)
+                                }
                             }
                         }
+                        if provider.options.contains(.translationModel) {
+                            TextField("Translation model", text: $settings.translationModel)
+                                .autocorrectionDisabled()
+                                #if os(iOS)
+                                .textInputAutocapitalization(.never)
+                                #endif
+                        }
+                    } header: {
+                        Text("Translation")
+                    } footer: {
+                        Text(provider.options.contains(.speed)
+                            ? "Faster speed shows words sooner; Accurate waits a little longer for better transcripts. Changes apply the next time you start listening."
+                            : "Changes apply the next time you start listening.")
                     }
-                    Picker("Chinese", selection: $settings.chineseScript) {
-                        ForEach(ChineseScript.allCases) { Text($0.label).tag($0) }
-                    }
-                    if provider.options.contains(.translationModel) {
-                        TextField("Translation model", text: $settings.translationModel)
-                            .autocorrectionDisabled()
-                            #if os(iOS)
-                            .textInputAutocapitalization(.never)
-                            #endif
-                    }
-                } header: {
-                    Text("Translation")
-                } footer: {
-                    Text(provider.options.contains(.speed)
-                        ? "Faster speed shows words sooner; Accurate waits a little longer for better transcripts. Changes apply the next time you start listening."
-                        : "Changes apply the next time you start listening.")
                 }
 
                 if let account = Account.shared {
@@ -102,6 +115,27 @@ struct SettingsView: View {
     }
 
     private var provider: SpeechProvider { settings.provider }
+
+    /// Picks one side of the pair. Choosing the other side's language swaps them.
+    private func languagePicker(_ title: String, selection side: WritableKeyPath<LanguagePair, Language>) -> some View {
+        let binding = Binding<Language>(
+            get: { settings.languages[keyPath: side] },
+            set: { language in
+                var pair = settings.languages
+                if pair.other(than: pair[keyPath: side]) == language {
+                    pair = LanguagePair(first: pair.second, second: pair.first)
+                } else {
+                    pair[keyPath: side] = language
+                }
+                settings.languages = pair
+            }
+        )
+        return Picker(title, selection: binding) {
+            ForEach(provider.languages.sorted { $0.englishName < $1.englishName }) { language in
+                Text(language.pickerName).tag(language)
+            }
+        }
+    }
 
     private func draft(for credential: ProviderCredential) -> Binding<String> {
         Binding(

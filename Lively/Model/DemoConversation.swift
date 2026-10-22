@@ -43,7 +43,7 @@ final class DemoConversation {
     /// Splits English into words and Chinese into 1-3 character chunks,
     /// roughly how realtime transcription streams them.
     private static func pieces(of text: String) -> [String] {
-        if Language.detect(text) == .english {
+        if Language.detect(text, in: .default) == .english {
             return text.split(separator: " ").enumerated().map { $0.offset == 0 ? String($0.element) : " " + $0.element }
         }
         var result: [String] = []
@@ -60,7 +60,7 @@ final class DemoConversation {
 /// Returns canned translations from the demo script, streamed in pieces.
 struct DemoTranslator: TranslationService {
     func translate(
-        _ text: String, from source: Language, context: [Utterance], script: ChineseScript
+        _ text: String, from source: Language, to target: Language, context: [Utterance], script: ChineseScript
     ) -> AsyncThrowingStream<String, Error> {
         let full = DemoConversation.script.first { $0.0.hasPrefix(text) }
         // Partial transcripts get a proportional slice of the final translation.

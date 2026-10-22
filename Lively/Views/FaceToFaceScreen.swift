@@ -6,6 +6,7 @@ import SwiftUI
 /// its reader's language. Controls sit in the middle so either person can reach them.
 struct FaceToFaceScreen: View {
     let store: ConversationStore
+    let languages: LanguagePair
     /// Language of the person on the near (bottom) side.
     @Binding var nearLanguage: Language
     var onShowTranscript: () -> Void
@@ -13,7 +14,7 @@ struct FaceToFaceScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            FaceToFaceHalf(store: store, language: nearLanguage.other)
+            FaceToFaceHalf(store: store, language: languages.other(than: nearLanguage))
                 .rotationEffect(.degrees(180))
             controlStrip
             FaceToFaceHalf(store: store, language: nearLanguage)
@@ -30,7 +31,7 @@ struct FaceToFaceScreen: View {
             }
             HStack(spacing: 10) {
                 GlassIconButton(systemImage: "arrow.up.arrow.down", label: "Swap sides") {
-                    nearLanguage = nearLanguage.other
+                    nearLanguage = languages.other(than: nearLanguage)
                 }
                 Menu {
                     Button("Transcript View", systemImage: "list.bullet", action: onShowTranscript)
@@ -127,13 +128,13 @@ private struct FaceToFaceHalf: View {
     private func statusLine(_ utterance: Utterance) -> some View {
         switch utterance.translationState {
         case .waitingForNetwork:
-            Label(language == .english ? "Waiting for connection" : "等待网络连接", systemImage: "wifi.slash")
+            Label(language == .chinese ? "等待网络连接" : "Waiting for connection", systemImage: "wifi.slash")
                 .font(.caption).foregroundStyle(.secondary)
         case .failed:
             Button {
                 store.retryTranslation(utterance)
             } label: {
-                Label(language == .english ? "Translation failed · Retry" : "翻译失败 · 重试", systemImage: "arrow.clockwise")
+                Label(language == .chinese ? "翻译失败 · 重试" : "Translation failed · Retry", systemImage: "arrow.clockwise")
                     .font(.caption)
             }
             .buttonStyle(.borderless)
@@ -146,15 +147,16 @@ private struct FaceToFaceHalf: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Text(store.isListening
-                 ? (language == .english ? "Listening. Go ahead and talk." : "正在听，请直接说话")
-                 : (language == .english ? "Tap the mic to start" : "点麦克风开始"))
+                 ? (language == .chinese ? "正在听，请直接说话" : "Listening. Go ahead and talk.")
+                 : (language == .chinese ? "点麦克风开始" : "Tap the mic to start"))
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(language.ink)
                 .contentTransition(.opacity)
                 .animation(.snappy, value: store.isListening)
-            Text(language == .english
-                 ? "Speak English. Lively translates for the other person."
-                 : "说中文就可以，Lively 会翻译给对方。")
+            // Other languages get English hints, naming the language to speak.
+            Text(language == .chinese
+                 ? "说中文就可以，Lively 会翻译给对方。"
+                 : "Speak \(language.englishName). Lively translates for the other person.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

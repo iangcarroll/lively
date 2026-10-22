@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One turn, shown chat-style: English speakers on the leading side,
-/// Chinese speakers on the trailing side, each bubble tinted with the
+/// One turn, shown chat-style: speakers of the pair's first language on the
+/// leading side, the second language on the trailing side, each bubble tinted with the
 /// speaker's language color. The spoken text sits on top; the translation,
 /// which the other person reads, is larger and in its own language's color.
 struct UtteranceBubble: View {
@@ -9,7 +9,7 @@ struct UtteranceBubble: View {
     var onRetry: () -> Void = {}
 
     private var spoken: Language { utterance.language }
-    private var leading: Bool { spoken == .english }
+    private var leading: Bool { spoken == utterance.languages.first }
 
     var body: some View {
         HStack {
@@ -33,7 +33,7 @@ struct UtteranceBubble: View {
                     Clipboard.copy(utterance.trimmedSource)
                 }
                 if !utterance.translation.isEmpty {
-                    Button("Copy \(spoken.other.nativeName)", systemImage: "doc.on.doc") {
+                    Button("Copy \(utterance.target.nativeName)", systemImage: "doc.on.doc") {
                         Clipboard.copy(utterance.translation)
                     }
                 }
@@ -63,7 +63,7 @@ struct UtteranceBubble: View {
 
     @ViewBuilder
     private var translation: some View {
-        let target = spoken.other
+        let target = utterance.target
         if !utterance.translation.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
                 block(target, text: utterance.translation, spoken: false)

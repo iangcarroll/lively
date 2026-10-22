@@ -131,6 +131,7 @@ extension SpeechProvider {
         summary: "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn.",
         credentials: [.mistral],
         options: [.speed, .translationModel],
+        languages: Language.voxtral,
         makePipeline: { settings in
             let key = settings.credential(.mistral)
             return SpeechPipeline(

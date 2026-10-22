@@ -2,8 +2,11 @@ import SwiftUI
 
 extension Language {
     /// Every piece of text in this language uses this color, whoever said it,
-    /// so each reader can find their language at a glance.
-    var ink: Color { self == .english ? Color(.englishInk) : Color(.chineseInk) }
+    /// so each reader can find their language at a glance. The color follows
+    /// the language's place in the chosen pair.
+    var ink: Color {
+        self == AppSettings.shared.languages.second ? Color(.secondLanguageInk) : Color(.firstLanguageInk)
+    }
 }
 
 extension Font {

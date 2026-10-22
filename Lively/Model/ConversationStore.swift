@@ -31,6 +31,8 @@ final class ConversationStore {
     var alert: String?
 
     private let settings: AppSettings
+    /// The languages of the turns in `utterances`.
+    private var languages: LanguagePair
     private let mic = MicCapture()
     private var engine: SpeechEngine?
     private let pathMonitor = NWPathMonitor()
@@ -62,6 +64,7 @@ final class ConversationStore {
 
     init(settings: AppSettings = .shared, demo: Bool = false) {
         self.settings = settings
+        languages = settings.languages
         if demo {
             self.demo = DemoConversation()
             self.translator = DemoTranslator()
@@ -234,6 +237,13 @@ final class ConversationStore {
     /// Settings can change the provider or key, which a warm session can't
     /// pick up, so the next start builds a new engine.
     func settingsDidClose() {
+        if languages != settings.languages {
+            // Turns in the old languages don't fit the new pair, and the
+            // engine listens for the old one.
+            languages = settings.languages
+            stopListening()
+            clear()
+        }
         if isListening { engineIsStale = true } else { releaseEngine() }
     }
 
@@ -278,7 +288,7 @@ final class ConversationStore {
             if let current {
                 utterance = current
             } else {
-                utterance = Utterance()
+                utterance = Utterance(languages: languages)
                 utterances.append(utterance)
                 current = utterance
             }
@@ -338,16 +348,12 @@ final class ConversationStore {
             // segments share the id sequence, so ids can skip.
             let last = segmentUtterances.keys.max()
             segmentUtterances = segmentUtterances.filter { $0.key == last }
-            utterance = Utterance()
+            utterance = Utterance(languages: languages)
             utterances.append(utterance)
             segmentUtterances[segment.id] = utterance
         }
 
-        let script = settings.chineseScript
-        utterance.setSource(script.convert(segment.source.trimmingLeadingWhitespace()), language: segment.language)
-        utterance.translation = script.convert(Filler.strip(segment.translation))
-        utterance.translatedSource = utterance.trimmedSource
-        utterance.translationState = segment.isClosed && !utterance.translation.isEmpty ? .current : .working
+        show(segment, in: utterance)
 
         if segment.isClosed {
             if current === utterance { finalizeCurrent() } else { utterance.isFinal = true }
@@ -371,7 +377,7 @@ final class ConversationStore {
             }
             let last = catchUpUtterances.keys.max()
             catchUpUtterances = catchUpUtterances.filter { $0.key == last }
-            utterance = Utterance()
+            utterance = Utterance(languages: languages)
             utterance.isLate = true
             let index = min(dropoutIndex ?? utterances.count, utterances.count)
             utterances.insert(utterance, at: index)
@@ -379,16 +385,27 @@ final class ConversationStore {
             catchUpUtterances[segment.id] = utterance
         }
 
-        let script = settings.chineseScript
-        utterance.setSource(script.convert(segment.source.trimmingLeadingWhitespace()), language: segment.language)
-        utterance.translation = script.convert(Filler.strip(segment.translation))
-        utterance.translatedSource = utterance.trimmedSource
-        utterance.translationState = segment.isClosed && !utterance.translation.isEmpty ? .current : .working
+        show(segment, in: utterance)
         utterance.isFinal = segment.isClosed
         if segment.isClosed && !utterance.hasContent {
             utterances.removeAll { $0 === utterance }
             dropoutIndex = dropoutIndex.map { max(0, $0 - 1) }
         }
+    }
+
+    private func show(_ segment: SpeechSegment, in utterance: Utterance) {
+        // Detect first, so only Chinese text gets the chosen script; Japanese kanji must not.
+        let source = segment.source.trimmingLeadingWhitespace()
+        let language = segment.language ?? Language.detect(source, in: languages) ?? utterance.language
+        let target = languages.other(than: language)
+        utterance.setSource(convertScript(source, in: language), language: language)
+        utterance.translation = convertScript(Filler.strip(segment.translation, in: target), in: target)
+        utterance.translatedSource = utterance.trimmedSource
+        utterance.translationState = segment.isClosed && !utterance.translation.isEmpty ? .current : .working
+    }
+
+    private func convertScript(_ text: String, in language: Language) -> String {
+        language == .chinese ? settings.chineseScript.convert(text) : text
     }
 
     /// Ends the turn if no text and no turn events have arrived for a while,
@@ -438,6 +455,7 @@ final class ConversationStore {
         guard !text.isEmpty, translations[utterance.id] == nil, let translator else { return }
 
         let language = utterance.language
+        let target = utterance.target
         let context = Array(utterances.prefix { $0 !== utterance }.filter { $0.isFinal && $0.hasContent }.suffix(3))
         let script = settings.chineseScript
 
@@ -457,7 +475,7 @@ final class ConversationStore {
                     // revising an existing one, swap in the new text only when
                     // it's complete so the line doesn't flicker.
                     let streamLive = utterance.translation.isEmpty
-                    for try await token in translator.translate(text, from: language, context: context, script: script) {
+                    for try await token in translator.translate(text, from: language, to: target, context: context, script: script) {
                         if Task.isCancelled { return }
                         output += token
                         if streamLive { utterance.translation = output }

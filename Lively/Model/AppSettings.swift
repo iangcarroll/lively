@@ -9,7 +9,10 @@ final class AppSettings {
 
     /// `SpeechProvider.id` of the chosen engine.
     var providerID: String {
-        didSet { defaults.set(providerID, forKey: "speechProvider") }
+        didSet {
+            defaults.set(providerID, forKey: "speechProvider")
+            if !provider.supports(languages) { languages = .default }
+        }
     }
 
     var provider: SpeechProvider { SpeechProvider.with(id: providerID) }
@@ -19,6 +22,14 @@ final class AppSettings {
 
     var latency: Latency {
         didSet { defaults.set(latency.rawValue, forKey: "latency") }
+    }
+
+    /// The conversation's two languages. Always ones the provider supports.
+    var languages: LanguagePair {
+        didSet {
+            defaults.set(languages.first.rawValue, forKey: "firstLanguage")
+            defaults.set(languages.second.rawValue, forKey: "secondLanguage")
+        }
     }
 
     var chineseScript: ChineseScript {
@@ -48,7 +59,13 @@ final class AppSettings {
     }
 
     private init() {
-        providerID = defaults.string(forKey: "speechProvider") ?? SpeechProvider.fallback.id
+        let providerID = defaults.string(forKey: "speechProvider") ?? SpeechProvider.fallback.id
+        self.providerID = providerID
+        let stored = LanguagePair(
+            first: Language(defaults.string(forKey: "firstLanguage") ?? LanguagePair.default.first.rawValue),
+            second: Language(defaults.string(forKey: "secondLanguage") ?? LanguagePair.default.second.rawValue)
+        )
+        languages = SpeechProvider.with(id: providerID).supports(stored) && stored.first != stored.second ? stored : .default
         latency = Latency(rawValue: defaults.integer(forKey: "latency")) ?? .fastest
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel

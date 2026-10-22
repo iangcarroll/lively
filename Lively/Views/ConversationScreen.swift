@@ -25,7 +25,8 @@ struct ConversationScreen: View {
                 if !wide && !phoneShowsTranscript {
                     FaceToFaceScreen(
                         store: store,
-                        nearLanguage: $nearLanguage,
+                        languages: settings.languages,
+                        nearLanguage: near,
                         onShowTranscript: { withAnimation(.snappy) { phoneShowsTranscript = true } },
                         onShowSettings: { showSettings = true }
                     )
@@ -76,6 +77,14 @@ struct ConversationScreen: View {
                 showSettings = true
             }
         }
+    }
+
+    /// The near side's language, kept within the current pair.
+    private var near: Binding<Language> {
+        Binding(
+            get: { settings.languages.contains(nearLanguage) ? nearLanguage : settings.languages.first },
+            set: { nearLanguage = $0 }
+        )
     }
 
     private var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }

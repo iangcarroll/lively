@@ -17,8 +17,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     struct Configuration {
         var credential: Credential
         var model = "stt-rt-v5"
-        var languageA: Language = .english
-        var languageB: Language = .chinese
+        var languages: LanguagePair
         /// How long Soniox waits before declaring an endpoint (500–3000 ms).
         var maxEndpointDelayMs = 1000
     }
@@ -141,14 +140,14 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
             "audio_format": "pcm_s16le",
             "sample_rate": Int(MicCapture.sampleRate),
             "num_channels": 1,
-            "language_hints": [config.languageA.rawValue, config.languageB.rawValue],
+            "language_hints": config.languages.all.map(\.rawValue),
             "enable_language_identification": true,
             "enable_endpoint_detection": true,
             "max_endpoint_delay_ms": config.maxEndpointDelayMs,
             "translation": [
                 "type": "two_way",
-                "language_a": config.languageA.rawValue,
-                "language_b": config.languageB.rawValue,
+                "language_a": config.languages.first.rawValue,
+                "language_b": config.languages.second.rawValue,
             ],
         ] as [String: Any])]
     }
@@ -250,7 +249,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
                 continue
             }
             if token["translation_status"] as? String == "translation" {
-                let source = (token["source_language"] as? String).flatMap(Language.init(rawValue:))
+                let source = config.languages.language(code: token["source_language"] as? String)
                 if Self.translationTargetIsOpen(state, sourceLanguage: source, extraText: "") {
                     state.open?.translation += text
                     if let id = state.open?.id { touched.insert(id) }
@@ -261,7 +260,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
             } else {
                 openSegmentIfNeeded(&state)
                 state.open?.source += text
-                if let language = (token["language"] as? String).flatMap(Language.init(rawValue:)) {
+                if let language = config.languages.language(code: token["language"] as? String) {
                     state.open?.language = language
                 }
                 if let id = state.open?.id { touched.insert(id) }
@@ -276,7 +275,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         for token in tokens where token["is_final"] as? Bool != true {
             guard let text = token["text"] as? String, text != "<end>", text != "<fin>" else { continue }
             if token["translation_status"] as? String == "translation" {
-                let source = (token["source_language"] as? String).flatMap(Language.init(rawValue:))
+                let source = config.languages.language(code: token["source_language"] as? String)
                 if Self.translationTargetIsOpen(state, sourceLanguage: source, extraText: pendingSource) {
                     pendingOpenTranslation += text
                 } else {
@@ -284,7 +283,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
                 }
             } else {
                 pendingSource += text
-                if let language = (token["language"] as? String).flatMap(Language.init(rawValue:)) {
+                if let language = config.languages.language(code: token["language"] as? String) {
                     pendingLanguage = language
                 }
             }
@@ -358,6 +357,7 @@ extension SpeechProvider {
         summary: "Soniox stt-rt-v5 transcribes and translates both ways in one stream, for the lowest latency.",
         credentials: [.soniox],
         options: [],
+        languages: Language.soniox,
         makePipeline: { settings in
             let key = settings.credential(.soniox)
             // A key entered in Settings overrides the broker.
@@ -366,7 +366,7 @@ extension SpeechProvider {
             } else {
                 .apiKey(key)
             }
-            return SpeechPipeline(engine: SonioxTranscriber(.init(credential: credential)), translator: nil)
+            return SpeechPipeline(engine: SonioxTranscriber(.init(credential: credential, languages: settings.languages)), translator: nil)
         }
     )
 }
