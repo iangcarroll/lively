@@ -222,7 +222,7 @@ describe("rate limits", () => {
 
     const third = await issueSonioxKey(keyRequest(id), local, NOW);
     expect(third.status).toBe(429);
-    expect(await third.json()).toMatchObject({ error: "rate_limited", message: "Today's listening time is used up." });
+    expect(await third.json()).toMatchObject({ error: "rate_limited", message: "Today's translation time is used up." });
     expect(Number(third.headers.get("Retry-After"))).toBe(12 * 3600 - 30);
 
     // Tomorrow.

@@ -32,12 +32,26 @@ final class Account {
         email = token == nil ? nil : Keychain.read(account: Self.emailAccount)
     }
 
+    /// Demo mode (`-LivelyDemo YES`) never reaches the broker: any email
+    /// gets a code, and the code is 123456.
+    private var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }
+
     /// Emails a 6-digit code to `email`.
     func sendCode(to email: String) async throws {
+        if isDemo {
+            try await Task.sleep(for: .milliseconds(600))
+            return
+        }
         _ = try await post("v1/auth/email/start", ["email": email], as: Empty.self)
     }
 
     func signIn(email: String, code: String) async throws {
+        if isDemo {
+            try await Task.sleep(for: .milliseconds(600))
+            guard code == "123456" else { throw AccountError(message: "That code didn't work. Try again.") }
+            self.email = email
+            return
+        }
         let body = try await post("v1/auth/email/verify", ["email": email, "code": code], as: SignedIn.self)
         Keychain.write(body.token, account: Self.tokenAccount)
         Keychain.write(body.user.email, account: Self.emailAccount)

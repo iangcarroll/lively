@@ -146,7 +146,7 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
       return error(503, "capacity", "Lively has reached today's capacity. Try again later.", secondsUntil(nextUTCMidnight(now), now));
     }
     const retryAfter = exceeded.window === "minute" ? secondsUntil((minute + 1) * 60_000, now) : secondsUntil(nextUTCMidnight(now), now);
-    return error(429, "rate_limited", exceeded.window === "minute" ? "Too many keys this minute." : "Today's listening time is used up.", retryAfter);
+    return error(429, "rate_limited", exceeded.window === "minute" ? "Too many keys this minute." : "Today's translation time is used up.", retryAfter);
   }
 
   // A session may run only as long as the day's budgets have left, counting this key.

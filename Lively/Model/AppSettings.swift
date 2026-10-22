@@ -32,6 +32,17 @@ final class AppSettings {
         }
     }
 
+    /// Sets one side of the pair. Choosing the other side's language swaps them.
+    func setLanguage(_ language: Language, for side: WritableKeyPath<LanguagePair, Language>) {
+        var pair = languages
+        if pair.other(than: pair[keyPath: side]) == language {
+            pair = LanguagePair(first: pair.second, second: pair.first)
+        } else {
+            pair[keyPath: side] = language
+        }
+        languages = pair
+    }
+
     var chineseScript: ChineseScript {
         didSet { defaults.set(chineseScript.rawValue, forKey: "chineseScript") }
     }

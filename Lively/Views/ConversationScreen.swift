@@ -5,8 +5,8 @@ struct ConversationScreen: View {
     @Bindable var settings: AppSettings = .shared
 
     @State private var showSettings = false
-    @State private var showAccount = false
-    @AppStorage(AccountSheet.shownKey) private var accountSheetShown = false
+    @State private var showOnboarding = false
+    @AppStorage("onboardingDone") private var onboardingDone = false
     @State private var didStartDemoAutomatically = false
     /// On phones, face-to-face is the main layout; the transcript is an alternative.
     @AppStorage("phoneShowsTranscript") private var phoneShowsTranscript = false
@@ -44,11 +44,13 @@ struct ConversationScreen: View {
             if !shown { store.settingsDidClose() }
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView(settings: settings) { store.clear() }
+            SettingsView(settings: settings, onClear: { store.clear() }, onShowWelcome: { showOnboarding = true })
         }
-        .sheet(isPresented: $showAccount) {
-            if let account = Account.shared { AccountSheet(account: account) }
-        }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showOnboarding) { onboarding }
+        #else
+        .sheet(isPresented: $showOnboarding) { onboarding.frame(width: 520, height: 760) }
+        #endif
         .alert("Lively", isPresented: alertBinding) {
             if !settings.hasCredentials { Button("Open Settings") { showSettings = true } }
             Button("OK", role: .cancel) {}
@@ -63,6 +65,10 @@ struct ConversationScreen: View {
             #endif
         }
         .onAppear {
+            if forcesOnboarding {
+                showOnboarding = true
+                return
+            }
             if isDemo {
                 if isDemoAutoPlay && !didStartDemoAutomatically {
                     didStartDemoAutomatically = true
@@ -70,9 +76,8 @@ struct ConversationScreen: View {
                 }
                 return
             }
-            if !accountSheetShown, Account.shared != nil {
-                accountSheetShown = true
-                showAccount = true
+            if !onboardingDone {
+                showOnboarding = true
             } else if !settings.hasCredentials {
                 showSettings = true
             }
@@ -86,6 +91,23 @@ struct ConversationScreen: View {
             set: { nearLanguage = $0 }
         )
     }
+
+    private var onboarding: some View {
+        OnboardingView(settings: settings) {
+            onboardingDone = true
+            nearLanguage = settings.languages.first
+            showOnboarding = false
+            if !settings.hasCredentials {
+                Task {
+                    try? await Task.sleep(for: .milliseconds(600))
+                    showSettings = true
+                }
+            }
+        }
+    }
+
+    /// Launch with `-LivelyOnboarding YES` to see the welcome tour every time.
+    private var forcesOnboarding: Bool { UserDefaults.standard.bool(forKey: "LivelyOnboarding") }
 
     private var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }
     private var isDemoAutoPlay: Bool {
