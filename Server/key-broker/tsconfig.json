@@ -4,7 +4,7 @@
     "module": "es2022",
     "moduleResolution": "bundler",
     "lib": ["es2024"],
-    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types", "node"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true
