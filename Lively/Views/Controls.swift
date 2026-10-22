@@ -1,4 +1,5 @@
 import SwiftUI
+import Translation
 
 /// The one big button: start and stop listening. A ring breathes with the mic level.
 struct MicButton: View {
@@ -116,5 +117,78 @@ struct GlassIconButton: View {
         .glassEffect(.regular.interactive(), in: .circle)
         .accessibilityLabel(label)
         .help(label)
+    }
+}
+
+/// An optional text field for typing a line to translate, for when speaking
+/// isn't practical. Opening it offers to download on-device languages, which
+/// typed text uses when no translation key is set.
+struct TypeToTranslateBar: View {
+    let store: ConversationStore
+    let languages: LanguagePair
+    /// The typist's language, for text that could be either.
+    let language: Language
+    var script: ChineseScript = AppSettings.shared.chineseScript
+    var onClose: () -> Void
+
+    @State private var text = ""
+    @FocusState private var focused: Bool
+    @State private var download: TranslationSession.Configuration?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TextField("Type to translate", text: $text)
+                .focused($focused)
+                .submitLabel(.send)
+                .onSubmit(send)
+                .padding(.leading, 16)
+                .padding(.vertical, 10)
+            Button(action: send) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .frame(width: 32, height: 32)
+                    .foregroundStyle(.white)
+                    .background(Color.accentColor, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .disabled(isEmpty)
+            .opacity(isEmpty ? 0.4 : 1)
+            .accessibilityLabel("Translate")
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(.circle)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
+            .accessibilityLabel("Close text input")
+            .padding(.trailing, 6)
+        }
+        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .onAppear {
+            focused = true
+            guard store.translatesTypedTextOnDevice else { return }
+            download = TranslationSession.Configuration(
+                source: AppleTranslator.language(languages.first, script: script),
+                target: AppleTranslator.language(languages.second, script: script)
+            )
+        }
+        .translationTask(download) { session in
+            // Offers the download if the pair isn't on the device yet. The
+            // session is only used here, inside the task SwiftUI gives it to.
+            nonisolated(unsafe) let session = session
+            try? await session.prepareTranslation()
+        }
+    }
+
+    private var isEmpty: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private func send() {
+        guard !isEmpty else { return }
+        withAnimation(.snappy) { store.submitTyped(text, language: language) }
+        text = ""
+        focused = true
     }
 }

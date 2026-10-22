@@ -270,6 +270,32 @@ final class ConversationStore {
         utterances.removeAll()
     }
 
+    /// Adds a typed turn and translates it. `language` is the typist's
+    /// language, used when the text doesn't say which of the pair it's in.
+    func submitTyped(_ text: String, language: Language) {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        let detected = Language.detect(text, in: languages) ?? (languages.contains(language) ? language : languages.first)
+        let utterance = Utterance(source: text, language: detected, languages: languages)
+        utterance.isTyped = true
+        utterance.isFinal = true
+        utterances.append(utterance)
+        translate(utterance)
+    }
+
+    /// Translates typed turns. Engines that translate speech by themselves
+    /// don't translate text, so this falls back to a Mistral key if there is
+    /// one, then to on-device translation.
+    private var textTranslator: TranslationService {
+        if let translator { return translator }
+        let key = settings.credential(.mistral)
+        if !key.isEmpty { return MistralTranslator(apiKey: key, model: settings.translationModel) }
+        return AppleTranslator()
+    }
+
+    /// True when typed text needs on-device languages.
+    var translatesTypedTextOnDevice: Bool { textTranslator is AppleTranslator }
+
     func retryTranslation(_ utterance: Utterance) {
         utterance.translatedSource = nil
         translate(utterance)
@@ -452,7 +478,8 @@ final class ConversationStore {
 
     private func translate(_ utterance: Utterance) {
         let text = utterance.trimmedSource
-        guard !text.isEmpty, translations[utterance.id] == nil, let translator else { return }
+        guard !text.isEmpty, translations[utterance.id] == nil,
+              let translator = utterance.isTyped ? textTranslator : translator else { return }
 
         let language = utterance.language
         let target = utterance.target

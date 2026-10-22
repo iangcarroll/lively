@@ -9,6 +9,7 @@ struct FaceToFaceScreen: View {
     let languages: LanguagePair
     /// Language of the person on the near (bottom) side.
     @Binding var nearLanguage: Language
+    @Binding var showsTextInput: Bool
     var onShowTranscript: () -> Void
     var onShowSettings: () -> Void
 
@@ -18,14 +19,30 @@ struct FaceToFaceScreen: View {
                 .rotationEffect(.degrees(180))
             controlStrip
             FaceToFaceHalf(store: store, language: nearLanguage)
+                .safeAreaBar(edge: .bottom) {
+                    if showsTextInput {
+                        // The near person types; the far side reads the translation.
+                        TypeToTranslateBar(store: store, languages: languages, language: nearLanguage) {
+                            withAnimation(.snappy) { showsTextInput = false }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
         }
         .animation(.snappy, value: nearLanguage)
     }
 
     private var controlStrip: some View {
         HStack(spacing: 12) {
-            StatusPill(status: store.status, isListening: store.isListening, compact: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 10) {
+                StatusPill(status: store.status, isListening: store.isListening, compact: true)
+                GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
+                    withAnimation(.snappy) { showsTextInput.toggle() }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             MicButton(isListening: store.isListening, level: store.level) {
                 store.toggleListening()
             }

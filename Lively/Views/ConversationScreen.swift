@@ -9,6 +9,7 @@ struct ConversationScreen: View {
     @State private var showPro = false
     @AppStorage("onboardingDone") private var onboardingDone = false
     @State private var didStartDemoAutomatically = false
+    @State private var showsTextInput = false
     /// On phones, face-to-face is the main layout; the transcript is an alternative.
     @AppStorage("phoneShowsTranscript") private var phoneShowsTranscript = false
     @AppStorage("nearLanguage") private var nearLanguage: Language = .english
@@ -28,6 +29,7 @@ struct ConversationScreen: View {
                         store: store,
                         languages: settings.languages,
                         nearLanguage: near,
+                        showsTextInput: $showsTextInput,
                         onShowTranscript: { withAnimation(.snappy) { phoneShowsTranscript = true } },
                         onShowSettings: { showSettings = true }
                     )
@@ -154,6 +156,19 @@ struct ConversationScreen: View {
     }
 
     private var controls: some View {
+        VStack(spacing: 4) {
+            if showsTextInput {
+                TypeToTranslateBar(store: store, languages: settings.languages, language: settings.languages.first) {
+                    withAnimation(.snappy) { showsTextInput = false }
+                }
+                .padding(.horizontal, 16)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            controlRow
+        }
+    }
+
+    private var controlRow: some View {
         HStack {
             GlassIconButton(systemImage: "trash", label: "Clear conversation") {
                 withAnimation(.snappy) { store.clear() }
@@ -165,8 +180,9 @@ struct ConversationScreen: View {
                 store.toggleListening()
             }
             Spacer()
-            // Balances the left button so the mic stays centered.
-            Color.clear.frame(width: 40, height: 40)
+            GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
+                withAnimation(.snappy) { showsTextInput.toggle() }
+            }
         }
         .padding(.horizontal, 24)
         .padding(.top, 8)

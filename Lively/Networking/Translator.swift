@@ -1,4 +1,5 @@
 import Foundation
+import Translation
 
 protocol TranslationService {
     /// Streams the translation of `text` token by token.
@@ -77,11 +78,45 @@ struct MistralTranslator: TranslationService {
     }
 }
 
+/// Translates on device with Apple's Translation framework, for typed text
+/// when no translation API key is set. The languages must be downloaded;
+/// `TypeToTranslateBar` offers the download when it opens.
+struct AppleTranslator: TranslationService {
+    func translate(
+        _ text: String, from source: Language, to target: Language, context: [Utterance], script: ChineseScript
+    ) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let session = TranslationSession(
+                        installedSource: Self.language(source, script: script),
+                        target: Self.language(target, script: script)
+                    )
+                    let response = try await session.translate(text)
+                    continuation.yield(response.targetText)
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: TranslationError.onDevice(languageName: target.englishName))
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    static func language(_ language: Language, script: ChineseScript) -> Locale.Language {
+        guard language == .chinese else { return Locale.Language(identifier: language.rawValue) }
+        return Locale.Language(identifier: script == .traditional ? "zh-Hant" : "zh-Hans")
+    }
+}
+
 enum TranslationError: LocalizedError {
     case http(Int)
+    /// On-device translation failed, usually because a language isn't downloaded.
+    case onDevice(languageName: String)
 
     var errorDescription: String? {
         switch self {
+        case .onDevice(let name): "\(name) isn't available on this device"
         case .http(401), .http(403): "API key rejected"
         case .http(429): "Rate limited"
         case .http(let code): "Server error \(code)"
@@ -90,7 +125,9 @@ enum TranslationError: LocalizedError {
 
     /// Errors that won't fix themselves by retrying.
     var isPermanent: Bool {
-        if case .http(let code) = self { return code == 400 || code == 401 || code == 403 || code == 404 }
-        return false
+        switch self {
+        case .http(let code): code == 400 || code == 401 || code == 403 || code == 404
+        case .onDevice: true
+        }
     }
 }
