@@ -7,7 +7,7 @@ struct ChatTranscript: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(store.utterances) { utterance in
+                ForEach(store.visibleUtterances) { utterance in
                     UtteranceBubble(utterance: utterance) { store.retryTranslation(utterance) }
                         .transition(.asymmetric(
                             insertion: .move(edge: .bottom).combined(with: .opacity),
@@ -17,7 +17,7 @@ struct ChatTranscript: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .animation(.snappy, value: store.utterances.count)
+            .animation(.snappy, value: store.visibleUtterances.count)
         }
         .defaultScrollAnchor(.bottom)
         .defaultScrollAnchor(.bottom, for: .sizeChanges)
@@ -42,14 +42,14 @@ struct ParallelTranscript: View {
 
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(store.utterances) { utterance in
+                    ForEach(store.visibleUtterances) { utterance in
                         ParallelRow(utterance: utterance) { store.retryTranslation(utterance) }
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                         Divider().opacity(0.4)
                     }
                 }
                 .padding(.horizontal, 20)
-                .animation(.snappy, value: store.utterances.count)
+                .animation(.snappy, value: store.visibleUtterances.count)
             }
             .defaultScrollAnchor(.bottom)
             .defaultScrollAnchor(.bottom, for: .sizeChanges)
@@ -86,9 +86,7 @@ private struct ParallelRow: View {
         let spoken = utterance.language == language
         let text = utterance.text(in: language)
         return VStack(alignment: .leading, spacing: 6) {
-            if spoken {
-                LanguageTag(language: language, spoken: true)
-            }
+            LanguageTag(language: language, spoken: spoken)
             if text.isEmpty {
                 failureOrDots(language)
             } else {
@@ -143,18 +141,22 @@ private struct ParallelRow: View {
 }
 
 struct EmptyConversation: View {
+    var isListening: Bool
+
     var body: some View {
         VStack(spacing: 18) {
             Image(systemName: "bubble.left.and.text.bubble.right")
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(.tertiary)
             VStack(spacing: 6) {
-                Text("Just start talking")
+                Text(isListening ? "Listening. Go ahead and talk." : "Tap the mic to start")
                     .font(.title3.weight(.semibold))
-                Text("说中文或英文都可以")
+                Text(isListening ? "正在听，说中文或英文都可以" : "点麦克风开始")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(Language.chinese.ink)
             }
+            .contentTransition(.opacity)
+            .animation(.snappy, value: isListening)
             Text("Lively hears English and Chinese and translates both ways. No need to say who's speaking.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

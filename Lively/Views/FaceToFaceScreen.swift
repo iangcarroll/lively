@@ -75,7 +75,7 @@ private struct FaceToFaceHalf: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                let recent = Array(store.utterances.suffix(12))
+                let recent = Array(store.visibleUtterances.suffix(12))
                 ForEach(recent) { utterance in
                     line(utterance, isLatest: utterance === recent.last)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -83,16 +83,16 @@ private struct FaceToFaceHalf: View {
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 20)
-            .animation(.snappy, value: store.utterances.count)
+            .animation(.snappy, value: store.visibleUtterances.count)
         }
         .defaultScrollAnchor(.bottom)
         .defaultScrollAnchor(.bottom, for: .sizeChanges)
         .scrollIndicators(.hidden)
         .overlay {
-            if store.utterances.isEmpty { emptyState }
+            if store.visibleUtterances.isEmpty { emptyState }
         }
         .overlay(alignment: .topLeading) {
-            LanguageTag(language: language).padding(14)
+            LanguageTag(language: language, showsIcon: false).padding(14)
         }
         .environment(\.locale, language.locale)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -145,9 +145,13 @@ private struct FaceToFaceHalf: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Text(language == .english ? "Just start talking" : "请直接说话")
+            Text(store.isListening
+                 ? (language == .english ? "Listening. Go ahead and talk." : "正在听，请直接说话")
+                 : (language == .english ? "Tap the mic to start" : "点麦克风开始"))
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(language.ink)
+                .contentTransition(.opacity)
+                .animation(.snappy, value: store.isListening)
             Text(language == .english
                  ? "Speak English. Lively translates for the other person."
                  : "说中文就可以，Lively 会翻译给对方。")

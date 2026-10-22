@@ -169,6 +169,9 @@ final class ConversationStore {
         refreshStatus()
     }
 
+    /// Turns with something to show: not empty, and not only filler words.
+    var visibleUtterances: [Utterance] { utterances.filter(\.hasContent) }
+
     func clear() {
         translations.values.forEach { $0.cancel() }
         debounces.values.forEach { $0.cancel() }
@@ -266,12 +269,13 @@ final class ConversationStore {
 
         let script = settings.chineseScript
         utterance.setSource(script.convert(segment.source.trimmingLeadingWhitespace()), language: segment.language)
-        utterance.translation = script.convert(segment.translation.trimmingCharacters(in: .whitespacesAndNewlines))
+        utterance.translation = script.convert(Filler.strip(segment.translation))
         utterance.translatedSource = utterance.trimmedSource
         utterance.translationState = segment.isClosed && !utterance.translation.isEmpty ? .current : .working
 
         if segment.isClosed {
             if current === utterance { finalizeCurrent() } else { utterance.isFinal = true }
+            if !utterance.hasContent { utterances.removeAll { $0 === utterance } }
         } else if !utterance.isFinal {
             current = utterance
             armSilenceFallback()
@@ -301,10 +305,14 @@ final class ConversationStore {
 
         let script = settings.chineseScript
         utterance.setSource(script.convert(segment.source.trimmingLeadingWhitespace()), language: segment.language)
-        utterance.translation = script.convert(segment.translation.trimmingCharacters(in: .whitespacesAndNewlines))
+        utterance.translation = script.convert(Filler.strip(segment.translation))
         utterance.translatedSource = utterance.trimmedSource
         utterance.translationState = segment.isClosed && !utterance.translation.isEmpty ? .current : .working
         utterance.isFinal = segment.isClosed
+        if segment.isClosed && !utterance.hasContent {
+            utterances.removeAll { $0 === utterance }
+            dropoutIndex = dropoutIndex.map { max(0, $0 - 1) }
+        }
     }
 
     /// Ends the turn if no text and no turn events have arrived for a while,
@@ -324,7 +332,7 @@ final class ConversationStore {
         guard let utterance = current else { return }
         current = nil
         utterance.isFinal = true
-        if utterance.trimmedSource.isEmpty {
+        if !utterance.hasContent {
             utterances.removeAll { $0 === utterance }
             return
         }
@@ -354,7 +362,7 @@ final class ConversationStore {
         guard !text.isEmpty, translations[utterance.id] == nil, let translator else { return }
 
         let language = utterance.language
-        let context = Array(utterances.prefix { $0 !== utterance }.filter(\.isFinal).suffix(3))
+        let context = Array(utterances.prefix { $0 !== utterance }.filter { $0.isFinal && $0.hasContent }.suffix(3))
         let script = settings.chineseScript
 
         utterance.translationState = .working

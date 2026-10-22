@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// One turn, shown chat-style: English speakers on the leading side,
-/// Chinese speakers on the trailing side. The spoken text sits on top in a
-/// quieter style; the translation, which the other person reads, is larger.
+/// Chinese speakers on the trailing side, each bubble tinted with the
+/// speaker's language color. The spoken text sits on top; the translation,
+/// which the other person reads, is larger and in its own language's color.
 struct UtteranceBubble: View {
     let utterance: Utterance
     var onRetry: () -> Void = {}
@@ -15,18 +16,16 @@ struct UtteranceBubble: View {
             if !leading { Spacer(minLength: 40) }
             VStack(alignment: .leading, spacing: 10) {
                 block(spoken, text: utterance.trimmedSource, spoken: true)
-                Divider().opacity(0.5)
+                Divider().overlay(spoken.ink.opacity(0.2))
                 translation
             }
             .padding(14)
-            .background(Color(.card), in: .rect(cornerRadius: 22, style: .continuous))
-            .overlay(alignment: leading ? .leading : .trailing) {
-                // A sliver of the speaker's color marks whose turn it was.
-                Capsule()
-                    .fill(spoken.ink)
-                    .frame(width: 3)
-                    .padding(.vertical, 16)
-                    .offset(x: leading ? -1.5 : 1.5)
+            .background {
+                // The speaker's color marks whose turn it was.
+                let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+                shape.fill(Color(.card))
+                shape.fill(spoken.ink.opacity(0.08))
+                shape.strokeBorder(spoken.ink.opacity(0.25), lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
             .contextMenu {
@@ -51,7 +50,7 @@ struct UtteranceBubble: View {
             HStack(alignment: .lastTextBaseline, spacing: 6) {
                 Text(text)
                     .font(.transcript(language, emphasized: !spoken))
-                    .foregroundStyle(spoken ? AnyShapeStyle(.secondary) : AnyShapeStyle(language.ink))
+                    .foregroundStyle(spoken ? AnyShapeStyle(.primary) : AnyShapeStyle(language.ink))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 if spoken && !utterance.isFinal {

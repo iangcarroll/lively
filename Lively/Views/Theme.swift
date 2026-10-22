@@ -14,25 +14,29 @@ extension Font {
     }
 }
 
-/// A small capsule naming the language, e.g. "EN" or "中文".
+/// A small capsule naming the language, e.g. "EN" or "中文". What was
+/// actually said gets a solid capsule with a waveform; a translation gets a
+/// light one with a translate icon, so the two never look alike.
 struct LanguageTag: View {
     let language: Language
     var spoken = false
+    /// Off for labels that name a language without saying how the text got there.
+    var showsIcon = true
 
     var body: some View {
         HStack(spacing: 3) {
-            if spoken {
-                Image(systemName: "waveform")
+            if showsIcon {
+                Image(systemName: spoken ? "waveform" : "translate")
                     .imageScale(.small)
             }
             Text(language.tag)
         }
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(language.ink)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(language.ink.opacity(0.12), in: .capsule)
-        .accessibilityLabel(spoken ? "Spoken in \(language.nativeName)" : "Translated to \(language.nativeName)")
+        .font(.caption2.weight(.bold))
+        .foregroundStyle(spoken ? AnyShapeStyle(.white) : AnyShapeStyle(language.ink))
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(spoken ? language.ink : language.ink.opacity(0.12), in: .capsule)
+        .accessibilityLabel(!showsIcon ? language.nativeName : spoken ? "Spoken in \(language.nativeName)" : "Translated to \(language.nativeName)")
     }
 }
 

@@ -50,7 +50,11 @@ final class Utterance: Identifiable {
         if let language { self.language = language } else if let detected = Language.detect(source) { self.language = detected }
     }
 
-    var trimmedSource: String { source.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// The transcript without filler words. This is what's shown and translated.
+    var trimmedSource: String { Filler.strip(source) }
+
+    /// False while the turn is empty or only filler so far.
+    var hasContent: Bool { !trimmedSource.isEmpty }
 
     var needsTranslation: Bool { translatedSource != trimmedSource }
 
