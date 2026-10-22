@@ -1,7 +1,7 @@
 {
   "name": "lively-key-broker",
   "version": "1.0.0",
-  "description": "Mints short-lived Soniox keys for the Lively app",
+  "description": "Mints short-lived Soniox keys and translates text for the Lively app",
   "scripts": {
     "dev": "wrangler dev",
     "test": "vitest run",

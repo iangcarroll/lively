@@ -109,6 +109,37 @@ Errors are JSON `{error, message}`. A per-minute 429 carries a short
 403 (denied) and 503 (global cap) stop listening and show `message`. A daily
 429 also carries `plan`; on `free` the app offers Lively Pro.
 
+## Text translation
+
+Soniox translates speech itself, so text translation is only for turns it
+doesn't cover, such as lines typed in the app. DeepSeek translates them through
+Cloudflare AI Gateway; the Worker holds the prompt and the DeepSeek key.
+
+```
+POST /v1/translate
+Lively-Install-ID: 3F2C9A3E-6B1D-4C55-9A0E-2D7E8F1B4C6A
+(Authorization, Lively-Subscription and Lively-Play-Purchase as for keys)
+{"text": "Hello!", "source": "en", "target": "zh", "script": "simplified",
+ "context": [{"source": "…", "translation": "…"}]}
+
+200 text/event-stream: OpenAI-style chat completion chunks
+```
+
+- The model is `DEEPSEEK_MODEL` (`deepseek-flash`, which DeepSeek points at its
+  latest Flash), with thinking off for a fast first token.
+- The `AI` binding reaches the `AI_GATEWAY_ID` gateway (`default`), so the
+  Worker needs no gateway token. Requests skip the gateway's logs.
+- Only the last 3 context turns are used, and text plus context is capped at
+  `TRANSLATE_MAX_CHARS`.
+- Each request counts 1 against its own budgets, kept apart from listening
+  time: `*_TRANSLATIONS_PER_MINUTE` and `*_TRANSLATIONS_PER_DAY` per install,
+  account, Pro subscription and IP, and `GLOBAL_TRANSLATIONS_PER_DAY`. A failed
+  upstream call is refunded.
+
+Set the key with `npx wrangler secret put DEEPSEEK_API_KEY`. Tests replace the
+`AI` binding with a fake (`remoteBindings: false` in `vitest.config.ts`), so
+they never reach Cloudflare.
+
 ## Lively Pro
 
 Pro raises the daily budget to the `PRO_` limits. A caller is Pro if it sends

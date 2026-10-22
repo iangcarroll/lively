@@ -74,6 +74,22 @@ export interface Env {
   GOOGLE_PLAY_SERVICE_ACCOUNT?: string;
   /** "true" to count Play's test purchases, as license testers and internal testing make. */
   PLAY_ALLOW_TEST_PURCHASES: string;
+  /** Text translation (translate.ts): DeepSeek through this AI Gateway. */
+  AI: Ai;
+  AI_GATEWAY_ID: string;
+  DEEPSEEK_MODEL: string;
+  /** Omit if the gateway stores the DeepSeek key itself. */
+  DEEPSEEK_API_KEY?: string;
+  TRANSLATE_MAX_CHARS: string;
+  PER_INSTALL_TRANSLATIONS_PER_MINUTE: string;
+  PER_INSTALL_TRANSLATIONS_PER_DAY: string;
+  PER_USER_TRANSLATIONS_PER_MINUTE: string;
+  PER_USER_TRANSLATIONS_PER_DAY: string;
+  PRO_TRANSLATIONS_PER_MINUTE: string;
+  PRO_TRANSLATIONS_PER_DAY: string;
+  PER_IP_TRANSLATIONS_PER_MINUTE: string;
+  PER_IP_TRANSLATIONS_PER_DAY: string;
+  GLOBAL_TRANSLATIONS_PER_DAY: string;
 }
 
 export type Region = "us" | "jp";
@@ -112,7 +128,19 @@ export function regionOrder(request: Request, env: Env): Region[] {
 const INSTALL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 
-export async function issueSonioxKey(request: Request, env: Env, now: number): Promise<Response> {
+/** Who's asking, for limits: the install, and the account and subscription if any. */
+export interface Caller {
+  installHash: string;
+  userHash?: string;
+  subscriptionHash?: string;
+  ipHash: string;
+  plan: "free" | "pro";
+  /** Whose budget a signed-in or subscribed caller spends: the subscription's, then the account's. */
+  owner?: string;
+}
+
+/** Identifies the caller, or returns the response that turns them away. */
+export async function identify(request: Request, env: Env, now: number): Promise<Caller | Response> {
   const installID = request.headers.get("Lively-Install-ID")?.trim() ?? "";
   if (!INSTALL_ID.test(installID)) {
     return error(400, "bad_install_id", "Send a UUID in the Lively-Install-ID header.");
@@ -132,34 +160,61 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
   for (const subjectHash of [installHash, userHash, subscriptionHash]) {
     if (subjectHash && (await isDenied(env, subjectHash))) return error(403, "denied", "This install can't get keys.");
   }
+  const owner = subscriptionHash ? `subscription:${subscriptionHash}` : userHash ? `user:${userHash}` : undefined;
+  return { installHash, userHash, subscriptionHash, ipHash, plan, owner };
+}
 
-  const limits = readLimits(env);
+/** Per-minute and per-day budgets for one kind of request. */
+export interface Budgets {
+  perMinute: number;
+  perDay: number;
+}
+
+/**
+ * The charges for one request: the owner's budgets if signed in or subscribed,
+ * else the install's and the IP's daily one; then the IP's per minute and the
+ * global daily cap. `prefix` keeps each kind of request's counters apart.
+ */
+export function chargesFor(
+  caller: Caller,
+  now: number,
+  prefix: string,
+  amount: number,
+  limits: { owner: Budgets; install: Budgets; ip: Budgets; globalPerDay: number },
+): Charge[] {
   const minute = Math.floor(now / 60_000);
   const day = new Date(now).toISOString().slice(0, 10);
   const minuteExpiry = (minute + 2) * 60;
   const dayExpiry = nowSeconds(nextUTCMidnight(now)) + 3600;
-
-  // Keys per minute count 1; minutes per day are tracked in charged seconds.
-  // The budget follows the subscription if there is one, then the account.
-  const owner = subscriptionHash ? `subscription:${subscriptionHash}` : userHash ? `user:${userHash}` : undefined;
-  const [keysPerMinute, secondsPerDay] =
-    plan === "pro" ? [limits.proKeysPerMinute, limits.proSecondsPerDay] : [limits.userKeysPerMinute, limits.userSecondsPerDay];
+  const { owner, installHash, ipHash } = caller;
   const subject: Charge[] = owner
     ? [
-        { key: `${owner}:min:${minute}`, amount: 1, limit: keysPerMinute, expiresAt: minuteExpiry, window: "minute" },
-        { key: `${owner}:day:${day}`, amount: limits.chargeSeconds, limit: secondsPerDay, expiresAt: dayExpiry, window: "day" },
+        { key: `${prefix}${owner}:min:${minute}`, amount: 1, limit: limits.owner.perMinute, expiresAt: minuteExpiry, window: "minute" },
+        { key: `${prefix}${owner}:day:${day}`, amount, limit: limits.owner.perDay, expiresAt: dayExpiry, window: "day" },
       ]
     : [
-        { key: `install:${installHash}:min:${minute}`, amount: 1, limit: limits.installKeysPerMinute, expiresAt: minuteExpiry, window: "minute" },
-        { key: `install:${installHash}:day:${day}`, amount: limits.chargeSeconds, limit: limits.installSecondsPerDay, expiresAt: dayExpiry, window: "day" },
-        { key: `ip:${ipHash}:day:${day}`, amount: limits.chargeSeconds, limit: limits.ipSecondsPerDay, expiresAt: dayExpiry, window: "day" },
+        { key: `${prefix}install:${installHash}:min:${minute}`, amount: 1, limit: limits.install.perMinute, expiresAt: minuteExpiry, window: "minute" },
+        { key: `${prefix}install:${installHash}:day:${day}`, amount, limit: limits.install.perDay, expiresAt: dayExpiry, window: "day" },
+        { key: `${prefix}ip:${ipHash}:day:${day}`, amount, limit: limits.ip.perDay, expiresAt: dayExpiry, window: "day" },
       ];
-  const charges: Charge[] = [
+  return [
     ...subject,
-    { key: `ip:${ipHash}:min:${minute}`, amount: 1, limit: limits.ipKeysPerMinute, expiresAt: minuteExpiry, window: "minute" },
-    { key: `global:day:${day}`, amount: 1, limit: limits.globalKeysPerDay, expiresAt: dayExpiry, window: "global" },
+    { key: `${prefix}ip:${ipHash}:min:${minute}`, amount: 1, limit: limits.ip.perMinute, expiresAt: minuteExpiry, window: "minute" },
+    { key: `${prefix}global:day:${day}`, amount: 1, limit: limits.globalPerDay, expiresAt: dayExpiry, window: "global" },
   ];
+}
 
+/**
+ * Applies every charge, or none: over any limit, refunds them all and
+ * returns the 429/503 to send. `dailyMessage` is for a used-up day.
+ */
+export async function applyCharges(
+  env: Env,
+  charges: Charge[],
+  now: number,
+  plan: Caller["plan"],
+  dailyMessage: Record<Caller["plan"], string>,
+): Promise<number[] | Response> {
   // One batch is one transaction, so concurrent requests can't both slip under a limit.
   const results = await env.DB.batch<{ value: number }>(
     charges.map((c) =>
@@ -171,19 +226,43 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
   );
   const totals = results.map((r) => r.results[0]?.value ?? Number.POSITIVE_INFINITY);
   const exceeded = charges.find((c, i) => totals[i] > c.limit);
-  if (exceeded) {
-    await refund(env, charges);
-    if (exceeded.window === "global") {
-      return error(503, "capacity", "Lively has reached today's capacity. Try again later.", secondsUntil(nextUTCMidnight(now), now));
-    }
-    if (exceeded.window === "minute") return error(429, "rate_limited", "Too many keys this minute.", secondsUntil((minute + 1) * 60_000, now));
-    // `plan` lets the app offer Pro when a free day runs out.
-    return json(
-      429,
-      { error: "rate_limited", message: plan === "pro" ? "Today's translation time is used up." : "Today's free translation time is used up.", plan },
-      { "Retry-After": String(secondsUntil(nextUTCMidnight(now), now)) },
-    );
+  if (!exceeded) return totals;
+  await refund(env, charges);
+  if (exceeded.window === "global") {
+    return error(503, "capacity", "Lively has reached today's capacity. Try again later.", secondsUntil(nextUTCMidnight(now), now));
   }
+  if (exceeded.window === "minute") {
+    return error(429, "rate_limited", "Too many requests this minute.", secondsUntil((Math.floor(now / 60_000) + 1) * 60_000, now));
+  }
+  // `plan` lets the app offer Pro when a free day runs out.
+  return json(
+    429,
+    { error: "rate_limited", message: dailyMessage[plan], plan },
+    { "Retry-After": String(secondsUntil(nextUTCMidnight(now), now)) },
+  );
+}
+
+export async function issueSonioxKey(request: Request, env: Env, now: number): Promise<Response> {
+  const caller = await identify(request, env, now);
+  if (caller instanceof Response) return caller;
+  const { installHash, userHash, subscriptionHash, plan } = caller;
+
+  // Keys per minute count 1; minutes per day are tracked in charged seconds.
+  const limits = readLimits(env);
+  const charges = chargesFor(caller, now, "", limits.chargeSeconds, {
+    owner:
+      plan === "pro"
+        ? { perMinute: limits.proKeysPerMinute, perDay: limits.proSecondsPerDay }
+        : { perMinute: limits.userKeysPerMinute, perDay: limits.userSecondsPerDay },
+    install: { perMinute: limits.installKeysPerMinute, perDay: limits.installSecondsPerDay },
+    ip: { perMinute: limits.ipKeysPerMinute, perDay: limits.ipSecondsPerDay },
+    globalPerDay: limits.globalKeysPerDay,
+  });
+  const totals = await applyCharges(env, charges, now, plan, {
+    free: "Today's free translation time is used up.",
+    pro: "Today's translation time is used up.",
+  });
+  if (totals instanceof Response) return totals;
 
   // A session may run only as long as the day's budgets have left, counting this key.
   const remaining = charges
@@ -254,7 +333,7 @@ async function mint(env: Env, regions: Region[], body: object): Promise<Minted> 
   return { ok: false, unreachable };
 }
 
-interface Charge {
+export interface Charge {
   key: string;
   amount: number;
   limit: number;
@@ -262,7 +341,7 @@ interface Charge {
   window: "minute" | "day" | "global";
 }
 
-async function refund(env: Env, charges: Charge[]): Promise<void> {
+export async function refund(env: Env, charges: Charge[]): Promise<void> {
   await env.DB.batch(
     charges.map((c) => env.DB.prepare("UPDATE counters SET value = value - ?1 WHERE key = ?2").bind(c.amount, c.key)),
   );
@@ -276,7 +355,7 @@ async function isDenied(env: Env, subjectHash: string): Promise<boolean> {
   return row !== null;
 }
 
-function readLimits(env: Env) {
+export function readLimits(env: Env) {
   const int = (value: string, name: string) => {
     const n = Number.parseInt(value, 10);
     if (!Number.isFinite(n) || n < 0) throw new Error(`${name} must be a non-negative integer`);
@@ -318,12 +397,12 @@ export function nowSeconds(ms: number): number {
   return Math.floor(ms / 1000);
 }
 
-function nextUTCMidnight(now: number): number {
+export function nextUTCMidnight(now: number): number {
   const d = new Date(now);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 }
 
-function secondsUntil(time: number, now: number): number {
+export function secondsUntil(time: number, now: number): number {
   return Math.max(1, Math.ceil((time - now) / 1000));
 }
 

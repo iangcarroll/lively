@@ -6,6 +6,8 @@ export default defineConfig(async () => {
   return {
     plugins: [
       cloudflareTest({
+        // The AI binding is replaced by a fake in tests, so nothing connects to Cloudflare.
+        remoteBindings: false,
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
           bindings: { SONIOX_API_KEY_US: "test-master-key", SONIOX_API_KEY_JP: "test-jp-master-key", TEST_MIGRATIONS: migrations },

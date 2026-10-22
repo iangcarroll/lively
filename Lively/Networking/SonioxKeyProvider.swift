@@ -197,8 +197,8 @@ final class SonioxKeyProvider {
     }
 
     /// A random ID for this install. It names no person or device, and the
-    /// broker only sees a hash of it.
-    private static let installID: String = {
+    /// broker only sees a hash of it. `BrokerTranslator` sends it too.
+    static let installID: String = {
         let account = "lively-install-id"
         if let id = Keychain.read(account: account) { return id }
         let id = UUID().uuidString

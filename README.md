@@ -58,10 +58,11 @@ when the conversation screen appears.
 | Reconnects, pings, audio backlog, shared by every engine | `Networking/ResilientSocket.swift` |
 | Voxtral: WebSocket to `voxtral-mini-transcribe-realtime-3`, language auto-detected, turn detection on | `Networking/RealtimeTranscriber.swift` |
 | Voxtral: streaming translation over Mistral chat completions | `Networking/Translator.swift` |
+| Typed lines: DeepSeek through the broker, falling back to on-device translation | `Networking/Translator.swift` |
 | Soniox: WebSocket to `stt-rt-v5` with two-way translation and endpoint detection | `Networking/SonioxTranscriber.swift` |
 | Soniox: temporary keys from the broker, with one spare kept ready | `Networking/SonioxKeyProvider.swift` |
 | Soniox: picks the region (US or Japan) with the shortest round trip | `Networking/RegionProber.swift` |
-| Key broker: Cloudflare Worker that mints temporary Soniox keys | `Server/key-broker/` |
+| Key broker: Cloudflare Worker that mints temporary Soniox keys and translates text | `Server/key-broker/` |
 | Turns, utterances, translation scheduling | `Model/ConversationStore.swift` |
 
 Engines report events in one of two ways:

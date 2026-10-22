@@ -284,10 +284,11 @@ final class ConversationStore {
     }
 
     /// Translates typed turns. Engines that translate speech by themselves
-    /// don't translate text, so this falls back to a Mistral key if there is
-    /// one, then to on-device translation.
+    /// don't translate text, so this uses the broker's DeepSeek, falling back
+    /// to on-device translation; then a Mistral key if there is one.
     private var textTranslator: TranslationService {
         if let translator { return translator }
+        if let broker = BrokerTranslator.shared { return FallbackTranslator(primary: broker, fallback: AppleTranslator()) }
         let key = settings.credential(.mistral)
         if !key.isEmpty { return MistralTranslator(apiKey: key, model: settings.translationModel) }
         return AppleTranslator()

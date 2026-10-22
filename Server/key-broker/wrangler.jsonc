@@ -27,6 +27,10 @@
   // Sign-in codes. The sender's domain must be onboarded under Email Service
   // › Sending in the dashboard.
   "send_email": [{ "name": "EMAIL" }],
+  // Text translation calls DeepSeek through AI Gateway. The binding
+  // authenticates to the gateway; the DeepSeek key is the secret
+  // DEEPSEEK_API_KEY.
+  "ai": { "binding": "AI" },
   // Keys live KEY_TTL_SECONDS, so the app's spare key survives a few minutes
   // of broker trouble; the app replaces it a minute before it expires.
   // Every key is charged KEY_CHARGE_SECONDS of listening: about half the
@@ -65,6 +69,20 @@
     // Test purchases (license testers, internal testing) count for now, like
     // TestFlight's Sandbox. Set "false" once Android testing is done.
     "PLAY_PACKAGE_NAME": "sh.ian.lively",
-    "PLAY_ALLOW_TEST_PURCHASES": "true"
+    "PLAY_ALLOW_TEST_PURCHASES": "true",
+    // Text translation (/v1/translate). `deepseek-flash` is DeepSeek's latest
+    // Flash. Limits count requests, one per translated line.
+    "AI_GATEWAY_ID": "default",
+    "DEEPSEEK_MODEL": "deepseek-flash",
+    "TRANSLATE_MAX_CHARS": "4000",
+    "PER_INSTALL_TRANSLATIONS_PER_MINUTE": "20",
+    "PER_INSTALL_TRANSLATIONS_PER_DAY": "200",
+    "PER_USER_TRANSLATIONS_PER_MINUTE": "30",
+    "PER_USER_TRANSLATIONS_PER_DAY": "500",
+    "PRO_TRANSLATIONS_PER_MINUTE": "60",
+    "PRO_TRANSLATIONS_PER_DAY": "5000",
+    "PER_IP_TRANSLATIONS_PER_MINUTE": "60",
+    "PER_IP_TRANSLATIONS_PER_DAY": "2000",
+    "GLOBAL_TRANSLATIONS_PER_DAY": "500000"
   }
 }
