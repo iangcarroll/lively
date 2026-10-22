@@ -60,7 +60,7 @@ struct OnboardingView: View {
     @ViewBuilder
     private var page: some View {
         switch step {
-        case .welcome: WelcomePage(languageCount: settings.provider.languages.count).environment(\.colorScheme, .dark)
+        case .welcome: WelcomePage(languageCount: SpeechProvider.all.map(\.languages.count).max() ?? 0).environment(\.colorScheme, .dark)
         case .table: TablePage()
         case .languages: LanguagesPage(settings: settings)
         case .account: if let account = Account.shared { AccountPage(account: account, onSignedIn: onFinish) }

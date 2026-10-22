@@ -66,14 +66,16 @@ struct SettingsView: View {
                         }
                     }
                     if provider.options.contains(.translationModel) {
-                        Label {
-                            TextField("Translation model", text: $settings.translationModel)
+                        LabeledContent {
+                            TextField("Model", text: $settings.translationModel, prompt: Text(AppSettings.defaultTranslationModel))
+                                .multilineTextAlignment(.trailing)
+                                .foregroundStyle(.secondary)
                                 .autocorrectionDisabled()
                                 #if os(iOS)
                                 .textInputAutocapitalization(.never)
                                 #endif
-                        } icon: {
-                            SettingsIcon(systemImage: "cpu", color: .indigo)
+                        } label: {
+                            Label { Text("Model") } icon: { SettingsIcon(systemImage: "cpu", color: .indigo) }
                         }
                     }
                 } header: {
