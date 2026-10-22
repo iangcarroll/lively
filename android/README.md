@@ -16,7 +16,9 @@ broker, account and Pro allowance:
 - Typing instead of speaking from the keyboard button, translated by
   DeepSeek through the key broker, falling back to ML Kit on the device
   (Apple's Translation framework on iOS).
-- Swipe a turn in the transcript, or long-press it, to delete it.
+- Swipe a turn in the transcript, or long-press it, to delete it. Long-press
+  also offers Edit, which fixes a misheard transcript and translates it
+  again; in face-to-face, long-press one of your own lines.
 - Optional email sign-in, and Lively Pro through Google Play Billing. The
   broker checks Play purchases with the Play Developer API
   ([Server/key-broker](../Server/key-broker/README.md#google-play-subscriptions)).

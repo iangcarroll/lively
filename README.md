@@ -23,7 +23,10 @@ lines go to DeepSeek through the key broker, falling back to on-device
 translation (Apple's Translation framework; ML Kit on Android). Voxtral uses its
 own Mistral translator for them.
 
-Swipe a turn in the transcript to delete it, or long-press it (right-click on Mac).
+Swipe a turn in the transcript to delete it, or long-press it (right-click on Mac)
+for Edit and Delete. Edit fixes a misheard transcript, such as a name, and
+translates the corrected text again the same way as typed lines. In face-to-face,
+long-press one of your own lines to edit it.
 
 Soniox only outputs Simplified Chinese. When Settings › Chinese is 繁體, Lively
 converts its output on the device.

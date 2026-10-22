@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
@@ -101,6 +102,7 @@ fun ChatTranscript(
     utterances: List<Utterance>,
     pair: LanguagePair,
     onRetry: (Utterance) -> Unit,
+    onEdit: (Utterance) -> Unit,
     onDelete: (Utterance) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
@@ -119,7 +121,7 @@ fun ChatTranscript(
     ) {
         items(utterances.asReversed(), key = { it.id }) { utterance ->
             SwipeToDelete(onDelete = { onDelete(utterance) }, modifier = Modifier.animateItem()) {
-                UtteranceBubble(utterance, pair, onRetry = { onRetry(utterance) }, onDelete = { onDelete(utterance) })
+                UtteranceBubble(utterance, pair, onRetry = { onRetry(utterance) }, onEdit = { onEdit(utterance) }, onDelete = { onDelete(utterance) })
             }
         }
     }
@@ -138,6 +140,7 @@ fun UtteranceBubble(
     utterance: Utterance,
     pair: LanguagePair,
     onRetry: () -> Unit,
+    onEdit: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -164,7 +167,7 @@ fun UtteranceBubble(
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             menu = true
                         },
-                        onLongClickLabel = if (onDelete != null) "Copy, share or delete" else "Copy or share",
+                        onLongClickLabel = if (onDelete != null) "Copy, share, edit or delete" else "Copy or share",
                     )
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -187,7 +190,7 @@ fun UtteranceBubble(
                     }
                 }
             }
-            CopyMenu(menu, onDismiss = { menu = false }, utterance, onDelete)
+            CopyMenu(menu, onDismiss = { menu = false }, utterance, onEdit, onDelete)
         }
     }
 }
@@ -237,7 +240,7 @@ fun RetryButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Utterance, onDelete: (() -> Unit)?) {
+private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Utterance, onEdit: (() -> Unit)?, onDelete: (() -> Unit)?) {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -268,11 +271,21 @@ private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Uttera
                 context.startActivity(Intent.createChooser(send, null))
             },
         )
+        if (onEdit != null && utterance.isFinal) EditMenuItem { onDismiss(); onEdit() }
         if (onDelete != null) {
             HorizontalDivider()
             DeleteMenuItem { onDismiss(); onDelete() }
         }
     }
+}
+
+@Composable
+private fun EditMenuItem(onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text("Edit") },
+        leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+        onClick = onClick,
+    )
 }
 
 @Composable
@@ -326,6 +339,7 @@ fun ParallelTranscript(
     utterances: List<Utterance>,
     pair: LanguagePair,
     onRetry: (Utterance) -> Unit,
+    onEdit: (Utterance) -> Unit,
     onDelete: (Utterance) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
@@ -345,7 +359,7 @@ fun ParallelTranscript(
             items(utterances.asReversed(), key = { it.id }) { utterance ->
                 Column(Modifier.animateItem()) {
                     SwipeToDelete(onDelete = { onDelete(utterance) }) {
-                        ParallelRow(utterance, pair, onRetry = { onRetry(utterance) }, onDelete = { onDelete(utterance) })
+                        ParallelRow(utterance, pair, onRetry = { onRetry(utterance) }, onEdit = { onEdit(utterance) }, onDelete = { onDelete(utterance) })
                     }
                     HorizontalDivider(Modifier.alpha(0.4f))
                 }
@@ -363,7 +377,7 @@ private fun Header(language: Language, pair: LanguagePair, modifier: Modifier) {
 }
 
 @Composable
-private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () -> Unit, onDelete: () -> Unit) {
+private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     Box {
@@ -376,7 +390,7 @@ private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () ->
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         menu = true
                     },
-                    onLongClickLabel = "Delete",
+                    onLongClickLabel = "Edit or delete",
                 )
                 .padding(vertical = 14.dp),
         ) {
@@ -417,6 +431,7 @@ private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () ->
             }
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
+            if (utterance.isFinal) EditMenuItem { menu = false; onEdit() }
             DeleteMenuItem { menu = false; onDelete() }
         }
     }

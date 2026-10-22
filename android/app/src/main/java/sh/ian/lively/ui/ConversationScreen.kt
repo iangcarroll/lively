@@ -36,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,6 +49,7 @@ import sh.ian.lively.model.AppSettings
 import sh.ian.lively.model.ConversationStore
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.Pro
+import sh.ian.lively.model.Utterance
 
 /** Unfolded foldables, landscape phones, tablets and Chromebooks get side-by-side columns. */
 val WideBreakpoint = 600.dp
@@ -69,6 +71,27 @@ fun ConversationScreen(
     // The near side's language, kept within the current pair.
     val near = if (nearLanguage in pair) nearLanguage else pair.first
     var showsTextInput by rememberSaveable { mutableStateOf(false) }
+    /** The turn being corrected in the text bar. */
+    var editing by remember { mutableStateOf<Utterance?>(null) }
+    /** The bar opened for an edit, so it closes when the edit ends. */
+    var textInputOpenedForEdit by remember { mutableStateOf(false) }
+    val setShowsTextInput = { shown: Boolean ->
+        showsTextInput = shown
+        if (!shown) {
+            editing = null
+            textInputOpenedForEdit = false
+        }
+    }
+    // Opens the text bar on a turn's transcript to correct it.
+    val startEditing = { utterance: Utterance ->
+        textInputOpenedForEdit = !showsTextInput
+        editing = utterance
+        showsTextInput = true
+    }
+    val endEditing = {
+        editing = null
+        if (textInputOpenedForEdit) setShowsTextInput(false)
+    }
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
@@ -88,7 +111,10 @@ fun ConversationScreen(
                     nearLanguage = near,
                     onSwap = { onNearLanguageChange(pair.other(near)) },
                     showsTextInput = showsTextInput,
-                    onShowsTextInputChange = { showsTextInput = it },
+                    onShowsTextInputChange = setShowsTextInput,
+                    editing = editing,
+                    onEdit = startEditing,
+                    onEndEditing = endEditing,
                     onShowTranscript = { onShowsTranscriptChange(true) },
                     onShowSettings = onShowSettings,
                     modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
@@ -98,7 +124,10 @@ fun ConversationScreen(
                 TranscriptLayout(
                     store, settings, wide,
                     showsTextInput = showsTextInput,
-                    onShowsTextInputChange = { showsTextInput = it },
+                    onShowsTextInputChange = setShowsTextInput,
+                    editing = editing,
+                    onEdit = startEditing,
+                    onEndEditing = endEditing,
                     onFaceToFace = { onShowsTranscriptChange(false) },
                     onShowSettings = onShowSettings,
                 )
@@ -137,6 +166,9 @@ private fun TranscriptLayout(
     wide: Boolean,
     showsTextInput: Boolean,
     onShowsTextInputChange: (Boolean) -> Unit,
+    editing: Utterance?,
+    onEdit: (Utterance) -> Unit,
+    onEndEditing: () -> Unit,
     onFaceToFace: () -> Unit,
     onShowSettings: () -> Unit,
 ) {
@@ -146,8 +178,8 @@ private fun TranscriptLayout(
         val utterances = store.visibleUtterances
         when {
             utterances.isEmpty() -> EmptyConversation(store.isListening, settings.languages, settings.chineseScript, Modifier.padding(barSpace))
-            wide -> ParallelTranscript(utterances, settings.languages, store::retryTranslation, store::delete, contentPadding = barSpace)
-            else -> ChatTranscript(utterances, settings.languages, store::retryTranslation, store::delete, contentPadding = barSpace)
+            wide -> ParallelTranscript(utterances, settings.languages, store::retryTranslation, onEdit, store::delete, contentPadding = barSpace)
+            else -> ChatTranscript(utterances, settings.languages, store::retryTranslation, onEdit, store::delete, contentPadding = barSpace)
         }
 
         // Top bar: status, then layout and settings.
@@ -180,6 +212,8 @@ private fun TranscriptLayout(
                     store, settings.languages.first,
                     onClose = { onShowsTextInputChange(false) },
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    editing = editing,
+                    onEndEditing = onEndEditing,
                 )
             }
             Row(

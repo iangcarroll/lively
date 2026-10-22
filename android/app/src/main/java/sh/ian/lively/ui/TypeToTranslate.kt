@@ -11,7 +11,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,10 +34,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import sh.ian.lively.model.ConversationStore
 import sh.ian.lively.model.Language
+import sh.ian.lively.model.Utterance
 
 /**
  * An optional text field for typing a line to translate, for when speaking
@@ -49,19 +54,41 @@ fun TypeToTranslateBar(
     language: Language,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** A turn whose transcript is being corrected; sending replaces it. */
+    editing: Utterance? = null,
+    onEndEditing: () -> Unit = {},
 ) {
-    var text by rememberSaveable { mutableStateOf("") }
+    var field by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     val focus = remember { FocusRequester() }
-    val isEmpty = text.isBlank()
+    val isEmpty = field.text.isBlank()
     val send = {
         if (!isEmpty) {
-            store.submitTyped(text, language)
-            text = ""
+            if (editing != null) {
+                store.edit(editing, field.text)
+                onEndEditing()
+            } else {
+                store.submitTyped(field.text, language)
+            }
+            field = TextFieldValue()
+        }
+    }
+    // Cancels an edit, or closes the bar.
+    val close = {
+        if (editing != null) {
+            field = TextFieldValue()
+            onEndEditing()
+        } else {
+            onClose()
         }
     }
     LaunchedEffect(Unit) {
         focus.requestFocus()
         store.prepareTypedTranslation()
+    }
+    LaunchedEffect(editing) {
+        val source = editing?.trimmedSource ?: return@LaunchedEffect
+        field = TextFieldValue(source, selection = TextRange(source.length))
+        focus.requestFocus()
     }
     Surface(
         shape = RoundedCornerShape(28.dp),
@@ -69,12 +96,21 @@ fun TypeToTranslateBar(
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (editing != null) {
+                Icon(
+                    Icons.Rounded.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp).size(20.dp),
+                )
+            }
             TextField(
-                value = text,
-                onValueChange = { text = it },
-                placeholder = { Text("Type to translate") },
+                value = field,
+                onValueChange = { field = it },
+                placeholder = { Text(if (editing == null) "Type to translate" else "Fix what was heard") },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                // Corrections are often names, which autocorrect would undo.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send, autoCorrectEnabled = editing == null),
                 keyboardActions = KeyboardActions(onSend = { send() }),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -93,11 +129,19 @@ fun TypeToTranslateBar(
                 modifier = Modifier.size(36.dp).alpha(if (isEmpty) 0.4f else 1f),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Translate", modifier = Modifier.size(18.dp))
+                    Icon(
+                        if (editing == null) Icons.AutoMirrored.Rounded.Send else Icons.Rounded.Check,
+                        contentDescription = if (editing == null) "Translate" else "Save and translate again",
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
             }
-            IconButton(onClick = onClose, modifier = Modifier.padding(end = 2.dp)) {
-                Icon(Icons.Rounded.Close, contentDescription = "Close text input", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            IconButton(onClick = close, modifier = Modifier.padding(end = 2.dp)) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = if (editing == null) "Close text input" else "Cancel editing",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

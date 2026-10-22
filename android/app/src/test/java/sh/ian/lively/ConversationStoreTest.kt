@@ -131,6 +131,38 @@ class ConversationStoreTest {
         assertEquals(Language.CHINESE, store.visibleUtterances[1].language)
     }
 
+    @Test fun editedTurnsAreTranslatedAgainAsText() = runTest {
+        val provider = SpeechProvider(
+            id = SpeechProviders.SONIOX_ID, name = "Fake", summary = "", credentials = emptyList(), options = emptySet(),
+            languages = Language.SONIOX, makePipeline = { error("unused") },
+        )
+        val store = ConversationStore(
+            AppSettings(memory, memory, listOf(provider)), backgroundScope, host,
+            brokerTranslator = translator, makePipeline = { SpeechPipeline(engine, null) },
+        )
+        store.startListening(); runCurrent()
+        store.handle(segment(0, "My name is Brian.", "我叫布莱恩。", closed = true))
+        val turn = store.visibleUtterances.single()
+        store.edit(turn, "My name is Ian.")
+        runCurrent()
+        assertEquals(listOf("My name is Ian."), translator.requests)
+        assertEquals("My name is Ian.", turn.trimmedSource)
+        assertEquals("[My name is Ian.]", turn.translation)
+        assertEquals(TranslationState.Current, turn.translationState)
+        // A late update to the segment doesn't undo the correction.
+        store.handle(segment(0, "My name is Brian.", "我叫布莱恩。", closed = true))
+        assertEquals("My name is Ian.", turn.trimmedSource)
+    }
+
+    @Test fun deletedTurnsLeaveTheConversation() = runTest {
+        val (store, _) = store()
+        store.startListening(); runCurrent()
+        store.handle(segment(0, "Where is the bus?", "公交车在哪里？", closed = true))
+        store.handle(segment(1, "就在这里。", "It's right here.", closed = true))
+        store.delete(store.visibleUtterances[0])
+        assertEquals(listOf("就在这里。"), store.visibleUtterances.map { it.trimmedSource })
+    }
+
     @Test fun traditionalScriptAppliesOnlyToChinese() = runTest {
         val (store, settings) = store()
         settings.chineseScript = ChineseScript.TRADITIONAL

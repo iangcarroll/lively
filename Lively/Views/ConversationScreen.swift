@@ -10,6 +10,10 @@ struct ConversationScreen: View {
     @AppStorage("onboardingDone") private var onboardingDone = false
     @State private var didStartDemoAutomatically = false
     @State private var showsTextInput = false
+    /// The turn being corrected in the text bar.
+    @State private var editing: Utterance?
+    /// The bar opened for an edit, so it closes when the edit ends.
+    @State private var textInputOpenedForEdit = false
     /// On phones, face-to-face is the main layout; the transcript is an alternative.
     @AppStorage("phoneShowsTranscript") private var phoneShowsTranscript = false
     @AppStorage("nearLanguage") private var nearLanguage: Language = .english
@@ -30,6 +34,8 @@ struct ConversationScreen: View {
                         languages: settings.languages,
                         nearLanguage: near,
                         showsTextInput: $showsTextInput,
+                        editing: $editing,
+                        onEdit: startEditing,
                         onShowTranscript: { withAnimation(.snappy) { phoneShowsTranscript = true } },
                         onShowSettings: { showSettings = true }
                     )
@@ -42,6 +48,14 @@ struct ConversationScreen: View {
                         .transition(.opacity)
                 }
             }
+        }
+        .onChange(of: editing == nil) { _, done in
+            guard done, textInputOpenedForEdit else { return }
+            textInputOpenedForEdit = false
+            withAnimation(.snappy) { showsTextInput = false }
+        }
+        .onChange(of: showsTextInput) { _, shown in
+            if !shown { editing = nil }
         }
         .onChange(of: showSettings) { _, shown in
             if !shown { store.settingsDidClose() }
@@ -149,16 +163,16 @@ struct ConversationScreen: View {
         if store.visibleUtterances.isEmpty {
             EmptyConversation(isListening: store.isListening)
         } else if wide {
-            ParallelTranscript(store: store)
+            ParallelTranscript(store: store, onEdit: startEditing)
         } else {
-            ChatTranscript(store: store)
+            ChatTranscript(store: store, onEdit: startEditing)
         }
     }
 
     private var controls: some View {
         VStack(spacing: 4) {
             if showsTextInput {
-                TypeToTranslateBar(store: store, languages: settings.languages, language: settings.languages.first) {
+                TypeToTranslateBar(store: store, languages: settings.languages, language: settings.languages.first, editing: $editing) {
                     withAnimation(.snappy) { showsTextInput = false }
                 }
                 .padding(.horizontal, 16)
@@ -187,6 +201,13 @@ struct ConversationScreen: View {
         .padding(.horizontal, 24)
         .padding(.top, 8)
         .padding(.bottom, 12)
+    }
+
+    /// Opens the text bar on a turn's transcript to correct it.
+    private func startEditing(_ utterance: Utterance) {
+        textInputOpenedForEdit = !showsTextInput
+        editing = utterance
+        withAnimation(.snappy) { showsTextInput = true }
     }
 
     private var alertBinding: Binding<Bool> {

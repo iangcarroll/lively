@@ -323,6 +323,25 @@ class ConversationStore(
     }
 
     /**
+     * Replaces a finished turn's transcript, such as a misheard name, and
+     * translates it again with the typed-text translator. The old
+     * translation stays until the new one is complete.
+     */
+    fun edit(utterance: Utterance, text: String) {
+        val trimmed = text.trim()
+        if (!utterance.isFinal || trimmed.isEmpty() || trimmed == utterance.trimmedSource) return
+        translations.remove(utterance.id)?.cancel()
+        debounces.remove(utterance.id)?.cancel()
+        // A translating engine's late update to the segment must not undo the edit.
+        segmentUtterances.values.removeAll { it === utterance }
+        catchUpUtterances.values.removeAll { it === utterance }
+        utterance.setSource(trimmed, language = null)
+        utterance.isTyped = true
+        utterance.translatedSource = null
+        translate(utterance)
+    }
+
+    /**
      * Adds a typed turn and translates it. [language] is the typist's
      * language, used when the text doesn't say which of the pair it's in.
      */

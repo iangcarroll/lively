@@ -10,6 +10,9 @@ struct FaceToFaceScreen: View {
     /// Language of the person on the near (bottom) side.
     @Binding var nearLanguage: Language
     @Binding var showsTextInput: Bool
+    @Binding var editing: Utterance?
+    /// Corrects one of the near person's own turns.
+    var onEdit: (Utterance) -> Void
     var onShowTranscript: () -> Void
     var onShowSettings: () -> Void
 
@@ -18,11 +21,11 @@ struct FaceToFaceScreen: View {
             FaceToFaceHalf(store: store, language: languages.other(than: nearLanguage))
                 .rotationEffect(.degrees(180))
             controlStrip
-            FaceToFaceHalf(store: store, language: nearLanguage)
+            FaceToFaceHalf(store: store, language: nearLanguage, onEdit: onEdit)
                 .safeAreaBar(edge: .bottom) {
                     if showsTextInput {
                         // The near person types; the far side reads the translation.
-                        TypeToTranslateBar(store: store, languages: languages, language: nearLanguage) {
+                        TypeToTranslateBar(store: store, languages: languages, language: nearLanguage, editing: $editing) {
                             withAnimation(.snappy) { showsTextInput = false }
                         }
                         .padding(.horizontal, 16)
@@ -89,6 +92,8 @@ struct FaceToFaceScreen: View {
 private struct FaceToFaceHalf: View {
     let store: ConversationStore
     let language: Language
+    /// Set on the near half, whose reader can correct their own turns.
+    var onEdit: ((Utterance) -> Void)?
 
     var body: some View {
         ScrollView {
@@ -139,6 +144,7 @@ private struct FaceToFaceHalf: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .opacity(isLatest ? 1 : 0.55)
         .animation(.snappy(duration: 0.25), value: text)
+        .modifier(EditMenu(utterance: utterance, onEdit: ownWords ? onEdit : nil))
     }
 
     @ViewBuilder
@@ -174,5 +180,21 @@ private struct FaceToFaceHalf: View {
                 .multilineTextAlignment(.center)
         }
         .padding(32)
+    }
+}
+
+/// Long-press to correct a finished turn's transcript, where editing is offered.
+private struct EditMenu: ViewModifier {
+    let utterance: Utterance
+    let onEdit: ((Utterance) -> Void)?
+
+    func body(content: Content) -> some View {
+        if let onEdit, utterance.isFinal {
+            content.contextMenu {
+                Button("Edit", systemImage: "pencil") { onEdit(utterance) }
+            }
+        } else {
+            content
+        }
     }
 }

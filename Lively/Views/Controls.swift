@@ -129,7 +129,20 @@ struct TypeToTranslateBar: View {
     /// The typist's language, for text that could be either.
     let language: Language
     var script: ChineseScript = AppSettings.shared.chineseScript
+    /// A turn whose transcript is being corrected; sending replaces it.
+    @Binding var editing: Utterance?
     var onClose: () -> Void
+
+    init(
+        store: ConversationStore, languages: LanguagePair, language: Language,
+        editing: Binding<Utterance?> = .constant(nil), onClose: @escaping () -> Void
+    ) {
+        self.store = store
+        self.languages = languages
+        self.language = language
+        _editing = editing
+        self.onClose = onClose
+    }
 
     @State private var text = ""
     @FocusState private var focused: Bool
@@ -137,14 +150,23 @@ struct TypeToTranslateBar: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            TextField("Type to translate", text: $text)
+            if editing != nil {
+                Image(systemName: "pencil")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 14)
+                    .accessibilityHidden(true)
+            }
+            TextField(editing == nil ? "Type to translate" : "Fix what was heard", text: $text)
+                // Corrections are often names, which autocorrect would undo.
+                .autocorrectionDisabled(editing != nil)
                 .focused($focused)
                 .submitLabel(.send)
                 .onSubmit(send)
-                .padding(.leading, 16)
+                .padding(.leading, editing == nil ? 16 : 0)
                 .padding(.vertical, 10)
             Button(action: send) {
-                Image(systemName: "arrow.up")
+                Image(systemName: editing == nil ? "arrow.up" : "checkmark")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 32, height: 32)
                     .foregroundStyle(.white)
@@ -153,8 +175,8 @@ struct TypeToTranslateBar: View {
             .buttonStyle(.plain)
             .disabled(isEmpty)
             .opacity(isEmpty ? 0.4 : 1)
-            .accessibilityLabel("Translate")
-            Button(action: onClose) {
+            .accessibilityLabel(editing == nil ? "Translate" : "Save and translate again")
+            Button(action: close) {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
@@ -163,10 +185,15 @@ struct TypeToTranslateBar: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.cancelAction)
-            .accessibilityLabel("Close text input")
+            .accessibilityLabel(editing == nil ? "Close text input" : "Cancel editing")
             .padding(.trailing, 6)
         }
         .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .onChange(of: editing?.id, initial: true) {
+            guard let editing else { return }
+            text = editing.trimmedSource
+            focused = true
+        }
         .onAppear {
             focused = true
             guard store.translatesTypedTextOnDevice else { return }
@@ -187,8 +214,20 @@ struct TypeToTranslateBar: View {
 
     private func send() {
         guard !isEmpty else { return }
-        withAnimation(.snappy) { store.submitTyped(text, language: language) }
+        if let editing {
+            store.edit(editing, to: text)
+            self.editing = nil
+        } else {
+            withAnimation(.snappy) { store.submitTyped(text, language: language) }
+        }
         text = ""
         focused = true
+    }
+
+    /// Cancels an edit, or closes the bar.
+    private func close() {
+        guard editing != nil else { return onClose() }
+        editing = nil
+        text = ""
     }
 }

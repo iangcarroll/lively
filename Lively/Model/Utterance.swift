@@ -33,7 +33,8 @@ final class Utterance: Identifiable {
     /// show up after later turns' translations.
     var isLate = false
 
-    /// Typed instead of spoken.
+    /// Typed instead of spoken, or its transcript corrected by hand, so it's
+    /// translated as text.
     var isTyped = false
 
     /// The transcript the current `translation` was produced from.

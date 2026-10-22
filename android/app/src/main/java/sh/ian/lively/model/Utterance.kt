@@ -43,7 +43,10 @@ class Utterance(
      */
     var isLate by mutableStateOf(false)
 
-    /** Typed instead of spoken. */
+    /**
+     * Typed instead of spoken, or its transcript corrected by hand, so it's
+     * translated as text.
+     */
     var isTyped = false
 
     /** The transcript the current [translation] was produced from. */

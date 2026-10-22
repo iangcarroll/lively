@@ -282,6 +282,23 @@ final class ConversationStore {
         if let dropoutIndex, index < dropoutIndex { self.dropoutIndex = dropoutIndex - 1 }
     }
 
+    /// Replaces a finished turn's transcript, such as a misheard name, and
+    /// translates it again with the typed-text translator. The old
+    /// translation stays until the new one is complete.
+    func edit(_ utterance: Utterance, to text: String) {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard utterance.isFinal, !text.isEmpty, text != utterance.trimmedSource else { return }
+        translations.removeValue(forKey: utterance.id)?.cancel()
+        debounces.removeValue(forKey: utterance.id)?.cancel()
+        // A translating engine's late update to the segment must not undo the edit.
+        segmentUtterances = segmentUtterances.filter { $0.value !== utterance }
+        catchUpUtterances = catchUpUtterances.filter { $0.value !== utterance }
+        utterance.setSource(text, language: nil)
+        utterance.isTyped = true
+        utterance.translatedSource = nil
+        translate(utterance)
+    }
+
     /// Adds a typed turn and translates it. `language` is the typist's
     /// language, used when the text doesn't say which of the pair it's in.
     func submitTyped(_ text: String, language: Language) {

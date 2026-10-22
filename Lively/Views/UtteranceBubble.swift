@@ -7,6 +7,7 @@ import SwiftUI
 struct UtteranceBubble: View {
     let utterance: Utterance
     var onRetry: () -> Void = {}
+    var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
 
     private var spoken: Language { utterance.language }
@@ -37,6 +38,9 @@ struct UtteranceBubble: View {
                     Button("Copy \(utterance.target.nativeName)", systemImage: "doc.on.doc") {
                         Clipboard.copy(utterance.translation)
                     }
+                }
+                if let onEdit, utterance.isFinal {
+                    Button("Edit", systemImage: "pencil", action: onEdit)
                 }
                 if let onDelete {
                     Divider()

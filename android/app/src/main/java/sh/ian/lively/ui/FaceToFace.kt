@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapVert
@@ -46,6 +47,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,6 +79,10 @@ fun FaceToFaceScreen(
     onSwap: () -> Unit,
     showsTextInput: Boolean,
     onShowsTextInputChange: (Boolean) -> Unit,
+    editing: Utterance?,
+    /** Corrects one of the near person's own turns. */
+    onEdit: (Utterance) -> Unit,
+    onEndEditing: () -> Unit,
     onShowTranscript: () -> Unit,
     onShowSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -92,7 +100,7 @@ fun FaceToFaceScreen(
         )
         ControlStrip(store, onSwap, showsTextInput, onShowsTextInputChange, onShowTranscript, onShowSettings)
         val bottom = contentPadding.calculateBottomPadding()
-        FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f), edgePadding = if (showsTextInput) 0.dp else bottom)
+        FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f), edgePadding = if (showsTextInput) 0.dp else bottom, onEdit = onEdit)
         // The near person types; the far side reads the translation. The
         // bottom padding includes the keyboard, so the halves make room for it.
         AnimatedVisibility(showsTextInput) {
@@ -100,6 +108,8 @@ fun FaceToFaceScreen(
                 store, nearLanguage,
                 onClose = { onShowsTextInputChange(false) },
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottom + 8.dp),
+                editing = editing,
+                onEndEditing = onEndEditing,
             )
         }
     }
@@ -184,6 +194,8 @@ private fun FaceToFaceHalf(
     script: ChineseScript,
     modifier: Modifier,
     edgePadding: androidx.compose.ui.unit.Dp,
+    /** Set on the near half, whose reader can correct their own turns. */
+    onEdit: ((Utterance) -> Unit)? = null,
 ) {
     val phrases = language.phrases(script)
     val recent = store.visibleUtterances.takeLast(12)
@@ -201,7 +213,7 @@ private fun FaceToFaceHalf(
                 verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Bottom),
             ) {
                 items(recent.asReversed(), key = { it.id }) { utterance ->
-                    Line(utterance, language, pair, phrases.waitingForConnection, phrases.translationFailed, isLatest = utterance === recent.last(), compact = compact, onRetry = { store.retryTranslation(utterance) }, Modifier.animateItem())
+                    Line(utterance, language, pair, phrases.waitingForConnection, phrases.translationFailed, isLatest = utterance === recent.last(), compact = compact, onRetry = { store.retryTranslation(utterance) }, onEdit = onEdit, modifier = Modifier.animateItem())
                 }
             }
             if (recent.isEmpty()) {
@@ -256,37 +268,72 @@ private fun Line(
     isLatest: Boolean,
     compact: Boolean,
     onRetry: () -> Unit,
+    onEdit: ((Utterance) -> Unit)?,
     modifier: Modifier,
 ) {
     val text = utterance.text(language)
     // Your own words are quiet; what the other person said is prominent.
     val ownWords = utterance.language == language
     val alpha by animateFloatAsState(if (isLatest) 1f else 0.55f, label = "age")
-    Column(modifier.fillMaxWidth().alpha(alpha), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (text.isEmpty()) {
-            TypingDots(language.ink(pair), Modifier.padding(vertical = 8.dp), dotSize = 8.dp)
-        } else {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                val type = MaterialTheme.typography
-                val style = when {
-                    compact -> if (isLatest) type.titleLarge else type.titleMedium
-                    else -> if (isLatest) type.headlineMedium else type.titleLarge
+    // Long-press to correct a finished turn's transcript, where editing is offered.
+    val editable = onEdit != null && ownWords && utterance.isFinal
+    var menu by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    Box(modifier) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .alpha(alpha)
+                .then(
+                    if (editable) {
+                        Modifier.combinedClickable(
+                            onClick = {},
+                            onLongClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                menu = true
+                            },
+                            onLongClickLabel = "Edit",
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (text.isEmpty()) {
+                TypingDots(language.ink(pair), Modifier.padding(vertical = 8.dp), dotSize = 8.dp)
+            } else {
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val type = MaterialTheme.typography
+                    val style = when {
+                        compact -> if (isLatest) type.titleLarge else type.titleMedium
+                        else -> if (isLatest) type.headlineMedium else type.titleLarge
+                    }
+                    Text(
+                        text,
+                        style = style.copy(localeList = language.localeList()),
+                        fontWeight = if (isLatest && !ownWords) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (ownWords) MaterialTheme.colorScheme.onSurfaceVariant else language.ink(pair),
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (ownWords && !utterance.isFinal) TypingDots(language.ink(pair), Modifier.padding(bottom = 10.dp))
                 }
-                Text(
-                    text,
-                    style = style.copy(localeList = language.localeList()),
-                    fontWeight = if (isLatest && !ownWords) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (ownWords) MaterialTheme.colorScheme.onSurfaceVariant else language.ink(pair),
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (ownWords && !utterance.isFinal) TypingDots(language.ink(pair), Modifier.padding(bottom = 10.dp))
+            }
+            if (!ownWords) {
+                when (utterance.translationState) {
+                    TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, waitingText)
+                    is TranslationState.Failed -> RetryButton(failedText, onRetry)
+                    else -> {}
+                }
             }
         }
-        if (!ownWords) {
-            when (utterance.translationState) {
-                TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, waitingText)
-                is TranslationState.Failed -> RetryButton(failedText, onRetry)
-                else -> {}
+        if (editable) {
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                    onClick = { menu = false; onEdit?.invoke(utterance) },
+                )
             }
         }
     }

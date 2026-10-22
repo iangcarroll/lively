@@ -4,6 +4,7 @@ import SwiftUI
 /// turns can be swiped away.
 struct ChatTranscript: View {
     let store: ConversationStore
+    var onEdit: (Utterance) -> Void = { _ in }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -12,6 +13,7 @@ struct ChatTranscript: View {
                     UtteranceBubble(
                         utterance: utterance,
                         onRetry: { store.retryTranslation(utterance) },
+                        onEdit: { onEdit(utterance) },
                         onDelete: { delete(utterance, from: store) }
                     )
                     .transcriptRow(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
@@ -31,6 +33,7 @@ struct ChatTranscript: View {
 /// straight down their own column.
 struct ParallelTranscript: View {
     let store: ConversationStore
+    var onEdit: (Utterance) -> Void = { _ in }
     var languages: LanguagePair { AppSettings.shared.languages }
 
     var body: some View {
@@ -47,6 +50,9 @@ struct ParallelTranscript: View {
                     ForEach(store.visibleUtterances) { utterance in
                         ParallelRow(utterance: utterance) { store.retryTranslation(utterance) }
                             .contextMenu {
+                                if utterance.isFinal {
+                                    Button("Edit", systemImage: "pencil") { onEdit(utterance) }
+                                }
                                 Button("Delete", systemImage: "trash", role: .destructive) { delete(utterance, from: store) }
                             }
                             .transcriptRow(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20), separator: true)
