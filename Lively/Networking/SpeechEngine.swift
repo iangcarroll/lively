@@ -16,6 +16,11 @@ protocol SpeechEngine: AnyObject {
 
     func start()
     func stop()
+    /// Stops taking audio but may keep the server session open for a while,
+    /// so `resume()` doesn't have to reconnect. Call `stop()` to let it go.
+    func pause()
+    /// Takes audio again after `pause()`.
+    func resume()
     /// Queues one 16 kHz mono PCM16 chunk. Safe to call while disconnected.
     func send(_ chunk: Data)
     /// The store ended the current turn on its own after a silence.
@@ -27,6 +32,8 @@ protocol SpeechEngine: AnyObject {
 
 extension SpeechEngine {
     var textLag: Duration { .zero }
+    func pause() { stop() }
+    func resume() { start() }
     func endTurn() {}
     func networkPathChanged() {}
 }

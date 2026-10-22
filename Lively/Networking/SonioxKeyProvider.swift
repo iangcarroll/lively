@@ -68,8 +68,9 @@ final class SonioxKeyProvider {
         regions.onChoiceChange = { [weak self] in
             guard let self else { return }
             // A spare minted for the old region won't work in the new one.
+            let hadSpare = self.spare != nil
             self.spare = nil
-            if self.refreshTask != nil { Task { try? await self.fillSpare() } }
+            if self.refreshTask != nil || hadSpare { Task { try? await self.fillSpare() } }
         }
     }
 
@@ -93,6 +94,14 @@ final class SonioxKeyProvider {
                 }
             }
         }
+    }
+
+    /// Fetches a spare ahead of the first connect, unless one is on hand with
+    /// a minute or more to live. Each key counts against the daily allowance,
+    /// so this runs when the app comes forward, never on a timer.
+    func prefetch() {
+        if let spare, spare.requestedRegion == regions.choice, spare.expiresAt.timeIntervalSinceNow > 60 { return }
+        Task { try? await fillSpare() }
     }
 
     func stopRefreshing() {

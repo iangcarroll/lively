@@ -52,6 +52,13 @@ final class ConversationStore {
     private var interface: NWInterface.InterfaceType?
     private var demo: DemoConversation?
     private var audioPump: Task<Void, Never>?
+    /// Ends a paused engine's session once it's been idle for `warmPause`.
+    private var idleTeardown: Task<Void, Never>?
+    /// How long a paused session stays open for a quick resume. Soniox bills
+    /// for the open stream, so this is kept short.
+    private static let warmPause: Duration = .seconds(60)
+    /// Settings changed while listening, so the engine isn't kept warm.
+    private var engineIsStale = false
 
     init(settings: AppSettings = .shared, demo: Bool = false) {
         self.settings = settings
@@ -89,11 +96,26 @@ final class ConversationStore {
         }
         pathMonitor.start(queue: DispatchQueue(label: "lively.path"))
         regionProber?.probe()
+        prefetchKey()
     }
 
-    /// Re-measures Soniox regions when the app comes to the foreground.
+    /// Re-measures Soniox regions and gets a key ready when the app comes to
+    /// the foreground, so tapping the mic doesn't wait on the key broker.
     func didBecomeActive() {
         regionProber?.probe()
+        prefetchKey()
+    }
+
+    /// The app went to the background, where iOS takes the mic and suspends
+    /// sockets: stop, and don't keep a session warm.
+    func didEnterBackground() {
+        stopListening()
+        releaseEngine()
+    }
+
+    private func prefetchKey() {
+        guard regionProber != nil else { return }
+        SonioxKeyProvider.shared?.prefetch()
     }
 
     /// Set when Soniox keys come from the broker, which mints in any of its regions.
@@ -129,26 +151,48 @@ final class ConversationStore {
                 alert = "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone."
                 return
             }
+            guard !isListening else { return }
+            isListening = true
+            Self.keepScreenAwake(true)
+            // Connect while the mic starts up. Audio that arrives before the
+            // session is ready waits in the socket's backlog.
+            startEngine(provider)
             do {
-                try mic.start()
+                // Activating the audio session can take a few hundred ms; keep it off the main thread.
+                try await Task.detached(priority: .userInitiated) { [mic] in try mic.start() }.value
             } catch {
+                stopListening()
+                releaseEngine()
                 alert = error.localizedDescription
                 return
             }
-            isListening = true
-            Self.keepScreenAwake(true)
-            startEngine(provider)
+            // Stopped while the mic was starting.
+            if !isListening { mic.stop() }
         }
     }
 
     private func startEngine(_ provider: SpeechProvider) {
+        if let engine {
+            // Still warm from the last pause.
+            idleTeardown?.cancel()
+            idleTeardown = nil
+            engine.resume()
+            refreshStatus()
+            return
+        }
         let pipeline = provider.makePipeline(settings)
         translator = pipeline.translator
         let engine = pipeline.engine
         engine.onEvent = { [weak self] in self?.handle($0) }
         engine.onStatus = { [weak self] status in
-            self?.transcriberStatus = status
-            self?.refreshStatus()
+            guard let self else { return }
+            self.transcriberStatus = status
+            if self.isListening {
+                self.refreshStatus()
+            } else if case .failed = status {
+                // A paused session failed; start over next time.
+                self.releaseEngine()
+            }
         }
         engine.networkAvailable = isOnline
         self.engine = engine
@@ -160,17 +204,49 @@ final class ConversationStore {
         isListening = false
         demo?.stop()
         mic.stop()
-        engine?.stop()
-        engine = nil
+        pauseEngine()
         level = 0
         Self.keepScreenAwake(false)
         finalizeCurrent()
-        transcriberStatus = .idle
         refreshStatus()
     }
 
     /// Turns with something to show: not empty, and not only filler words.
     var visibleUtterances: [Utterance] { utterances.filter(\.hasContent) }
+
+    /// Keeps the engine's session open for `warmPause`, so listening again
+    /// right away doesn't reconnect.
+    private func pauseEngine() {
+        guard let engine else { return }
+        guard !engineIsStale else {
+            releaseEngine()
+            return
+        }
+        engine.pause()
+        idleTeardown?.cancel()
+        idleTeardown = Task { [weak self] in
+            try? await Task.sleep(for: Self.warmPause)
+            guard !Task.isCancelled else { return }
+            self?.releaseEngine()
+        }
+    }
+
+    /// Settings can change the provider or key, which a warm session can't
+    /// pick up, so the next start builds a new engine.
+    func settingsDidClose() {
+        if isListening { engineIsStale = true } else { releaseEngine() }
+    }
+
+    /// Closes a paused engine's session.
+    private func releaseEngine() {
+        guard !isListening else { return }
+        engineIsStale = false
+        idleTeardown?.cancel()
+        idleTeardown = nil
+        engine?.stop()
+        engine = nil
+        transcriberStatus = .idle
+    }
 
     func clear() {
         translations.values.forEach { $0.cancel() }
@@ -424,6 +500,10 @@ final class ConversationStore {
     }
 
     private func refreshStatus() {
+        guard isListening else {
+            status = .idle
+            return
+        }
         switch transcriberStatus {
         case .idle: status = .idle
         case .connecting: status = isOnline ? .connecting : .offline
@@ -431,10 +511,9 @@ final class ConversationStore {
         case .reconnecting: status = isOnline ? .reconnecting : .offline
         case .failed(let message):
             status = .failed(message)
-            if isListening {
-                stopListening()
-                alert = message
-            }
+            stopListening()
+            releaseEngine()
+            alert = message
         }
     }
 

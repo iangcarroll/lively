@@ -6,7 +6,7 @@ import os
 protocol SocketDialect: AnyObject {
     /// Called before every connection. Throw `SocketSetupError.fail` to stop;
     /// any other error reconnects with backoff.
-    func makeRequest() async throws -> URLRequest
+    func makeRequest(for stream: SocketStream) async throws -> URLRequest
     /// Sent first on every new connection, before any audio.
     func openingMessages() -> [URLSessionWebSocketTask.Message]
     func audioMessage(_ chunk: Data) -> URLSessionWebSocketTask.Message
@@ -24,7 +24,15 @@ protocol SocketDialect: AnyObject {
     /// The live session was torn down after it had started.
     func sessionDidReset(_ stream: SocketStream)
     /// A connection is up and can take audio.
-    func sessionDidOpen()
+    func sessionDidOpen(_ stream: SocketStream)
+    /// A connection failed before it was ready.
+    func connectFailed(_ stream: SocketStream)
+
+    /// Keeps an idle session open while audio is paused. Nil when the server
+    /// can't idle, so pausing stops instead.
+    var keepaliveMessage: URLSessionWebSocketTask.Message? { get }
+    /// Sent when audio pauses, so the server finishes what it has heard.
+    var pauseMessage: URLSessionWebSocketTask.Message? { get }
 
     /// Reconnect when audio has gone out but nothing has come back for this
     /// long. Only for servers that reply steadily while audio flows.
@@ -42,7 +50,10 @@ protocol SocketDialect: AnyObject {
 
 extension SocketDialect {
     func keyRejected() -> SocketSignal { .fail(rejectedKeyMessage) }
-    func sessionDidOpen() {}
+    func sessionDidOpen(_ stream: SocketStream) {}
+    func connectFailed(_ stream: SocketStream) {}
+    var keepaliveMessage: URLSessionWebSocketTask.Message? { nil }
+    var pauseMessage: URLSessionWebSocketTask.Message? { nil }
     var stallTimeout: Duration? { nil }
     var supportsSideStreams: Bool { false }
     func isMidUtterance(on stream: SocketStream) -> Bool { false }
@@ -80,6 +91,9 @@ struct SocketStream: Hashable {
 /// - Pings every 4 s keep NAT mappings alive and find dead sockets. Dialects
 ///   that reply steadily also get a stall watchdog, which finds a dead socket
 ///   in `stallTimeout` (2.5 s for Soniox).
+/// - The socket is ready as soon as its handshake completes. An attempt that
+///   isn't up after `hedgeDelay` is raced by a second one, so a packet lost
+///   on a bad network doesn't hold up the connect.
 /// - Reconnects use jittered exponential backoff, and retry at once when the
 ///   network comes back.
 /// - While the socket is down, audio is held in a bounded backlog. On
@@ -89,6 +103,8 @@ struct SocketStream: Hashable {
 ///   1.15× real time). Dialects without side streams replay at most 5 s.
 /// - When the network path changes, a second socket opens on the new path and
 ///   audio moves to it at the next utterance boundary (make-before-break).
+/// - While paused, a live session is kept open with keepalives, so resuming
+///   doesn't reconnect.
 final class ResilientSocket {
     var onStatus: (SpeechEngineStatus) -> Void = { _ in }
 
@@ -112,10 +128,18 @@ final class ResilientSocket {
     private static let handoverWait: Duration = .seconds(8)
     /// An old socket gets this long to finish its last utterance.
     private static let drainDeadline: Duration = .seconds(10)
+    /// A good connect takes about 0.5 s (Tools/probe/ASIA_LATENCY.md §2), and
+    /// one over a slow network a couple of seconds. Every attempt uses up a
+    /// broker key, so only a clearly stuck one gets raced.
+    private static let hedgeDelay: Duration = .seconds(2)
+    /// Soniox closes a session after 20 s without audio or a keepalive.
+    private static let keepaliveInterval: Duration = .seconds(8)
 
     private unowned let dialect: SocketDialect
     private var isRunning = false
-    private let session = URLSession(configuration: .default)
+    private var isPaused = false
+    private let opens = OpenWatcher()
+    private let session: URLSession
     private var nextStreamID = 0
 
     /// The connection that gets live audio.
@@ -126,6 +150,8 @@ final class ResilientSocket {
     /// Old and catch-up connections finishing their work.
     private var side: [Connection] = []
     private var reconnectTask: Task<Void, Never>?
+    private var hedgeTask: Task<Void, Never>?
+    private var keepaliveTask: Task<Void, Never>?
 
     private var failures = 0
     private var throttled = false
@@ -144,9 +170,15 @@ final class ResilientSocket {
 
     init(dialect: SocketDialect) {
         self.dialect = dialect
+        session = URLSession(configuration: .default, delegate: opens, delegateQueue: nil)
+    }
+
+    deinit {
+        session.finishTasksAndInvalidate()
     }
 
     func start() {
+        endPause()
         isRunning = true
         failures = 0
         throttled = false
@@ -158,7 +190,9 @@ final class ResilientSocket {
     }
 
     func stop() {
+        endPause()
         isRunning = false
+        hedgeTask?.cancel()
         if let primary, primary.isReady, let end = dialect.endOfAudioMessage { primary.send(end) }
         tearDownPrimary()
         dropStandby()
@@ -168,7 +202,7 @@ final class ResilientSocket {
     }
 
     func send(_ chunk: Data) {
-        guard isRunning else { return }
+        guard isRunning, !isPaused else { return }
         if let primary, primary.isReady {
             enqueueAudio(chunk, on: primary)
         } else {
@@ -182,7 +216,8 @@ final class ResilientSocket {
     /// The device moved to a different network interface. Opens a socket on
     /// the new path before letting go of the old one.
     func networkPathChanged() {
-        guard isRunning, networkAvailable else { return }
+        // A paused session finds out from its pings if the old path died.
+        guard isRunning, !isPaused, networkAvailable else { return }
         guard let primary, primary.isReady else {
             // Still connecting, maybe over the old path: start over on the new one.
             if status == .reconnecting || status == .connecting {
@@ -195,6 +230,49 @@ final class ResilientSocket {
         let connection = makeConnection(isCatchUp: false)
         standby = connection
         open(connection)
+    }
+
+    /// Stops taking audio but keeps the live session open, so `resume()` is
+    /// instant. A session that isn't live yet, or a server that can't idle,
+    /// is stopped instead.
+    func pause() {
+        guard isRunning, !isPaused else { return }
+        guard let primary, primary.isReady, let keepalive = dialect.keepaliveMessage else {
+            stop()
+            return
+        }
+        isPaused = true
+        hedgeTask?.cancel()
+        dropStandby()
+        backlog.removeAll()
+        primary.awaitingReplySince = nil
+        if let message = dialect.pauseMessage { primary.send(message) }
+        debugLog("paused stream \(primary.stream.id)")
+        keepaliveTask = Task { [weak primary] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.keepaliveInterval)
+                guard !Task.isCancelled, let primary, !primary.isClosed else { return }
+                primary.send(keepalive)
+            }
+        }
+    }
+
+    /// Takes audio again, on the paused session if it's still up.
+    func resume() {
+        let wasPaused = isPaused
+        endPause()
+        guard wasPaused, isRunning, let primary, primary.isReady else {
+            start()
+            return
+        }
+        debugLog("resumed stream \(primary.stream.id)")
+        status = .live
+    }
+
+    private func endPause() {
+        isPaused = false
+        keepaliveTask?.cancel()
+        keepaliveTask = nil
     }
 
     // MARK: - Connection
@@ -212,6 +290,7 @@ final class ResilientSocket {
         var awaitingReplySince: ContinuousClock.Instant?
         /// Audio to send once ready, then end the stream (catch-up only).
         var replay: [Data] = []
+        let createdAt = ContinuousClock.now
 
         init(stream: SocketStream) {
             self.stream = stream
@@ -246,6 +325,24 @@ final class ResilientSocket {
         let connection = makeConnection(isCatchUp: false)
         primary = connection
         open(connection)
+        scheduleHedge(for: connection)
+    }
+
+    /// On a lossy network one attempt can sit for seconds on a lost packet.
+    /// If it isn't up after `hedgeDelay`, a second attempt races it as the
+    /// standby, and whichever opens first carries the audio.
+    private func scheduleHedge(for connection: Connection) {
+        hedgeTask?.cancel()
+        guard dialect.supportsSideStreams, !throttled else { return }
+        hedgeTask = Task { [weak self, weak connection] in
+            try? await Task.sleep(for: Self.hedgeDelay)
+            guard !Task.isCancelled, let self, let connection, connection === self.primary,
+                  !connection.isReady, self.standby == nil, self.networkAvailable else { return }
+            self.debugLog("stream \(connection.stream.id) is slow to open; racing another")
+            let hedge = self.makeConnection(isCatchUp: false)
+            self.standby = hedge
+            self.open(hedge)
+        }
     }
 
     /// Fetches a request, then opens the socket and starts its tasks.
@@ -255,9 +352,12 @@ final class ResilientSocket {
             do {
                 #if DEBUG
                 if self.isBlackholed { throw URLError(.notConnectedToInternet) }
+                if connection === self.primary { await self.simulateSlowConnect() }
                 #endif
-                let request = try await self.dialect.makeRequest()
+                guard let stream = connection?.stream else { return }
+                let request = try await self.dialect.makeRequest(for: stream)
                 guard let connection, !connection.isClosed, !Task.isCancelled else { return }
+                self.debugLog("stream \(stream.id) has its request after \(connection.createdAt.duration(to: .now))")
                 self.start(connection, request: request)
             } catch SocketSetupError.fail(let message) {
                 guard let connection, !connection.isClosed else { return }
@@ -278,6 +378,7 @@ final class ResilientSocket {
 
         let (stream, continuation) = AsyncStream<URLSessionWebSocketTask.Message>.makeStream()
         connection.outbox = continuation
+        if dialect.readyWhenOpen { opens.expect(socket) }
         socket.resume()
         dialect.openingMessages().forEach { continuation.yield($0) }
 
@@ -314,16 +415,15 @@ final class ResilientSocket {
             }
         })
 
-        connection.tasks.append(Task { [weak self, weak connection, readyWhenOpen = dialect.readyWhenOpen] in
-            // A pong can only come back once the handshake is done, so the
-            // first one doubles as the "socket is open" signal.
+        connection.tasks.append(Task { [weak self, weak connection, opens, readyWhenOpen = dialect.readyWhenOpen] in
             if readyWhenOpen {
-                let opened = await Self.ping(socket, timeout: .seconds(5))
+                let opened = await opens.waitForOpen(socket, timeout: .seconds(5))
                 guard let self, let connection, !connection.isClosed else { return }
                 guard opened else {
                     self.connection(connection, failed: .retry("Handshake timed out"))
                     return
                 }
+                self.debugLog("stream \(connection.stream.id) opened after \(connection.createdAt.duration(to: .now))")
                 self.connection(connection, received: .ready)
             }
             while !Task.isCancelled {
@@ -361,7 +461,7 @@ final class ResilientSocket {
             switch signal {
             case .ready:
                 connection.isReady = true
-                dialect.sessionDidOpen()
+                dialect.sessionDidOpen(connection.stream)
                 standbyBecameReady()
             case .retry, .fail:
                 dropStandby()
@@ -372,7 +472,7 @@ final class ResilientSocket {
             switch signal {
             case .ready:
                 connection.isReady = true
-                dialect.sessionDidOpen()
+                dialect.sessionDidOpen(connection.stream)
                 if connection.stream.isCatchUp { sendReplay(on: connection) }
             case .retry, .fail:
                 // Includes the server finishing after end of audio.
@@ -385,6 +485,7 @@ final class ResilientSocket {
 
     private func connection(_ connection: Connection, failed signal: SocketSignal) {
         if case .retry(let reason, _) = signal { debugLog("stream \(connection.stream.id) failed: \(reason)") }
+        if !connection.isReady { dialect.connectFailed(connection.stream) }
         if connection === primary {
             handlePrimary(signal)
         } else if connection === standby {
@@ -405,7 +506,10 @@ final class ResilientSocket {
             failures = 0
             throttled = false
             status = .live
-            dialect.sessionDidOpen()
+            dialect.sessionDidOpen(primary.stream)
+            // It won the race; a hedge still connecting isn't needed.
+            hedgeTask?.cancel()
+            dropStandby()
             flushBacklog(to: primary)
         case .boundary:
             if standby?.isReady == true { handOver() }
@@ -419,6 +523,12 @@ final class ResilientSocket {
 
     private func handleFailure() {
         guard isRunning else { return }
+        // Nobody is waiting on a paused session; reconnect when they come back.
+        if isPaused {
+            debugLog("paused session dropped")
+            stop()
+            return
+        }
 
         if let response = primary?.socket?.response as? HTTPURLResponse {
             if response.statusCode == 401 || response.statusCode == 403,
@@ -429,18 +539,9 @@ final class ResilientSocket {
             if response.statusCode == 429 { throttled = true }
         }
 
-        // A socket already open on a new path takes over at once.
-        if let standby {
-            self.standby = nil
-            handoverTimer?.cancel()
-            tearDownPrimary()
-            primary = standby
-            if standby.isReady {
-                status = .live
-                flushBacklog(to: standby)
-            } else {
-                status = .reconnecting
-            }
+        // A socket already opening on a new path, or racing this one, takes over at once.
+        if standby != nil {
+            promoteStandby()
             return
         }
 
@@ -462,6 +563,8 @@ final class ResilientSocket {
     }
 
     private func fail(_ message: String) {
+        endPause()
+        hedgeTask?.cancel()
         tearDownPrimary()
         dropStandby()
         isRunning = false
@@ -480,8 +583,8 @@ final class ResilientSocket {
 
     private func standbyBecameReady() {
         guard let primary, primary.isReady else {
-            // The primary is down; the standby takes over now.
-            handleFailure()
+            // The primary is down or still connecting; the standby takes over now.
+            promoteStandby()
             return
         }
         if !dialect.isMidUtterance(on: primary.stream) {
@@ -492,6 +595,25 @@ final class ResilientSocket {
             try? await Task.sleep(for: Self.handoverWait)
             guard !Task.isCancelled else { return }
             self?.handOver()
+        }
+    }
+
+    /// Makes the standby the primary in place of one that failed or never opened.
+    private func promoteStandby() {
+        guard let standby else { return }
+        self.standby = nil
+        handoverTimer?.cancel()
+        hedgeTask?.cancel()
+        tearDownPrimary()
+        primary = standby
+        if standby.isReady {
+            debugLog("stream \(standby.stream.id) took over")
+            failures = 0
+            throttled = false
+            status = .live
+            flushBacklog(to: standby)
+        } else {
+            status = .reconnecting
         }
     }
 
@@ -652,6 +774,15 @@ final class ResilientSocket {
         blackholeUntil.map { ContinuousClock.now < $0 } ?? false
     }
 
+    /// `-LivelySlowConnect SECONDS` holds up each primary connection attempt,
+    /// so a hedge races it.
+    private func simulateSlowConnect() async {
+        let delay = UserDefaults.standard.double(forKey: "LivelySlowConnect")
+        guard delay > 0 else { return }
+        debugLog("simulated slow connect for \(delay) s")
+        try? await Task.sleep(for: .seconds(delay))
+    }
+
     /// `-LivelyDropout "AT,FOR"` blackholes the network FOR seconds, starting
     /// AT seconds after listening starts. `-LivelyPathChange AT` reports a
     /// network interface change AT seconds in.
@@ -679,6 +810,75 @@ final class ResilientSocket {
         }
     }
     #endif
+}
+
+/// Reports when each WebSocket's handshake completes, a round trip sooner
+/// than a ping could come back.
+nonisolated private final class OpenWatcher: NSObject, URLSessionWebSocketDelegate, @unchecked Sendable {
+    private enum State {
+        case pending
+        case waiting(CheckedContinuation<Bool, Never>)
+        case opened
+        case closed
+    }
+
+    private let states = OSAllocatedUnfairLock(initialState: [Int: State]())
+
+    /// Call before `resume()`, so an open that comes quickly isn't missed.
+    func expect(_ task: URLSessionWebSocketTask) {
+        states.withLock { $0[task.taskIdentifier] = .pending }
+    }
+
+    /// True once the handshake is done; false if it failed or took too long.
+    func waitForOpen(_ task: URLSessionWebSocketTask, timeout: Duration) async -> Bool {
+        let id = task.taskIdentifier
+        let timer = Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            guard !Task.isCancelled else { return }
+            self?.settle(id, opened: false)
+        }
+        defer { timer.cancel() }
+        return await withCheckedContinuation { continuation in
+            let result: Bool? = states.withLock { states in
+                switch states[id] {
+                case .pending:
+                    states[id] = .waiting(continuation)
+                    return nil
+                case .opened:
+                    states[id] = nil
+                    return true
+                case .closed, .waiting, nil:
+                    states[id] = nil
+                    return false
+                }
+            }
+            if let result { continuation.resume(returning: result) }
+        }
+    }
+
+    private func settle(_ id: Int, opened: Bool) {
+        let waiter: CheckedContinuation<Bool, Never>? = states.withLock { states in
+            switch states[id] {
+            case .pending:
+                states[id] = opened ? .opened : .closed
+                return nil
+            case .waiting(let continuation):
+                states[id] = nil
+                return continuation
+            case .opened, .closed, nil:
+                return nil
+            }
+        }
+        waiter?.resume(returning: opened)
+    }
+
+    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
+        settle(webSocketTask.taskIdentifier, opened: true)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+        settle(task.taskIdentifier, opened: false)
+    }
 }
 
 extension URLSessionWebSocketTask.Message {

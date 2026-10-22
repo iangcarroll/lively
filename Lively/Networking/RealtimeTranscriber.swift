@@ -42,7 +42,7 @@ final class RealtimeTranscriber: SpeechEngine, SocketDialect {
 
     // MARK: - SocketDialect
 
-    func makeRequest() -> URLRequest {
+    func makeRequest(for stream: SocketStream) -> URLRequest {
         var request = URLRequest(url: Self.endpoint.appending(queryItems: [
             URLQueryItem(name: "model", value: config.model),
         ]))

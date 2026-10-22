@@ -68,8 +68,9 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     /// Temporary keys rejected in a row. A temporary key that has expired is
     /// rejected like a bad one, so a few rejections just mean "get a new key".
     private var rejectedTemporaryKeys = 0
-    /// The region of the latest connection attempt, until it opens.
-    private var connectingRegion: String?
+    /// The region of each connection attempt, until it opens or fails.
+    /// Attempts overlap when a slow one is raced.
+    private var connectingRegions: [Int: String] = [:]
 
     init(_ configuration: Configuration) {
         config = configuration
@@ -77,10 +78,16 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
 
     func start() {
         rejectedTemporaryKeys = 0
-        connectingRegion = nil
+        connectingRegions.removeAll()
         if case .broker(let provider) = config.credential { provider.startRefreshing() }
         socket.start()
     }
+
+    /// Finalizes what was heard and keeps the session open with keepalives.
+    /// The spare key keeps refreshing, in case the session drops meanwhile.
+    func pause() { socket.pause() }
+
+    func resume() { socket.resume() }
 
     func send(_ chunk: Data) { socket.send(chunk) }
 
@@ -89,6 +96,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         socket.stop()
         for id in streams.keys { closeOpenSegment(in: id) }
         streams.removeAll()
+        connectingRegions.removeAll()
     }
 
     func endTurn() {
@@ -99,18 +107,15 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
 
     // MARK: - SocketDialect
 
-    func makeRequest() async throws -> URLRequest {
+    func makeRequest(for stream: SocketStream) async throws -> URLRequest {
         let key: String
         let url: URL
         switch config.credential {
         case .apiKey(let value):
             (key, url) = (value, Self.defaultEndpoint)
         case .broker(let provider):
-            // The last attempt never opened.
-            if let region = connectingRegion { provider.regions.connectFailed(region: region) }
-            connectingRegion = nil
             let temporary = try await provider.takeKey()
-            connectingRegion = temporary.region
+            connectingRegions[stream.id] = temporary.region
             (key, url) = (temporary.value, temporary.websocketURL)
         }
         var request = URLRequest(url: url)
@@ -118,10 +123,16 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         return request
     }
 
-    func sessionDidOpen() {
-        guard case .broker(let provider) = config.credential, let region = connectingRegion else { return }
-        connectingRegion = nil
+    func sessionDidOpen(_ stream: SocketStream) {
+        guard case .broker(let provider) = config.credential,
+              let region = connectingRegions.removeValue(forKey: stream.id) else { return }
         provider.regions.connectSucceeded(region: region)
+    }
+
+    func connectFailed(_ stream: SocketStream) {
+        guard case .broker(let provider) = config.credential,
+              let region = connectingRegions.removeValue(forKey: stream.id) else { return }
+        provider.regions.connectFailed(region: region)
     }
 
     func openingMessages() -> [URLSessionWebSocketTask.Message] {
@@ -152,6 +163,10 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     /// Soniox replies about every 0.12 s while audio flows, and within 1.1 s
     /// at worst (Tools/probe/ASIA_LATENCY.md §2).
     var stallTimeout: Duration? { .milliseconds(2500) }
+    /// https://soniox.com/docs/stt/rt/connection-keepalive
+    var keepaliveMessage: URLSessionWebSocketTask.Message? { .json(["type": "keepalive"]) }
+    /// Finalizes pending tokens, so the last words before a pause show up now.
+    var pauseMessage: URLSessionWebSocketTask.Message? { .json(["type": "finalize"]) }
     var supportsSideStreams: Bool { true }
 
     func isMidUtterance(on stream: SocketStream) -> Bool {

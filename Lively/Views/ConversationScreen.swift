@@ -39,6 +39,9 @@ struct ConversationScreen: View {
                 }
             }
         }
+        .onChange(of: showSettings) { _, shown in
+            if !shown { store.settingsDidClose() }
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView(settings: settings) { store.clear() }
         }
@@ -55,7 +58,7 @@ struct ConversationScreen: View {
             if phase == .active { store.didBecomeActive() }
             #if os(iOS)
             // iOS takes the mic away in the background anyway; stop cleanly.
-            if phase == .background { store.stopListening() }
+            if phase == .background { store.didEnterBackground() }
             #endif
         }
         .onAppear {
