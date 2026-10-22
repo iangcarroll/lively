@@ -30,7 +30,7 @@ struct AccountContent: View {
         VStack(spacing: 32) {
             header
             if let email = account.email {
-                SignedInCard(email: email) { account.signOut() }
+                SignedInCard(account: account, email: email)
             } else {
                 SignInForm(account: account)
                 benefits
@@ -111,11 +111,21 @@ private struct BenefitRow: View {
 }
 
 private struct SignedInCard: View {
+    let account: Account
     let email: String
-    let signOut: () -> Void
-    @State private var confirming = false
+    @State private var confirmingSignOut = false
+    @State private var confirmingDelete = false
+    @State private var deleting = false
+    @State private var deleteError: String?
 
     var body: some View {
+        VStack(spacing: 16) {
+            card
+            deleteButton
+        }
+    }
+
+    private var card: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 SettingsIcon(systemImage: "envelope.fill", color: .blue)
@@ -129,8 +139,21 @@ private struct SignedInCard: View {
                     .accessibilityLabel("Verified")
             }
             .padding(16)
+            if account.hasFreePro {
+                Divider().padding(.leading, 58)
+                HStack(spacing: 12) {
+                    SettingsIcon(systemImage: "star.fill", color: .orange)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Lively Pro").font(.body)
+                        Text("Included free with your account").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(16)
+                .accessibilityElement(children: .combine)
+            }
             Divider().padding(.leading, 58)
-            Button(role: .destructive) { confirming = true } label: {
+            Button(role: .destructive) { confirmingSignOut = true } label: {
                 Text("Sign Out")
                     .font(.body.weight(.medium))
                     .frame(maxWidth: .infinity, minHeight: 50)
@@ -140,10 +163,53 @@ private struct SignedInCard: View {
             .foregroundStyle(.red)
         }
         .background(Color(.card), in: .rect(cornerRadius: 24, style: .continuous))
-        .confirmationDialog("Sign out of Lively?", isPresented: $confirming, titleVisibility: .visible) {
-            Button("Sign Out", role: .destructive, action: signOut)
+        .confirmationDialog("Sign out of Lively?", isPresented: $confirmingSignOut, titleVisibility: .visible) {
+            Button("Sign Out", role: .destructive) { account.signOut() }
         } message: {
             Text("You'll go back to this device's daily translation time.")
+        }
+    }
+
+    private var deleteButton: some View {
+        VStack(spacing: 8) {
+            Button(role: .destructive) { confirmingDelete = true } label: {
+                ZStack {
+                    Text("Delete Account").opacity(deleting ? 0 : 1)
+                    if deleting { ProgressView() }
+                }
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.red)
+            .disabled(deleting)
+            if let deleteError {
+                Label(deleteError, systemImage: "exclamationmark.circle.fill")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .confirmationDialog("Delete your Lively account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            Button("Delete Account", role: .destructive, action: delete)
+        } message: {
+            Text(account.hasFreePro
+                ? "This erases your email and account from Lively's servers, including the free Lively Pro that came with it. It can't be undone."
+                : "This erases your email and account from Lively's servers and can't be undone. It doesn't cancel a Lively Pro subscription.")
+        }
+    }
+
+    private func delete() {
+        deleting = true
+        deleteError = nil
+        Task {
+            defer { deleting = false }
+            do {
+                try await account.deleteAccount()
+            } catch {
+                deleteError = error.localizedDescription
+            }
         }
     }
 }

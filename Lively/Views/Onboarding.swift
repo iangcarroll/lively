@@ -212,7 +212,7 @@ private struct LanguagesPage: View {
                         ForEach(ChineseScript.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 180)
+                    .frame(width: 280)
                     .offset(y: 52)
                     .transition(.opacity)
                 }

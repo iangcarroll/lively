@@ -198,7 +198,8 @@ describe("signed-in keys", () => {
     expect(response.status).toBe(200);
     const sent = JSON.parse((soniox.mock.calls[0] as [string, RequestInit])[1].body as string);
     expect(sent.client_reference_id).toBe(await hash(`user:${user.id}`));
-    expect(sent.max_session_duration_seconds).toBe(7200);
+    // Capped to a free account's 30 minutes a day.
+    expect(sent.max_session_duration_seconds).toBe(1800);
   });
 
   it("gives accounts their own daily budget across installs", async () => {

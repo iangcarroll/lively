@@ -6,8 +6,9 @@
  *   Lively-Install-ID: <random UUID the app keeps in its Keychain>
  *   Lively-Region: us | jp   (optional; the app's measured best region)
  *   Authorization: Bearer <session token>   (optional; see auth.ts)
+ *   Lively-Subscription: <signed App Store transaction>   (optional; see appstore.ts)
  *   → 200 {api_key, expires_at, expires_in_seconds, max_session_seconds,
- *          region, websocket_url, regions}
+ *          region, websocket_url, regions, plan}
  *
  * Soniox regions are separate projects with region-scoped keys, so there is
  * one master key per region, and a temporary key works only on its region's
@@ -21,8 +22,13 @@
  * caller is limited per account instead of per install, with a bigger daily
  * budget, and isn't held to the per-IP daily budget, so people behind one
  * carrier NAT don't use up each other's time.
+ *
+ * Pro callers, with an App Store subscription or an account with `free_pro`,
+ * get the PRO_ limits. A subscription is charged per subscription, wherever
+ * it's used, and like an account isn't held to the per-IP daily budget.
  */
 
+import { proSubscription } from "./appstore";
 import { authenticate, unauthorized } from "./auth";
 
 export interface Env {
@@ -42,6 +48,8 @@ export interface Env {
   PER_INSTALL_MINUTES_PER_DAY: string;
   PER_USER_KEYS_PER_MINUTE: string;
   PER_USER_MINUTES_PER_DAY: string;
+  PRO_KEYS_PER_MINUTE: string;
+  PRO_MINUTES_PER_DAY: string;
   PER_IP_KEYS_PER_MINUTE: string;
   PER_IP_MINUTES_PER_DAY: string;
   GLOBAL_KEYS_PER_DAY: string;
@@ -52,6 +60,13 @@ export interface Env {
   CODES_PER_EMAIL_PER_DAY: string;
   CODES_PER_IP_PER_HOUR: string;
   SESSION_DAYS: string;
+  /** Lively Pro. Lists are comma-separated. */
+  APP_BUNDLE_ID: string;
+  PRO_PRODUCT_IDS: string;
+  /** App Store environments whose transactions count: Production, and Sandbox for TestFlight. */
+  APP_STORE_ENVIRONMENTS: string;
+  /** Tests only: trust this root (base64 DER) instead of Apple's. */
+  APP_STORE_TEST_ROOT?: string;
 }
 
 export type Region = "us" | "jp";
@@ -100,10 +115,13 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
   if (auth.state === "invalid") return unauthorized();
   const installHash = await hash(`install:${installID.toLowerCase()}`);
   const userHash = auth.state === "signed_in" ? await hash(`user:${auth.user.id}`) : undefined;
+  const subscription = await proSubscription(request, env, now);
+  const subscriptionHash = subscription ? await hash(`subscription:${subscription.originalTransactionId}`) : undefined;
   const ipHash = await hash(`ip:${networkOf(request.headers.get("CF-Connecting-IP") ?? "local")}`);
+  const plan = subscription || (auth.state === "signed_in" && auth.user.freePro) ? "pro" : "free";
 
-  if (await isDenied(env, installHash) || (userHash && (await isDenied(env, userHash)))) {
-    return error(403, "denied", "This install can't get keys.");
+  for (const subjectHash of [installHash, userHash, subscriptionHash]) {
+    if (subjectHash && (await isDenied(env, subjectHash))) return error(403, "denied", "This install can't get keys.");
   }
 
   const limits = readLimits(env);
@@ -113,10 +131,14 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
   const dayExpiry = nowSeconds(nextUTCMidnight(now)) + 3600;
 
   // Keys per minute count 1; minutes per day are tracked in charged seconds.
-  const subject: Charge[] = userHash
+  // The budget follows the subscription if there is one, then the account.
+  const owner = subscriptionHash ? `subscription:${subscriptionHash}` : userHash ? `user:${userHash}` : undefined;
+  const [keysPerMinute, secondsPerDay] =
+    plan === "pro" ? [limits.proKeysPerMinute, limits.proSecondsPerDay] : [limits.userKeysPerMinute, limits.userSecondsPerDay];
+  const subject: Charge[] = owner
     ? [
-        { key: `user:${userHash}:min:${minute}`, amount: 1, limit: limits.userKeysPerMinute, expiresAt: minuteExpiry, window: "minute" },
-        { key: `user:${userHash}:day:${day}`, amount: limits.chargeSeconds, limit: limits.userSecondsPerDay, expiresAt: dayExpiry, window: "day" },
+        { key: `${owner}:min:${minute}`, amount: 1, limit: keysPerMinute, expiresAt: minuteExpiry, window: "minute" },
+        { key: `${owner}:day:${day}`, amount: limits.chargeSeconds, limit: secondsPerDay, expiresAt: dayExpiry, window: "day" },
       ]
     : [
         { key: `install:${installHash}:min:${minute}`, amount: 1, limit: limits.installKeysPerMinute, expiresAt: minuteExpiry, window: "minute" },
@@ -145,8 +167,13 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
     if (exceeded.window === "global") {
       return error(503, "capacity", "Lively has reached today's capacity. Try again later.", secondsUntil(nextUTCMidnight(now), now));
     }
-    const retryAfter = exceeded.window === "minute" ? secondsUntil((minute + 1) * 60_000, now) : secondsUntil(nextUTCMidnight(now), now);
-    return error(429, "rate_limited", exceeded.window === "minute" ? "Too many keys this minute." : "Today's translation time is used up.", retryAfter);
+    if (exceeded.window === "minute") return error(429, "rate_limited", "Too many keys this minute.", secondsUntil((minute + 1) * 60_000, now));
+    // `plan` lets the app offer Pro when a free day runs out.
+    return json(
+      429,
+      { error: "rate_limited", message: plan === "pro" ? "Today's translation time is used up." : "Today's free translation time is used up.", plan },
+      { "Retry-After": String(secondsUntil(nextUTCMidnight(now), now)) },
+    );
   }
 
   // A session may run only as long as the day's budgets have left, counting this key.
@@ -161,7 +188,7 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
     expires_in_seconds: limits.keyTTLSeconds,
     single_use: true,
     max_session_duration_seconds: maxSession,
-    client_reference_id: userHash ?? installHash,
+    client_reference_id: subscriptionHash ?? userHash ?? installHash,
   });
   if (!minted.ok) {
     await refund(env, charges);
@@ -178,6 +205,7 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
     region: minted.region,
     websocket_url: REGIONS[minted.region].websocket,
     regions: Object.fromEntries(regions.map((r) => [r, REGIONS[r].websocket])),
+    plan,
   });
 }
 
@@ -231,10 +259,11 @@ async function refund(env: Env, charges: Charge[]): Promise<void> {
   );
 }
 
-async function isDenied(env: Env, installHash: string): Promise<boolean> {
+/** Install, account and subscription hashes all share the denylist. */
+async function isDenied(env: Env, subjectHash: string): Promise<boolean> {
   const listed = env.DENYLIST.split(",").map((s) => s.trim().toLowerCase());
-  if (listed.includes(installHash)) return true;
-  const row = await env.DB.prepare("SELECT 1 FROM denylist WHERE install_hash = ?").bind(installHash).first();
+  if (listed.includes(subjectHash)) return true;
+  const row = await env.DB.prepare("SELECT 1 FROM denylist WHERE install_hash = ?").bind(subjectHash).first();
   return row !== null;
 }
 
@@ -252,6 +281,8 @@ function readLimits(env: Env) {
     installSecondsPerDay: int(env.PER_INSTALL_MINUTES_PER_DAY, "PER_INSTALL_MINUTES_PER_DAY") * 60,
     userKeysPerMinute: int(env.PER_USER_KEYS_PER_MINUTE, "PER_USER_KEYS_PER_MINUTE"),
     userSecondsPerDay: int(env.PER_USER_MINUTES_PER_DAY, "PER_USER_MINUTES_PER_DAY") * 60,
+    proKeysPerMinute: int(env.PRO_KEYS_PER_MINUTE, "PRO_KEYS_PER_MINUTE"),
+    proSecondsPerDay: int(env.PRO_MINUTES_PER_DAY, "PRO_MINUTES_PER_DAY") * 60,
     ipKeysPerMinute: int(env.PER_IP_KEYS_PER_MINUTE, "PER_IP_KEYS_PER_MINUTE"),
     ipSecondsPerDay: int(env.PER_IP_MINUTES_PER_DAY, "PER_IP_MINUTES_PER_DAY") * 60,
     globalKeysPerDay: int(env.GLOBAL_KEYS_PER_DAY, "GLOBAL_KEYS_PER_DAY"),

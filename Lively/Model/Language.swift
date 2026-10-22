@@ -122,7 +122,8 @@ enum ChineseScript: String, CaseIterable, Identifiable, Sendable {
     case simplified, traditional
 
     var id: String { rawValue }
-    var label: String { self == .simplified ? "简体" : "繁體" }
+    /// English first, for whoever is setting Lively up.
+    var label: String { self == .simplified ? "Simplified 简体" : "Traditional 繁體" }
     var promptName: String { self == .simplified ? "Simplified Chinese" : "Traditional Chinese" }
 
     /// Rewrites Simplified Chinese in this script, for engines that only

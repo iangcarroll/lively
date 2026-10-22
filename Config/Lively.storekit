@@ -1,0 +1,89 @@
+{
+  "identifier" : "4C1D2A6E",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_developerTeamID" : "SWA3UUHCJR",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21880001",
+      "localizations" : [
+
+      ],
+      "name" : "Lively Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "21880002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "10 hours of live translation a day",
+              "displayName" : "Lively Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "sh.ian.lively.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Lively Pro Monthly",
+          "subscriptionGroupID" : "21880001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "39.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21880003",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "10 hours of live translation a day",
+              "displayName" : "Lively Pro Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "sh.ian.lively.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Lively Pro Yearly",
+          "subscriptionGroupID" : "21880001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

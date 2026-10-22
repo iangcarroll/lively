@@ -53,7 +53,8 @@ describe("POST /v1/soniox/key", () => {
     const body = await response.json<{ api_key: string; expires_at: string; expires_in_seconds: number; max_session_seconds: number }>();
     expect(body.api_key).toMatch(/^temp:/);
     expect(body.expires_at).toBe("2026-10-20T12:01:30Z");
-    expect(body.max_session_seconds).toBe(7200);
+    // Capped to the free day's 15 minutes.
+    expect(body.max_session_seconds).toBe(900);
     expect(body.expires_in_seconds).toBe(300);
 
     expect(soniox).toHaveBeenCalledOnce();
@@ -64,7 +65,7 @@ describe("POST /v1/soniox/key", () => {
       usage_type: "transcribe_websocket",
       expires_in_seconds: 300,
       single_use: true,
-      max_session_duration_seconds: 7200,
+      max_session_duration_seconds: 900,
       client_reference_id: await hash(`install:${installID}`),
     });
   });
@@ -222,7 +223,7 @@ describe("rate limits", () => {
 
     const third = await issueSonioxKey(keyRequest(id), local, NOW);
     expect(third.status).toBe(429);
-    expect(await third.json()).toMatchObject({ error: "rate_limited", message: "Today's translation time is used up." });
+    expect(await third.json()).toMatchObject({ error: "rate_limited", message: "Today's free translation time is used up.", plan: "free" });
     expect(Number(third.headers.get("Retry-After"))).toBe(12 * 3600 - 30);
 
     // Tomorrow.

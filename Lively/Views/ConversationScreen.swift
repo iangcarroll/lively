@@ -6,6 +6,7 @@ struct ConversationScreen: View {
 
     @State private var showSettings = false
     @State private var showOnboarding = false
+    @State private var showPro = false
     @AppStorage("onboardingDone") private var onboardingDone = false
     @State private var didStartDemoAutomatically = false
     /// On phones, face-to-face is the main layout; the transcript is an alternative.
@@ -51,8 +52,19 @@ struct ConversationScreen: View {
         #else
         .sheet(isPresented: $showOnboarding) { onboarding.frame(width: 520, height: 760) }
         #endif
+        .sheet(isPresented: $showPro) {
+            NavigationStack {
+                ProView().toolbar {
+                    ToolbarItem(placement: .confirmationAction) { Button("Done") { showPro = false } }
+                }
+            }
+            #if os(macOS)
+            .frame(minWidth: 460, minHeight: 640)
+            #endif
+        }
         .alert("Lively", isPresented: alertBinding) {
             if !settings.hasCredentials { Button("Open Settings") { showSettings = true } }
+            if Pro.shared.freeLimitReached && !Pro.shared.isPro { Button("Get Lively Pro") { showPro = true } }
             Button("OK", role: .cancel) {}
         } message: {
             Text(store.alert ?? "")
@@ -162,6 +174,11 @@ struct ConversationScreen: View {
     }
 
     private var alertBinding: Binding<Bool> {
-        Binding(get: { store.alert != nil }, set: { if !$0 { store.alert = nil } })
+        Binding(get: { store.alert != nil }, set: {
+            if !$0 {
+                store.alert = nil
+                Pro.shared.freeLimitReached = false
+            }
+        })
     }
 }

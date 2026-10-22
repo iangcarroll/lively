@@ -5,6 +5,10 @@
  *   POST /v1/auth/email/verify  {email, code}  → 200 {token, user: {id, email}}
  *   GET  /v1/auth/me            Authorization: Bearer <token> → 200 {user}
  *   POST /v1/auth/logout        Authorization: Bearer <token> → 200 {ok}
+ *   POST /v1/auth/delete        Authorization: Bearer <token> → 200 {ok}
+ *
+ * `user` is {id, email, free_pro}. An account with `free_pro` gets Lively Pro
+ * without a subscription (see broker.ts).
  *
  * Sign-in is optional. A signed-in app sends its token with key requests and
  * gets a per-account listening budget instead of the per-install one.
@@ -21,6 +25,22 @@ import type { Env } from "./broker";
 export interface User {
   id: string;
   email: string;
+  freePro: boolean;
+}
+
+/** A user as the API shows it. */
+function userJSON(user: User) {
+  return { id: user.id, email: user.email, free_pro: user.freePro };
+}
+
+interface UserRow {
+  id: string;
+  email: string;
+  free_pro: number;
+}
+
+function userOf(row: UserRow): User {
+  return { id: row.id, email: row.email, freePro: row.free_pro === 1 };
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -95,29 +115,45 @@ export async function verifyEmailSignIn(request: Request, env: Env, now: number)
 
   const userID = crypto.randomUUID();
   const token = randomToken();
-  const [, user] = await env.DB.batch<{ id: string; email: string }>([
+  const [, user] = await env.DB.batch<UserRow>([
     env.DB.prepare("DELETE FROM login_codes WHERE email = ?").bind(email),
     env.DB.prepare(
-      "INSERT INTO users (id, email) VALUES (?1, ?2) ON CONFLICT(email) DO UPDATE SET email = email RETURNING id, email",
+      "INSERT INTO users (id, email) VALUES (?1, ?2) ON CONFLICT(email) DO UPDATE SET email = email RETURNING id, email, free_pro",
     ).bind(userID, email),
   ]);
-  const account = user.results[0];
+  const account = userOf(user.results[0]);
   await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?1, ?2, ?3)")
     .bind(await tokenHash(token), account.id, nowSeconds(now) + limits.sessionDays * 86_400)
     .run();
 
-  return json(200, { token, user: { id: account.id, email: account.email } });
+  return json(200, { token, user: userJSON(account) });
 }
 
 export async function me(request: Request, env: Env, now: number): Promise<Response> {
   const auth = await authenticate(request, env, now);
   if (auth.state !== "signed_in") return unauthorized();
-  return json(200, { user: auth.user });
+  return json(200, { user: userJSON(auth.user) });
 }
 
 export async function logout(request: Request, env: Env): Promise<Response> {
   const token = bearerToken(request);
   if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await tokenHash(token)).run();
+  return json(200, { ok: true });
+}
+
+/**
+ * Deletes the account, its sessions and any pending code. Usage counters
+ * hold only a hash of the account ID and expire within a day. A Pro
+ * subscription isn't tied to the account, so it keeps working.
+ */
+export async function deleteAccount(request: Request, env: Env, now: number): Promise<Response> {
+  const auth = await authenticate(request, env, now);
+  if (auth.state !== "signed_in") return unauthorized();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(auth.user.id),
+    env.DB.prepare("DELETE FROM login_codes WHERE email = ?").bind(auth.user.email),
+    env.DB.prepare("DELETE FROM users WHERE id = ?").bind(auth.user.id),
+  ]);
   return json(200, { ok: true });
 }
 
@@ -128,12 +164,12 @@ export async function authenticate(request: Request, env: Env, now: number): Pro
   const token = bearerToken(request);
   if (token === undefined) return { state: "anonymous" };
   const user = await env.DB.prepare(
-    "SELECT users.id, users.email FROM sessions JOIN users ON users.id = sessions.user_id " +
+    "SELECT users.id, users.email, users.free_pro FROM sessions JOIN users ON users.id = sessions.user_id " +
       "WHERE sessions.token_hash = ?1 AND sessions.expires_at > ?2",
   )
     .bind(await tokenHash(token), nowSeconds(now))
-    .first<User>();
-  return user ? { state: "signed_in", user } : { state: "invalid" };
+    .first<UserRow>();
+  return user ? { state: "signed_in", user: userOf(user) } : { state: "invalid" };
 }
 
 export function unauthorized(): Response {

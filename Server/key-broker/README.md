@@ -14,7 +14,8 @@ Lively-Region: jp                      (optional)
      "region": "jp",
      "websocket_url": "wss://stt-rt.jp.soniox.com/transcribe-websocket",
      "regions": {"us": "wss://stt-rt.soniox.com/transcribe-websocket",
-                 "jp": "wss://stt-rt.jp.soniox.com/transcribe-websocket"}}
+                 "jp": "wss://stt-rt.jp.soniox.com/transcribe-websocket"},
+     "plan": "free"}
 ```
 
 For each request the Worker calls Soniox's
@@ -65,14 +66,16 @@ limits cap what that costs:
 | Variable | Default | Limit |
 |---|---|---|
 | `PER_INSTALL_KEYS_PER_MINUTE` | 6 | keys per install per minute |
-| `PER_INSTALL_MINUTES_PER_DAY` | 240 | listening minutes per install per UTC day |
+| `PER_INSTALL_MINUTES_PER_DAY` | 15 | listening minutes per install per UTC day |
 | `PER_IP_KEYS_PER_MINUTE` | 30 | keys per IP per minute (IPv6 by /64) |
 | `PER_IP_MINUTES_PER_DAY` | 1440 | listening minutes per IP per UTC day (anonymous only) |
 | `PER_USER_KEYS_PER_MINUTE` | 10 | keys per account per minute |
-| `PER_USER_MINUTES_PER_DAY` | 600 | listening minutes per account per UTC day |
+| `PER_USER_MINUTES_PER_DAY` | 30 | listening minutes per account per UTC day |
+| `PRO_KEYS_PER_MINUTE` | 10 | keys per Pro subscription or account per minute |
+| `PRO_MINUTES_PER_DAY` | 600 | listening minutes per Pro subscription or account per UTC day |
 | `GLOBAL_KEYS_PER_DAY` | 100000 | keys for everyone per UTC day |
 | `KEY_CHARGE_SECONDS` | 120 | listening time charged per key |
-| `DENYLIST` | empty | comma-separated install hashes to refuse |
+| `DENYLIST` | empty | comma-separated install, account or subscription hashes to refuse |
 
 A signed-in caller is charged per account instead of per install, so its budget
 follows it across devices. It isn't held to the per-IP daily budget, since
@@ -103,7 +106,69 @@ dashboard under Settings › Variables.
 
 Errors are JSON `{error, message}`. A per-minute 429 carries a short
 `Retry-After`, and the app retries it. A daily 429 (`Retry-After` over 60 s),
-403 (denied) and 503 (global cap) stop listening and show `message`.
+403 (denied) and 503 (global cap) stop listening and show `message`. A daily
+429 also carries `plan`; on `free` the app offers Lively Pro.
+
+## Lively Pro
+
+Pro raises the daily budget to the `PRO_` limits. A caller is Pro if it sends
+an active subscription or is signed in to an account with `free_pro`.
+
+### Subscriptions
+
+The app sends its current StoreKit 2 transaction (`jwsRepresentation`) as
+`Lively-Subscription` with each key request. `src/appstore.ts` checks it
+without calling Apple:
+
+1. The `x5c` chain: the intermediate must be signed by the copy of Apple Root
+   CA - G3 in the source, not by whatever root the chain brings, and the leaf
+   by the intermediate. Each must carry Apple's marker extension (leaf
+   `1.2.840.113635.100.6.11.1`, intermediate `1.2.840.113635.100.6.2.1`), as
+   Apple's own App Store Server Library requires, so other certificates under
+   Apple's root, like developers' signing certificates, don't pass. Each must
+   be valid at the transaction's `signedDate`.
+2. The ES256 signature, with the leaf's key.
+3. `bundleId` is `APP_BUNDLE_ID`, `productId` is in `PRO_PRODUCT_IDS`,
+   `environment` is in `APP_STORE_ENVIRONMENTS`, `expiresDate` is in the
+   future, there's no `revocationDate`, and the original transaction isn't in
+   `revoked_subscriptions`.
+
+A bad or expired transaction is ignored, and the caller gets the free plan. A
+transaction can't be forged, but it can be copied, so Pro usage is charged to
+`subscription:<hash of the original transaction ID>`, wherever it's used.
+Like an account, a subscription isn't held to the per-IP daily budget, and its
+hash is the `client_reference_id`.
+
+`APP_STORE_ENVIRONMENTS` includes `Sandbox`, which is where TestFlight
+purchases happen, for free. Xcode's local StoreKit testing signs with a
+certificate of its own, so the broker never accepts those transactions.
+
+Renewals are new transactions, which StoreKit delivers to the app. Refunds
+and revocations come from App Store Server Notifications V2:
+
+```
+POST /v1/appstore/notifications   {"signedPayload": "..."}   → 200 {"ok": true}
+```
+
+The payload and its `signedTransactionInfo` are checked the same way. `REFUND`
+and `REVOKE` add the original transaction ID to `revoked_subscriptions`;
+`REFUND_REVERSED` removes it. Anything else, or another app's notification, is
+acknowledged and ignored. In App Store Connect, set **App Information › App
+Store Server Notifications** to `https://lively.ian.sh/v1/appstore/notifications`,
+Version 2, for both Production and Sandbox.
+
+### Free Pro accounts
+
+Accounts with `free_pro` get Pro without paying. Migration 0003 gives it to
+every account that existed before Pro. To give it to someone, have them sign in
+once, then:
+
+```bash
+npx wrangler d1 execute lively-key-broker --remote \
+  --command "UPDATE users SET free_pro = 1 WHERE email = 'friend@example.com'"
+```
+
+Set it to 0 to take it away. The app rereads it at launch.
 
 ## Sign-in
 
@@ -114,11 +179,17 @@ POST /v1/auth/email/start   {"email": "a@example.com"}
 200 {"ok": true, "expires_in_seconds": 600}
 
 POST /v1/auth/email/verify  {"email": "a@example.com", "code": "123456"}
-200 {"token": "<43 chars>", "user": {"id": "<uuid>", "email": "a@example.com"}}
+200 {"token": "<43 chars>", "user": {"id": "<uuid>", "email": "a@example.com", "free_pro": false}}
 
 GET  /v1/auth/me            Authorization: Bearer <token>   → {"user": {...}}
 POST /v1/auth/logout        Authorization: Bearer <token>   → {"ok": true}
+POST /v1/auth/delete        Authorization: Bearer <token>   → {"ok": true}
 ```
+
+`user` is `{id, email, free_pro}`. Delete removes the account, all its sessions
+and any pending code. Usage counters hold only a hash of the account ID and
+expire within a day. A subscription isn't tied to an account, so it keeps
+working.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -146,6 +217,13 @@ doesn't send: it logs each message and saves its text under `.wrangler/tmp/email
 Counters live in D1. Each request makes one batched, transactional upsert, so
 concurrent requests can't both slip under a limit. Rejected and failed requests
 are refunded. A cron job at :17 every hour deletes expired counters, codes and sessions.
+
+## Pages
+
+The Worker also serves the App Store's required pages: `/privacy`, `/support`
+and `/terms`. Each gives `support@lively.ian.sh` as the contact. Mail to it
+needs Cloudflare Email Routing on the `ian.sh` zone (Email › Email Routing ›
+Routing rules), forwarding `support@lively.ian.sh` to a real inbox.
 
 ## Develop
 

@@ -7,7 +7,8 @@ import Foundation
 /// network never waits on the broker. Keys live 5 min and the spare is
 /// replaced after 4, so it outlasts minutes of broker trouble.
 /// The broker identifies this install by a random ID kept in the Keychain and
-/// rate-limits by it, or by the account when signed in (`Account`).
+/// rate-limits by it, by the account when signed in (`Account`), or by the
+/// subscription with Lively Pro (`Pro`).
 ///
 /// Keys are region-scoped: each works only on its own region's WebSocket
 /// host, which comes with it. `regions` picks the region to ask for, and the
@@ -104,6 +105,13 @@ final class SonioxKeyProvider {
         Task { try? await fillSpare() }
     }
 
+    /// Forgets the spare, for when the plan changes: its session limit is the old plan's.
+    func dropSpare() {
+        guard spare != nil else { return }
+        spare = nil
+        if refreshTask != nil { Task { try? await fillSpare() } }
+    }
+
     func stopRefreshing() {
         regions.stopPeriodicProbing()
         refreshTask?.cancel()
@@ -143,6 +151,9 @@ final class SonioxKeyProvider {
         if let requestedRegion { request.setValue(requestedRegion, forHTTPHeaderField: "Lively-Region") }
         let token = Account.shared?.token
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        if let subscription = Pro.shared.signedTransaction {
+            request.setValue(subscription, forHTTPHeaderField: "Lively-Subscription")
+        }
 
         let started = Date.now
         let (data, response) = try await session.data(for: request)
@@ -155,11 +166,15 @@ final class SonioxKeyProvider {
         }
 
         guard http.statusCode == 200 else {
-            let message = (try? JSONDecoder().decode(BrokerError.self, from: data))?.message
+            let brokerError = try? JSONDecoder().decode(BrokerError.self, from: data)
+            let message = brokerError?.message
             let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 0
             switch http.statusCode {
             // A per-minute limit clears quickly; reconnecting with backoff gets past it.
             case 429 where retryAfter <= 60: throw URLError(.resourceUnavailable)
+            case 429 where brokerError?.plan == "free":
+                Pro.shared.freeLimitReached = true
+                throw SocketSetupError.fail(message ?? "Today's free translation time is used up.")
             case 400, 403, 429, 503:
                 throw SocketSetupError.fail(message ?? "Lively's key service turned down the request.")
             default: throw URLError(.badServerResponse)
@@ -202,5 +217,7 @@ final class SonioxKeyProvider {
 
     private struct BrokerError: Decodable {
         let message: String
+        /// On a daily limit: "free" or "pro".
+        let plan: String?
     }
 }

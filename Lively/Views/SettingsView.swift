@@ -21,6 +21,24 @@ struct SettingsView: View {
                     }
                 }
 
+                if SonioxKeyProvider.shared != nil {
+                    Section {
+                        NavigationLink {
+                            ProView()
+                        } label: {
+                            LabeledContent {
+                                Text(proStatus)
+                            } label: {
+                                Label { Text("Lively Pro") } icon: { SettingsIcon(systemImage: "star.fill", color: .orange) }
+                            }
+                        }
+                    } footer: {
+                        if !Pro.shared.isPro {
+                            Text("Up to 10 hours of translation a day with the Soniox engine.")
+                        }
+                    }
+                }
+
                 Section {
                     languageLink("First language", side: .first)
                     languageLink("Second language", side: .second)
@@ -129,6 +147,12 @@ struct SettingsView: View {
     }
 
     private var provider: SpeechProvider { settings.provider }
+
+    private var proStatus: String {
+        if Pro.shared.isSubscribed { return "Active" }
+        if Account.shared?.hasFreePro == true { return "Included" }
+        return "Upgrade"
+    }
 
     private var engineFooter: String {
         var lines = [provider.summary]

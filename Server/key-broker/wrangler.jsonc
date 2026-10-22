@@ -5,6 +5,8 @@
   "account_id": "1020dc9a8bd7a82cd0801975a100d3ee",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
+  // For node:crypto's X509Certificate, which checks App Store signatures.
+  "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   // Run near D1 and Soniox's API rather than near the caller, so a far-away
   // caller pays one long round trip instead of one per upstream call.
@@ -34,10 +36,13 @@
     "MAX_SESSION_SECONDS": "7200",
     "KEY_CHARGE_SECONDS": "120",
     "PER_INSTALL_KEYS_PER_MINUTE": "6",
-    "PER_INSTALL_MINUTES_PER_DAY": "240",
+    "PER_INSTALL_MINUTES_PER_DAY": "15",
     // Signed-in accounts get these instead of the per-install limits.
     "PER_USER_KEYS_PER_MINUTE": "10",
-    "PER_USER_MINUTES_PER_DAY": "600",
+    "PER_USER_MINUTES_PER_DAY": "30",
+    // Lively Pro: a subscription, or an account with `free_pro`. A fair-use cap.
+    "PRO_KEYS_PER_MINUTE": "10",
+    "PRO_MINUTES_PER_DAY": "600",
     "PER_IP_KEYS_PER_MINUTE": "30",
     "PER_IP_MINUTES_PER_DAY": "1440",
     "GLOBAL_KEYS_PER_DAY": "100000",
@@ -50,6 +55,10 @@
     "CODES_PER_EMAIL_PER_HOUR": "5",
     "CODES_PER_EMAIL_PER_DAY": "10",
     "CODES_PER_IP_PER_HOUR": "20",
-    "SESSION_DAYS": "365"
+    "SESSION_DAYS": "365",
+    // Lively Pro. Sandbox is TestFlight's environment, where purchases are free.
+    "APP_BUNDLE_ID": "sh.ian.lively",
+    "PRO_PRODUCT_IDS": "sh.ian.lively.pro.monthly,sh.ian.lively.pro.yearly",
+    "APP_STORE_ENVIRONMENTS": "Production,Sandbox"
   }
 }

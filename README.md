@@ -31,6 +31,15 @@ broker at `https://lively.ian.sh` (see
 [Server/key-broker](Server/key-broker/README.md)). For Voxtral, add a Mistral
 key in Settings.
 
+Lively Pro is an App Store subscription that raises the daily translation
+allowance (`Model/Pro.swift`, `Views/ProView.swift`). The key broker checks
+each signed transaction itself; see
+[Server/key-broker](Server/key-broker/README.md#lively-pro). To try purchases
+from Xcode, pick `Config/Lively.storekit` under Edit Scheme › Run › Options ›
+StoreKit Configuration. The broker doesn't accept those local test
+transactions, so this exercises only the UI. Use a TestFlight build with a
+Sandbox account for the full flow.
+
 To try the UI without a key, add the launch argument `-LivelyDemo YES` and tap the
 mic. It plays a scripted conversation through the real turn and translation logic.
 For unattended screenshots, also pass `-LivelyDemoAutoPlay YES` to start the demo
