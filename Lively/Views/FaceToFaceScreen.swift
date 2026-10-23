@@ -9,7 +9,9 @@ struct FaceToFaceScreen: View {
     let languages: LanguagePair
     /// Language of the person on the near (bottom) side.
     @Binding var nearLanguage: Language
-    @Binding var showsTextInput: Bool
+    let showsTextInput: Bool
+    var textInputFocused: FocusState<Bool>.Binding
+    var onSetTextInput: (Bool) -> Void
     @Binding var editing: Utterance?
     /// Corrects one of the near person's own turns.
     var onEdit: (Utterance) -> Void
@@ -25,12 +27,13 @@ struct FaceToFaceScreen: View {
                 .safeAreaBar(edge: .bottom) {
                     if showsTextInput {
                         // The near person types; the far side reads the translation.
-                        TypeToTranslateBar(store: store, languages: languages, language: nearLanguage, editing: $editing) {
-                            withAnimation(.snappy) { showsTextInput = false }
-                        }
+                        TypeToTranslateBar(
+                            store: store, languages: languages, language: nearLanguage,
+                            editing: $editing, focused: textInputFocused
+                        ) { onSetTextInput(false) }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(.opacity)
                     }
                 }
         }
@@ -42,7 +45,7 @@ struct FaceToFaceScreen: View {
             HStack(spacing: 10) {
                 StatusPill(status: store.status, isListening: store.isListening, compact: true)
                 GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
-                    withAnimation(.snappy) { showsTextInput.toggle() }
+                    onSetTextInput(!showsTextInput)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

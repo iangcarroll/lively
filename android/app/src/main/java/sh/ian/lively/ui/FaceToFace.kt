@@ -103,7 +103,7 @@ fun FaceToFaceScreen(
         FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f), edgePadding = if (showsTextInput) 0.dp else bottom, onEdit = onEdit)
         // The near person types; the far side reads the translation. The
         // bottom padding includes the keyboard, so the halves make room for it.
-        AnimatedVisibility(showsTextInput) {
+        AnimatedVisibility(showsTextInput, enter = fadeIn(), exit = fadeOut()) {
             TypeToTranslateBar(
                 store, nearLanguage,
                 onClose = { onShowsTextInputChange(false) },

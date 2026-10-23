@@ -131,21 +131,24 @@ struct TypeToTranslateBar: View {
     var script: ChineseScript = AppSettings.shared.chineseScript
     /// A turn whose transcript is being corrected; sending replaces it.
     @Binding var editing: Utterance?
+    /// Owned by the screen, so it can drop the keyboard before removing the bar.
+    var focused: FocusState<Bool>.Binding
     var onClose: () -> Void
 
     init(
         store: ConversationStore, languages: LanguagePair, language: Language,
-        editing: Binding<Utterance?> = .constant(nil), onClose: @escaping () -> Void
+        editing: Binding<Utterance?> = .constant(nil), focused: FocusState<Bool>.Binding,
+        onClose: @escaping () -> Void
     ) {
         self.store = store
         self.languages = languages
         self.language = language
         _editing = editing
+        self.focused = focused
         self.onClose = onClose
     }
 
     @State private var text = ""
-    @FocusState private var focused: Bool
     @State private var download: TranslationSession.Configuration?
 
     var body: some View {
@@ -160,7 +163,7 @@ struct TypeToTranslateBar: View {
             TextField(editing == nil ? "Type to translate" : "Fix what was heard", text: $text)
                 // Corrections are often names, which autocorrect would undo.
                 .autocorrectionDisabled(editing != nil)
-                .focused($focused)
+                .focused(focused)
                 .submitLabel(.send)
                 .onSubmit(send)
                 .padding(.leading, editing == nil ? 16 : 0)
@@ -192,10 +195,10 @@ struct TypeToTranslateBar: View {
         .onChange(of: editing?.id, initial: true) {
             guard let editing else { return }
             text = editing.trimmedSource
-            focused = true
+            focused.wrappedValue = true
         }
         .onAppear {
-            focused = true
+            focused.wrappedValue = true
             guard store.translatesTypedTextOnDevice else { return }
             download = TranslationSession.Configuration(
                 source: AppleTranslator.language(languages.first, script: script),
@@ -221,7 +224,7 @@ struct TypeToTranslateBar: View {
             withAnimation(.snappy) { store.submitTyped(text, language: language) }
         }
         text = ""
-        focused = true
+        focused.wrappedValue = true
     }
 
     /// Cancels an edit, or closes the bar.

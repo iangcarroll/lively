@@ -10,6 +10,7 @@ struct ConversationScreen: View {
     @AppStorage("onboardingDone") private var onboardingDone = false
     @State private var didStartDemoAutomatically = false
     @State private var showsTextInput = false
+    @FocusState private var textInputFocused: Bool
     /// The turn being corrected in the text bar.
     @State private var editing: Utterance?
     /// The bar opened for an edit, so it closes when the edit ends.
@@ -33,7 +34,9 @@ struct ConversationScreen: View {
                         store: store,
                         languages: settings.languages,
                         nearLanguage: near,
-                        showsTextInput: $showsTextInput,
+                        showsTextInput: showsTextInput,
+                        textInputFocused: $textInputFocused,
+                        onSetTextInput: setTextInput,
                         editing: $editing,
                         onEdit: startEditing,
                         onShowTranscript: { withAnimation(.snappy) { phoneShowsTranscript = true } },
@@ -52,7 +55,7 @@ struct ConversationScreen: View {
         .onChange(of: editing == nil) { _, done in
             guard done, textInputOpenedForEdit else { return }
             textInputOpenedForEdit = false
-            withAnimation(.snappy) { showsTextInput = false }
+            setTextInput(false)
         }
         .onChange(of: showsTextInput) { _, shown in
             if !shown { editing = nil }
@@ -172,11 +175,12 @@ struct ConversationScreen: View {
     private var controls: some View {
         VStack(spacing: 4) {
             if showsTextInput {
-                TypeToTranslateBar(store: store, languages: settings.languages, language: settings.languages.first, editing: $editing) {
-                    withAnimation(.snappy) { showsTextInput = false }
-                }
+                TypeToTranslateBar(
+                    store: store, languages: settings.languages, language: settings.languages.first,
+                    editing: $editing, focused: $textInputFocused
+                ) { setTextInput(false) }
                 .padding(.horizontal, 16)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.opacity)
             }
             controlRow
         }
@@ -195,7 +199,7 @@ struct ConversationScreen: View {
             }
             Spacer()
             GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
-                withAnimation(.snappy) { showsTextInput.toggle() }
+                setTextInput(!showsTextInput)
             }
         }
         .padding(.horizontal, 24)
@@ -207,7 +211,23 @@ struct ConversationScreen: View {
     private func startEditing(_ utterance: Utterance) {
         textInputOpenedForEdit = !showsTextInput
         editing = utterance
-        withAnimation(.snappy) { showsTextInput = true }
+        setTextInput(true)
+    }
+
+    /// Shows or hides the text bar. Hiding drops the keyboard first, while
+    /// the field is still there, so the controls ride down with it; removing
+    /// a focused field makes the keyboard vanish and the layout jump.
+    private func setTextInput(_ shown: Bool) {
+        guard shown != showsTextInput else { return }
+        guard !shown else {
+            withAnimation(.snappy) { showsTextInput = true }
+            return
+        }
+        textInputFocused = false
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation(.snappy) { showsTextInput = false }
+        }
     }
 
     private var alertBinding: Binding<Bool> {

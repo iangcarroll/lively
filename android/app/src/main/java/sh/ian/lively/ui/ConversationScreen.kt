@@ -41,6 +41,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -75,11 +80,24 @@ fun ConversationScreen(
     var editing by remember { mutableStateOf<Utterance?>(null) }
     /** The bar opened for an edit, so it closes when the edit ends. */
     var textInputOpenedForEdit by remember { mutableStateOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
+    // Hiding drops the keyboard first, while the field is still there, so the
+    // layout follows the keyboard's animation; removing a focused field leaves
+    // the keyboard up a moment and then makes everything jump.
     val setShowsTextInput = { shown: Boolean ->
-        showsTextInput = shown
-        if (!shown) {
+        if (shown) {
+            showsTextInput = true
+        } else if (showsTextInput) {
+            keyboard?.hide()
+            focusManager.clearFocus()
             editing = null
             textInputOpenedForEdit = false
+            scope.launch {
+                withFrameNanos {}
+                showsTextInput = false
+            }
         }
     }
     // Opens the text bar on a turn's transcript to correct it.
@@ -207,7 +225,7 @@ private fun TranscriptLayout(
                 .padding(bottom = insets.calculateBottomPadding())
                 .padding(top = 24.dp, bottom = 12.dp),
         ) {
-            AnimatedVisibility(showsTextInput) {
+            AnimatedVisibility(showsTextInput, enter = fadeIn(), exit = fadeOut()) {
                 TypeToTranslateBar(
                     store, settings.languages.first,
                     onClose = { onShowsTextInputChange(false) },
