@@ -76,6 +76,9 @@ class ConversationStore(
         private set
     var isOnline by mutableStateOf(true)
         private set
+    /** Listening, but the speech service isn't connected yet, so nobody is heard. */
+    val isConnecting: Boolean
+        get() = isListening && (status == ConnectionStatus.Connecting || status == ConnectionStatus.Reconnecting)
     /** Smoothed mic level for the meter, 0…1. */
     var level by mutableFloatStateOf(0f)
         private set

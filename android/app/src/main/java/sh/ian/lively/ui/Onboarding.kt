@@ -253,7 +253,7 @@ private fun OnboardingPage(title: String, message: String, light: Boolean = fals
 /**
  * Lays [content] out at its natural height, then scales it down to fit the
  * space it's given (or up by [grow] where there's room), so the words below
- * it never get pushed off a small screen.
+ * it never get pushed off a small screen or run into the picture.
  */
 @Composable
 private fun FitInside(grow: Float, content: @Composable () -> Unit) {
@@ -535,22 +535,25 @@ private fun TableDemo(active: Boolean) {
 
     val colors = Lively.colors
     val dark = MaterialTheme.colorScheme.background.red < 0.5f
+    // Tall enough for the phone standing up, so it fits before it tilts too.
     Box(
         Modifier
-            .size(260.dp, 360.dp)
+            .size(260.dp, 390.dp)
             .semantics { contentDescription = "A phone lying flat between two people. Each half shows the conversation in one person's language." },
         contentAlignment = Alignment.Center,
     ) {
         Box(
             Modifier
-                .offset(y = 124.dp)
+                .offset(y = 75.dp)
                 .size(240.dp, 54.dp)
                 .alpha(tilt.value * 0.12f)
                 .background(Color.Black, RoundedCornerShape(50)),
         )
+        // Tilting pushes the near edge down and toward the viewer; the
+        // lift keeps the flat phone centered in its frame.
         Column(
             Modifier
-                .offset { IntOffset(0, (12.dp * tilt.value).roundToPx()) }
+                .offset { IntOffset(0, ((-37).dp * tilt.value).roundToPx()) }
                 .graphicsLayer {
                     rotationX = 44f * tilt.value
                     cameraDistance = 6f * density
@@ -588,7 +591,7 @@ private fun TableDemo(active: Boolean) {
         // The camera punch-hole, riding along with the tilted phone.
         Box(
             Modifier
-                .offset { IntOffset(0, ((-182).dp + 95.dp * tilt.value).roundToPx()) }
+                .offset { IntOffset(0, ((-182).dp + 46.dp * tilt.value).roundToPx()) }
                 .size(12.dp)
                 .alpha(1f - tilt.value)
                 .background(Color(0xFF1F1F1F), CircleShape),

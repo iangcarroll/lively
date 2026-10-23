@@ -172,11 +172,13 @@ private struct FaceToFaceHalf: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Text(store.isListening ? language.phrases.listening : language.phrases.tapToStart)
+            Text(store.isConnecting ? language.phrases.connecting
+                 : store.isListening ? language.phrases.listening : language.phrases.tapToStart)
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(language.ink)
                 .contentTransition(.opacity)
                 .animation(.snappy, value: store.isListening)
+                .animation(.snappy, value: store.isConnecting)
             Text(language.phrases.speakHint)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

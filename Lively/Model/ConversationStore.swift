@@ -26,6 +26,8 @@ final class ConversationStore {
     private(set) var isListening = false
     private(set) var status: ConnectionStatus = .idle
     private(set) var isOnline = true
+    /// Listening, but the speech service isn't connected yet, so nobody is heard.
+    var isConnecting: Bool { isListening && (status == .connecting || status == .reconnecting) }
     /// Smoothed mic level for the meter, 0...1.
     private(set) var level: Float = 0
     var alert: String?

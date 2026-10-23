@@ -195,7 +195,7 @@ private fun TranscriptLayout(
         val barSpace = PaddingValues(top = insets.calculateTopPadding() + 64.dp, bottom = insets.calculateBottomPadding() + if (showsTextInput) 176.dp else 104.dp)
         val utterances = store.visibleUtterances
         when {
-            utterances.isEmpty() -> EmptyConversation(store.isListening, settings.languages, settings.chineseScript, Modifier.padding(barSpace))
+            utterances.isEmpty() -> EmptyConversation(store.isListening, store.isConnecting, settings.languages, settings.chineseScript, Modifier.padding(barSpace))
             wide -> ParallelTranscript(utterances, settings.languages, store::retryTranslation, onEdit, store::delete, contentPadding = barSpace)
             else -> ChatTranscript(utterances, settings.languages, store::retryTranslation, onEdit, store::delete, contentPadding = barSpace)
         }

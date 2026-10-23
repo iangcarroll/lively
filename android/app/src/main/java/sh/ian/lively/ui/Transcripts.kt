@@ -438,7 +438,7 @@ private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () ->
 }
 
 @Composable
-fun EmptyConversation(isListening: Boolean, pair: LanguagePair, script: ChineseScript, modifier: Modifier = Modifier) {
+fun EmptyConversation(isListening: Boolean, isConnecting: Boolean, pair: LanguagePair, script: ChineseScript, modifier: Modifier = Modifier) {
     Column(
         modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -454,7 +454,11 @@ fun EmptyConversation(isListening: Boolean, pair: LanguagePair, script: ChineseS
         for (language in pair.all) {
             val phrases = language.phrases(script)
             Text(
-                if (isListening) phrases.listening else phrases.tapToStart,
+                when {
+                    isConnecting -> phrases.connecting
+                    isListening -> phrases.listening
+                    else -> phrases.tapToStart
+                },
                 style = MaterialTheme.typography.titleLarge.copy(localeList = language.localeList()),
                 fontWeight = FontWeight.SemiBold,
                 color = if (language == pair.second) language.ink(pair) else MaterialTheme.colorScheme.onSurface,

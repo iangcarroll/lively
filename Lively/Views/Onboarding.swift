@@ -138,13 +138,28 @@ private struct OnboardingPage<Art: View>: View {
     var light = false
     @ViewBuilder var art: Art
     @Environment(\.horizontalSizeClass) private var sizeClass
+    /// The picture's own height, and the height it has room for.
+    @State private var artHeight: CGFloat = 0
+    @State private var room: CGFloat = 0
+
+    /// Scales the picture down to fit the space it's given (or up where
+    /// there's room), so it never runs into the words below. The unfolded
+    /// Duo is wide but short, so a fixed scale there overlapped the title.
+    private var artScale: CGFloat {
+        // iPad and the unfolded Duo have room for a bigger picture.
+        let grow: CGFloat = sizeClass == .regular ? 1.3 : 1
+        guard artHeight > 0, room > 0 else { return 1 }
+        return min(grow, room / artHeight)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             art
-                // iPad and the unfolded Duo have room for a bigger picture.
-                .scaleEffect(sizeClass == .regular ? 1.3 : 1)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { artHeight = $0 }
+                .scaleEffect(artScale)
+                .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { room = $0 }
             VStack(spacing: 12) {
                 Text(title)
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
@@ -157,6 +172,7 @@ private struct OnboardingPage<Art: View>: View {
             }
             .foregroundStyle(light ? .white : .primary)
             .padding(.horizontal, 32)
+            .padding(.top, 8)
             .padding(.bottom, 28)
         }
     }
@@ -483,12 +499,15 @@ private struct TableDemo: View {
                 .fill(.black.opacity(tilted ? 0.12 : 0))
                 .frame(width: 240, height: 54)
                 .blur(radius: 18)
-                .offset(y: 124)
+                .offset(y: 84)
+            // Tilting pushes the near edge down and toward the viewer; the
+            // lift keeps the flat phone centered in its frame.
             phone
                 .rotation3DEffect(.degrees(tilted ? 44 : 0), axis: (x: 1, y: 0, z: 0), anchor: .center, perspective: 0.55)
-                .offset(y: tilted ? 12 : 0)
+                .offset(y: tilted ? -28 : 0)
         }
-        .frame(height: 360)
+        // Tall enough for the phone standing up, so it fits before it tilts too.
+        .frame(height: 390)
         .accessibilityElement()
         .accessibilityLabel("A phone lying flat between two people. Each half shows the conversation in one person's language.")
         .task { await play() }

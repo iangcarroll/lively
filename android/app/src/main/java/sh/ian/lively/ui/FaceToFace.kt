@@ -225,7 +225,11 @@ private fun FaceToFaceHalf(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     AnimatedContent(
-                        targetState = if (store.isListening) phrases.listening else phrases.tapToStart,
+                        targetState = when {
+                            store.isConnecting -> phrases.connecting
+                            store.isListening -> phrases.listening
+                            else -> phrases.tapToStart
+                        },
                         transitionSpec = { fadeIn() togetherWith fadeOut() },
                         label = "prompt",
                     ) { prompt ->

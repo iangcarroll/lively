@@ -193,6 +193,7 @@ private struct ParallelRow: View {
 
 struct EmptyConversation: View {
     var isListening: Bool
+    var isConnecting: Bool
     var languages: LanguagePair { AppSettings.shared.languages }
 
     var body: some View {
@@ -209,6 +210,7 @@ struct EmptyConversation: View {
             }
             .contentTransition(.opacity)
             .animation(.snappy, value: isListening)
+            .animation(.snappy, value: isConnecting)
             Text("Lively hears \(languages.first.englishName) and \(languages.second.englishName) and translates both ways. No need to say who's speaking.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -219,6 +221,7 @@ struct EmptyConversation: View {
     }
 
     private func prompt(in language: Language) -> String {
-        isListening ? language.phrases.listening : language.phrases.tapToStart
+        isConnecting ? language.phrases.connecting
+            : isListening ? language.phrases.listening : language.phrases.tapToStart
     }
 }

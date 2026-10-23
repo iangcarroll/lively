@@ -164,7 +164,7 @@ struct ConversationScreen: View {
     @ViewBuilder
     private func transcript(wide: Bool) -> some View {
         if store.visibleUtterances.isEmpty {
-            EmptyConversation(isListening: store.isListening)
+            EmptyConversation(isListening: store.isListening, isConnecting: store.isConnecting)
         } else if wide {
             ParallelTranscript(store: store, onEdit: startEditing)
         } else {
