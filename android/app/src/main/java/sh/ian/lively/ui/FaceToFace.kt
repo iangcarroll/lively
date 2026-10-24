@@ -149,10 +149,10 @@ private fun ControlStrip(
                 }
                 MicButton(store.isListening, store.level, onClick = store::toggleListening, size = if (narrow) 66.dp else 76.dp, isHearing = store.isHearing)
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(if (narrow) 6.dp else 10.dp, Alignment.End)) {
-                    TonalIconButton(Icons.Rounded.SwapVert, "Swap sides", size = buttonSize, onClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        onSwap()
-                    })
+                    TonalIconButton(
+                        Icons.Rounded.DeleteOutline, "Clear conversation", store::clear,
+                        enabled = store.utterances.isNotEmpty(), size = buttonSize,
+                    )
                     Box {
                         var menu by remember { mutableStateOf(false) }
                         TonalIconButton(Icons.Rounded.MoreVert, "More", size = buttonSize, onClick = { menu = true })
@@ -163,10 +163,13 @@ private fun ControlStrip(
                                 onClick = { menu = false; onShowTranscript() },
                             )
                             DropdownMenuItem(
-                                text = { Text("Clear conversation") },
-                                leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
-                                enabled = store.utterances.isNotEmpty(),
-                                onClick = { menu = false; store.clear() },
+                                text = { Text("Swap sides") },
+                                leadingIcon = { Icon(Icons.Rounded.SwapVert, null) },
+                                onClick = {
+                                    menu = false
+                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                    onSwap()
+                                },
                             )
                             HorizontalDivider()
                             DropdownMenuItem(

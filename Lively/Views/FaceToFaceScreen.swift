@@ -53,15 +53,16 @@ struct FaceToFaceScreen: View {
                 store.toggleListening()
             }
             HStack(spacing: 10) {
-                GlassIconButton(systemImage: "arrow.up.arrow.down", label: "Swap sides") {
-                    nearLanguage = languages.other(than: nearLanguage)
+                GlassIconButton(systemImage: "trash", label: "Clear conversation") {
+                    withAnimation(.snappy) { store.clear() }
                 }
+                .disabled(store.utterances.isEmpty)
+                .opacity(store.utterances.isEmpty ? 0.4 : 1)
                 Menu {
                     Button("Transcript View", systemImage: "list.bullet", action: onShowTranscript)
-                    Button("Clear Conversation", systemImage: "trash", role: .destructive) {
-                        withAnimation(.snappy) { store.clear() }
+                    Button("Swap Sides", systemImage: "arrow.up.arrow.down") {
+                        nearLanguage = languages.other(than: nearLanguage)
                     }
-                    .disabled(store.utterances.isEmpty)
                     Divider()
                     Button("Settings", systemImage: "gearshape", action: onShowSettings)
                 } label: {
