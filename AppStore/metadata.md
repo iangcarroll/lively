@@ -65,6 +65,7 @@ The product IDs must match `Pro.productIDs` in the app and `PRO_PRODUCT_IDS` in
 - Content rights: Lively does not contain, show, or access third-party content.
 - Age rating: None for all mature-content categories; no unrestricted web access, user-generated-content feed, remote messaging, advertising, gambling, or health content.
 - Privacy policy: `https://lively.ian.sh/privacy`
+- Account deletion URL: `https://lively.ian.sh/delete-account`
 - Data types:
   - Email Address — app functionality; linked to the optional account; not used for tracking.
   - Device ID — app functionality; not linked to identity; not used for tracking.

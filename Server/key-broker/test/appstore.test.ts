@@ -302,11 +302,21 @@ describe("account deletion", () => {
 });
 
 describe("pages", () => {
-  it.each(["/privacy", "/support", "/terms"])("serves %s with the support email", async (path) => {
+  it.each(["/privacy", "/support", "/terms", "/delete-account"])("serves %s with the support email", async (path) => {
     const response = await worker.fetch(new Request(`https://broker.test${path}`), local);
     expect(response.status).toBe(200);
     const body = await response.text();
     expect(body).toContain("support@lively.ian.sh");
     expect(body).not.toContain("github.com");
+  });
+
+  it("serves a protected account deletion flow", async () => {
+    const page = await worker.fetch(new Request("https://broker.test/delete-account"), local);
+    expect(page.headers.get("Content-Security-Policy")).toContain("script-src 'self'");
+    expect(await page.text()).toContain("Delete account permanently");
+
+    const script = await worker.fetch(new Request("https://broker.test/delete-account.js"), local);
+    expect(script.headers.get("Content-Type")).toContain("text/javascript");
+    expect(await script.text()).toContain("/v1/auth/delete");
   });
 });

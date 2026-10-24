@@ -18,7 +18,7 @@ const privacy = page(
   <p>To use the default provider without creating an account, the app creates a random installation identifier and stores it in your device Keychain (on Android, in app storage encrypted with a key held by the Android Keystore). Lively's key service receives that identifier and your network address to enforce usage limits and prevent abuse. It stores one-way hashes and short-lived counters, not your raw identifier, raw network address, audio, or transcript.</p>
   <h2>Optional account</h2>
   <p>You can optionally sign in for a larger listening allowance. If you do, Lively collects your email address, stores it with a randomly generated account identifier, and stores only hashes of sign-in codes and session tokens. Your email is used only to send a requested sign-in code and operate your account. It is not used for marketing or linked to your conversation content.</p>
-  <p>You can delete your account at any time in Settings → Account → Delete Account. This immediately deletes your email address, account identifier and sessions from Lively's servers.</p>
+  <p>You can delete your account at any time in Settings → Account → Delete Account or at <a href="/delete-account">lively.ian.sh/delete-account</a>. This immediately deletes your email address, account identifier and sessions from Lively's servers.</p>
   <h2>Lively Pro purchases</h2>
   <p>Lively Pro is sold through Apple's App Store, and Apple processes your payment. Lively never receives your payment details or Apple ID. To check that a subscription is active, the app sends Lively's key service the signed transaction record the App Store issued, which includes the product, its purchase and expiry dates, and a transaction identifier. Lively uses it only to apply your Pro allowance, and keeps a one-way hash of the transaction identifier in short-lived usage counters. If a purchase is refunded, Lively stores that transaction identifier to stop the refunded subscription from being used.</p>
   <p>On Android, Lively Pro is sold through Google Play, and Google processes your payment. Lively never receives your payment details or Google account. To check that a subscription is active, the app sends Lively's key service the purchase token Google Play issued, and the key service asks Google for the subscription's product, status and expiry date. Lively uses it only to apply your Pro allowance, and keeps a one-way hash of the token in short-lived usage counters.</p>
@@ -40,11 +40,24 @@ const support = page(
   <h2>Lively Pro</h2>
   <ul><li>To restore a subscription on a new device, open Settings → Lively Pro → Restore Purchases.</li><li>To cancel, open the Settings app → your name → Subscriptions → Lively. You keep Pro until the end of the period you paid for.</li><li>For refunds, use <a href="https://reportaproblem.apple.com">Apple's Report a Problem</a>. Apple handles all App Store payments.</li><li>On Android, to cancel, open the Play Store app → your profile → Payments &amp; subscriptions → Subscriptions → Lively. Google handles all Google Play payments and refunds.</li></ul>
   <h2>Your account</h2>
-  <p>To delete your account, open Settings → Account → Delete Account. Deleting it doesn't cancel a Lively Pro subscription.</p>
+  <p>To delete your account, open Settings → Account → Delete Account or use the <a href="/delete-account">account deletion page</a>. Deleting it doesn't cancel a Lively Pro subscription.</p>
   <h2>Get help</h2>
   <p>Email <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a> to report a problem or ask a question. Please do not include private conversation audio, transcripts, API keys, or other sensitive information.</p>
   <p>See also the <a href="/privacy">privacy policy</a> and the <a href="/terms">terms of use</a>.</p>`,
 );
+
+const accountDeletion = page(
+  "Delete your account",
+  `<p>Delete your optional Lively account and its associated data. You can also delete it while signed in under Settings → Account in the app.</p>
+  <p>Deletion is immediate and permanent. It removes your email address, account identifier and all active sessions. Short-lived, one-way-hashed usage counters expire automatically and cannot be linked back to you after deletion. Lively does not store conversation audio or transcripts on its servers. Deleting your account does not cancel a Lively Pro subscription.</p>
+  <form id="email-form"><label for="email">Account email</label><input id="email" type="email" autocomplete="email" required><button type="submit">Email me a code</button></form>
+  <form id="code-form" hidden><label for="code">6-digit code</label><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required><button class="danger" type="submit">Delete account permanently</button></form>
+  <p id="status" role="status" aria-live="polite"></p>
+  <p>If you need help, email <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>
+  <script src="/delete-account.js" defer></script>`,
+);
+
+const accountDeletionScript = `const emailForm=document.querySelector('#email-form');const codeForm=document.querySelector('#code-form');const email=document.querySelector('#email');const code=document.querySelector('#code');const status=document.querySelector('#status');let address='';async function call(path,options){const response=await fetch(path,options);const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.message||'Something went wrong. Try again.');return body}emailForm.addEventListener('submit',async event=>{event.preventDefault();address=email.value.trim();status.textContent='Sending code…';try{await call('/v1/auth/email/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:address})});emailForm.hidden=true;codeForm.hidden=false;status.textContent='Enter the code sent to '+address+'.';code.focus()}catch(error){status.textContent=error.message}});codeForm.addEventListener('submit',async event=>{event.preventDefault();status.textContent='Deleting account…';try{const signedIn=await call('/v1/auth/email/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:address,code:code.value})});await call('/v1/auth/delete',{method:'POST',headers:{Authorization:'Bearer '+signedIn.token}});codeForm.hidden=true;status.textContent='Your Lively account and associated data have been deleted.'}catch(error){status.textContent=error.message}});`;
 
 const terms = page(
   "Terms of Use",
@@ -81,6 +94,17 @@ export default {
     if (url.pathname === "/privacy") return html(privacy);
     if (url.pathname === "/support") return html(support);
     if (url.pathname === "/terms") return html(terms);
+    if (url.pathname === "/delete-account") return html(accountDeletion, true);
+    if (url.pathname === "/delete-account.js") {
+      return new Response(accountDeletionScript, {
+        headers: {
+          "Cache-Control": "public, max-age=3600",
+          "Content-Type": "text/javascript; charset=utf-8",
+          "Referrer-Policy": "no-referrer",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
     const route = Object.hasOwn(ROUTES, url.pathname) ? ROUTES[url.pathname] : undefined;
     if (!route) return error(404, "not_found", "No such endpoint.");
     if (request.method !== route.method) return error(405, "method_not_allowed", `Use ${route.method}.`);
@@ -94,11 +118,13 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-function html(body: string): Response {
+function html(body: string, interactive = false): Response {
   return new Response(body, {
     headers: {
       "Cache-Control": "public, max-age=3600",
-      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "Content-Security-Policy": interactive
+        ? "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+        : "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       "Content-Type": "text/html; charset=utf-8",
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
@@ -107,5 +133,5 @@ function html(body: string): Response {
 }
 
 function page(title: string, content: string): string {
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Lively — ${title}</title><style>:root{color-scheme:light dark;font:17px/1.55 system-ui,-apple-system,sans-serif}body{max-width:720px;margin:0 auto;padding:48px 24px 80px}h1{font-size:2.25rem;letter-spacing:-.03em;margin-bottom:.25em}h2{font-size:1.25rem;margin-top:2em}a{color:#4f46e5}@media(prefers-color-scheme:dark){a{color:#a5b4fc}}footer{border-top:1px solid color-mix(in srgb,currentColor 20%,transparent);margin-top:3rem;padding-top:1rem;opacity:.7}</style><main><h1>${title}</h1>${content}</main><footer>Lively · English ⇄ Chinese conversation translation</footer></html>`;
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Lively — ${title}</title><style>:root{color-scheme:light dark;font:17px/1.55 system-ui,-apple-system,sans-serif}body{max-width:720px;margin:0 auto;padding:48px 24px 80px}h1{font-size:2.25rem;letter-spacing:-.03em;margin-bottom:.25em}h2{font-size:1.25rem;margin-top:2em}a{color:#4f46e5}form{display:grid;gap:.6rem;margin:1.5rem 0;max-width:28rem}label{font-weight:600}input,button{box-sizing:border-box;font:inherit;padding:.7rem .8rem;border-radius:.5rem;border:1px solid color-mix(in srgb,currentColor 35%,transparent)}button{width:max-content;cursor:pointer;font-weight:600}.danger{color:#fff;background:#b91c1c;border-color:#b91c1c}[hidden]{display:none!important}@media(prefers-color-scheme:dark){a{color:#a5b4fc}}footer{border-top:1px solid color-mix(in srgb,currentColor 20%,transparent);margin-top:3rem;padding-top:1rem;opacity:.7}</style><main><h1>${title}</h1>${content}</main><footer>Lively · English ⇄ Chinese conversation translation</footer></html>`;
 }
