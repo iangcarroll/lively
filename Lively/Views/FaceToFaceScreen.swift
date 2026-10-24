@@ -56,6 +56,10 @@ struct FaceToFaceScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             MicButton(isListening: store.isListening, level: store.level, isHearing: store.isHearing) {
                 store.toggleListening()
+            } onHoldStart: {
+                store.startListening()
+            } onHoldEnd: {
+                store.stopListening()
             }
             HStack(spacing: narrow ? 6 : 10) {
                 GlassIconButton(systemImage: "trash", label: "Clear conversation") {

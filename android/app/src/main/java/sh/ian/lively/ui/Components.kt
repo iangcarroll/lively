@@ -46,8 +46,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -72,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import sh.ian.lively.model.ConnectionStatus
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguagePair
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.sin
@@ -145,12 +150,28 @@ fun TypingDots(color: Color, modifier: Modifier = Modifier, dotSize: Dp = 6.dp) 
     }
 }
 
+/** How long a press lasts before it counts as a hold rather than a tap. */
+private const val MIC_HOLD_DELAY_MS = 300L
+
 /**
  * The one big button: start and stop listening. A ring breathes with the mic
  * level, and fades while the noise gate is holding back distant sound.
+ *
+ * Tapping toggles listening. Holding it while stopped listens only until
+ * it's let go, like a walkie-talkie. [onHoldStart] is called once a press has
+ * lasted [MIC_HOLD_DELAY_MS], and [onHoldEnd] when it ends.
  */
 @Composable
-fun MicButton(isListening: Boolean, level: Float, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 76.dp, isHearing: Boolean = true) {
+fun MicButton(
+    isListening: Boolean,
+    level: Float,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 76.dp,
+    isHearing: Boolean = true,
+    onHoldStart: () -> Unit = {},
+    onHoldEnd: () -> Unit = {},
+) {
     val view = LocalView.current
     val primary = MaterialTheme.colorScheme.primary
     val container by animateColorAsState(
@@ -162,6 +183,40 @@ fun MicButton(isListening: Boolean, level: Float, onClick: () -> Unit, modifier:
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(if (pressed) 0.94f else 1f, spring(stiffness = 800f), label = "press")
+    // iOS gets these from .sensoryFeedback on isListening; Android plays them by hand.
+    fun haptic(starting: Boolean) = view.performHapticFeedback(
+        when {
+            starting -> HapticFeedbackConstants.CONTEXT_CLICK
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> HapticFeedbackConstants.CONFIRM
+            else -> HapticFeedbackConstants.VIRTUAL_KEY
+        },
+    )
+    var isHolding by remember { mutableStateOf(false) }
+    // The release that ended a hold also reports a click; this drops it.
+    var swallowsTap by remember { mutableStateOf(false) }
+    val listening by rememberUpdatedState(isListening)
+    val holdStart by rememberUpdatedState(onHoldStart)
+    val holdEnd by rememberUpdatedState(onHoldEnd)
+    fun endHold() {
+        isHolding = false
+        haptic(starting = false)
+        holdEnd()
+    }
+    LaunchedEffect(pressed) {
+        if (pressed) {
+            swallowsTap = false
+            // A hold only means something while stopped; otherwise it's a slow tap.
+            if (listening) return@LaunchedEffect
+            delay(MIC_HOLD_DELAY_MS)
+            isHolding = true
+            haptic(starting = true)
+            holdStart()
+        } else if (isHolding) {
+            // Released, possibly after sliding off the button.
+            endHold()
+            swallowsTap = true
+        }
+    }
     Box(modifier.size(size + 8.dp), contentAlignment = Alignment.Center) {
         if (isListening) {
             Box(
@@ -173,14 +228,15 @@ fun MicButton(isListening: Boolean, level: Float, onClick: () -> Unit, modifier:
         }
         Surface(
             onClick = {
-                view.performHapticFeedback(
-                    when {
-                        !isListening -> HapticFeedbackConstants.CONTEXT_CLICK
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> HapticFeedbackConstants.CONFIRM
-                        else -> HapticFeedbackConstants.VIRTUAL_KEY
-                    },
-                )
-                onClick()
+                // The click can arrive before or after the press ends.
+                when {
+                    isHolding -> endHold()
+                    swallowsTap -> swallowsTap = false
+                    else -> {
+                        haptic(starting = !isListening)
+                        onClick()
+                    }
+                }
             },
             shape = CircleShape,
             color = container,

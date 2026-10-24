@@ -44,7 +44,10 @@ struct ConversationScreen: View {
                     )
                     .transition(.opacity)
                 } else {
-                    transcript(wide: wide)
+                    // A stable container, so the bars aren't rebuilt when the
+                    // first turn replaces the empty state; that would drop a
+                    // press on the mic mid-hold.
+                    ZStack { transcript(wide: wide) }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .safeAreaBar(edge: .top) { topBar(wide: wide) }
                         .safeAreaBar(edge: .bottom) { controls }
@@ -196,6 +199,10 @@ struct ConversationScreen: View {
             Spacer()
             MicButton(isListening: store.isListening, level: store.level, isHearing: store.isHearing) {
                 store.toggleListening()
+            } onHoldStart: {
+                store.startListening()
+            } onHoldEnd: {
+                store.stopListening()
             }
             Spacer()
             GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {

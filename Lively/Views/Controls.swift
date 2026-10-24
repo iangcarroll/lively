@@ -3,14 +3,28 @@ import Translation
 
 /// The one big button: start and stop listening. A ring breathes with the mic
 /// level, and fades while the noise gate is holding back distant sound.
+///
+/// Tapping toggles listening. Holding it while stopped listens only until
+/// it's let go, like a walkie-talkie.
 struct MicButton: View {
     let isListening: Bool
     let level: Float
     var isHearing = true
     let action: () -> Void
+    /// `onHoldStart` runs once a press has lasted `holdDelay`; `onHoldEnd` when it ends.
+    var onHoldStart: () -> Void = {}
+    var onHoldEnd: () -> Void = {}
+
+    /// How long a press lasts before it counts as a hold rather than a tap.
+    static let holdDelay = Duration.milliseconds(300)
+
+    @State private var holdTimer: Task<Void, Never>?
+    @State private var isHolding = false
+    /// The release that ended a hold also reports a tap; this drops it.
+    @State private var swallowsTap = false
 
     var body: some View {
-        Button(action: action) {
+        Button(action: tap) {
             ZStack {
                 if isListening {
                     Circle()
@@ -27,7 +41,7 @@ struct MicButton: View {
             .frame(width: 76, height: 76)
             .contentShape(.circle)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressReportingStyle(onChange: pressChanged))
         .glassEffect(
             isListening ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
             in: .circle
@@ -35,6 +49,51 @@ struct MicButton: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: isListening)
         .keyboardShortcut(.space, modifiers: [])
         .accessibilityLabel(isListening ? "Stop listening" : "Start listening")
+    }
+
+    private func pressChanged(_ pressed: Bool) {
+        holdTimer?.cancel()
+        holdTimer = nil
+        if pressed {
+            swallowsTap = false
+            // A hold only means something while stopped; otherwise it's a slow tap.
+            guard !isListening else { return }
+            holdTimer = Task {
+                try? await Task.sleep(for: Self.holdDelay)
+                guard !Task.isCancelled else { return }
+                isHolding = true
+                onHoldStart()
+            }
+        } else if isHolding {
+            // Released, possibly after sliding off the button.
+            endHold()
+            swallowsTap = true
+        }
+    }
+
+    private func tap() {
+        // The tap can arrive before or after the press ends.
+        if isHolding { return endHold() }
+        if swallowsTap {
+            swallowsTap = false
+            return
+        }
+        action()
+    }
+
+    private func endHold() {
+        isHolding = false
+        onHoldEnd()
+    }
+}
+
+/// A plain button style that reports when it's pressed and released.
+private struct PressReportingStyle: ButtonStyle {
+    let onChange: (Bool) -> Void
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, pressed in onChange(pressed) }
     }
 }
 

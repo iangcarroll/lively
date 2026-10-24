@@ -18,6 +18,9 @@ Settings are stored in the Keychain.
 
 Soniox is the default because it won the [benchmark](Tools/probe/RESULTS.md).
 
+Tap the mic to start and stop listening, or hold it to listen only while it's
+pressed, like a walkie-talkie: letting go ends the turn and stops the mic.
+
 When speaking isn't practical, the keyboard button opens a text field. Typed
 lines go to DeepSeek through the key broker, falling back to on-device
 translation (Apple's Translation framework; ML Kit on Android). Voxtral uses its

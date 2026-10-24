@@ -13,6 +13,8 @@ broker, account and Pro allowance:
   sessions after a dropout, make-before-break handover when the network
   changes, and a warm session for a quick resume. All of it is a port of the
   Swift code, file by file (see the table below).
+- Tap the mic to start and stop, or hold it to listen only while it's
+  pressed, as on iOS.
 - Typing instead of speaking from the keyboard button, translated by
   DeepSeek through the key broker, falling back to ML Kit on the device
   (Apple's Translation framework on iOS).
