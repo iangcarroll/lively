@@ -62,3 +62,45 @@ struct TypingDots: View {
         .accessibilityLabel("Working")
     }
 }
+
+/// The iPhone Duo shows its camera, clock and status icons in a column down
+/// one side instead of a bar across the top. iOS reports the whole column as
+/// a side safe area inset, but only its top holds anything, so screens let
+/// content below it use the full width and put their own controls in it,
+/// below the status icons.
+nonisolated struct StatusColumn: Equatable, Sendable {
+    let edge: HorizontalEdge
+    let width: CGFloat
+
+    /// How far down the camera, clock and status icons reach. iOS doesn't
+    /// report it, so this matches the iPhone Duo.
+    static let itemsHeight: CGFloat = 160
+    /// The status icons sit a little in from the column's middle, away from
+    /// the screen edge. Controls in the column leave this much room on the
+    /// edge side so they line up under them.
+    static let itemsInset: CGFloat = 12
+
+    /// The column a view's size and safe area describe, if any: a side inset
+    /// on a portrait screen. Landscape phones inset a side for the notch too,
+    /// but that runs the full height and isn't a column.
+    init?(size: CGSize, insets: EdgeInsets) {
+        guard size.height > size.width, insets.top == 0 else { return nil }
+        if insets.trailing > 0 {
+            edge = .trailing
+            width = insets.trailing
+        } else if insets.leading > 0 {
+            edge = .leading
+            width = insets.leading
+        } else {
+            return nil
+        }
+    }
+
+    /// The column's side as a set of edges, for padding and safe areas.
+    var edges: Edge.Set { edge == .trailing ? .trailing : .leading }
+}
+
+extension EnvironmentValues {
+    /// The iPhone Duo's status column, for views inside a screen that spans it.
+    @Entry var statusColumn: StatusColumn?
+}

@@ -17,14 +17,17 @@ struct FaceToFaceScreen: View {
     var onEdit: (Utterance) -> Void
     var onShowTranscript: () -> Void
     var onShowSettings: () -> Void
-    /// Small screens, such as the iPhone Duo beside its status bar column,
-    /// get tighter spacing, so the mic stays centered.
+    /// The iPhone Duo's status column, which this screen spans: only the far
+    /// half, beside its status icons, keeps clear of it.
+    var statusColumn: StatusColumn?
+    /// Small screens get tighter spacing, so the mic stays centered.
     @State private var narrow = false
 
     var body: some View {
         VStack(spacing: 0) {
             FaceToFaceHalf(store: store, language: languages.other(than: nearLanguage))
                 .rotationEffect(.degrees(180))
+                .padding(statusColumn?.edges ?? [], statusColumn?.width ?? 0)
             controlStrip
             FaceToFaceHalf(store: store, language: nearLanguage, onEdit: onEdit)
                 .safeAreaBar(edge: .bottom) {
@@ -92,8 +95,7 @@ struct FaceToFaceScreen: View {
         .onGeometryChange(for: Bool.self) { $0.size.width < 400 } action: { narrow = $0 }
         .background {
             // Hairlines separate the two readers' halves.
-            // They run edge to edge, through any side inset such as the
-            // iPhone Duo's status bar column.
+            // They run edge to edge, through any side inset.
             VStack {
                 Divider()
                 Spacer()

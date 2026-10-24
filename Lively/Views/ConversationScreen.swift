@@ -26,6 +26,7 @@ struct ConversationScreen: View {
     var body: some View {
         GeometryReader { geometry in
             let wide = geometry.size.width >= Self.wideBreakpoint
+            let column = StatusColumn(size: geometry.size, insets: geometry.safeAreaInsets)
             ZStack {
                 Color(.canvas).ignoresSafeArea()
 
@@ -40,8 +41,11 @@ struct ConversationScreen: View {
                         editing: $editing,
                         onEdit: startEditing,
                         onShowTranscript: { withAnimation(.snappy) { phoneShowsTranscript = true } },
-                        onShowSettings: { showSettings = true }
+                        onShowSettings: { showSettings = true },
+                        statusColumn: column
                     )
+                    // Below its status icons, the iPhone Duo's column is free.
+                    .ignoresSafeArea(edges: column?.edges ?? [])
                     .transition(.opacity)
                 } else {
                     // A stable container, so the bars aren't rebuilt when the
@@ -49,9 +53,23 @@ struct ConversationScreen: View {
                     // press on the mic mid-hold.
                     ZStack { transcript(wide: wide) }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .safeAreaBar(edge: .top) { topBar(wide: wide) }
-                        .safeAreaBar(edge: .bottom) { controls }
+                        .safeAreaBar(edge: .top) { topBar(wide: wide, column: column) }
+                        .safeAreaBar(edge: .bottom) { controls(column: column) }
                         .transition(.opacity)
+                    if let column {
+                        // Turns stay clear of the column; its buttons sit in it,
+                        // below the status icons, like the system apps' toolbars.
+                        VStack(spacing: 10) { trailingButtons(wide: wide) }
+                            .frame(width: column.width - StatusColumn.itemsInset)
+                            .padding(column.edges, StatusColumn.itemsInset)
+                            .padding(.top, StatusColumn.itemsHeight)
+                            .frame(
+                                maxWidth: .infinity, maxHeight: .infinity,
+                                alignment: column.edge == .trailing ? .topTrailing : .topLeading
+                            )
+                            .ignoresSafeArea(edges: column.edges)
+                            .transition(.opacity)
+                    }
                 }
             }
         }
@@ -148,20 +166,25 @@ struct ConversationScreen: View {
         UserDefaults.standard.bool(forKey: "LivelyDemoAutoPlay")
     }
 
-    private func topBar(wide: Bool) -> some View {
+    private func topBar(wide: Bool, column: StatusColumn?) -> some View {
         HStack(spacing: 10) {
             StatusPill(status: store.status, isListening: store.isListening)
             Spacer()
-            if !wide {
-                GlassIconButton(systemImage: "rectangle.split.1x2", label: "Face-to-face mode") {
-                    withAnimation(.snappy) { phoneShowsTranscript = false }
-                }
-            }
-            GlassIconButton(systemImage: "gearshape", label: "Settings") { showSettings = true }
+            if column == nil { trailingButtons(wide: wide) }
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 6)
+    }
+
+    @ViewBuilder
+    private func trailingButtons(wide: Bool) -> some View {
+        if !wide {
+            GlassIconButton(systemImage: "rectangle.split.1x2", label: "Face-to-face mode") {
+                withAnimation(.snappy) { phoneShowsTranscript = false }
+            }
+        }
+        GlassIconButton(systemImage: "gearshape", label: "Settings") { showSettings = true }
     }
 
     @ViewBuilder
@@ -175,7 +198,7 @@ struct ConversationScreen: View {
         }
     }
 
-    private var controls: some View {
+    private func controls(column: StatusColumn?) -> some View {
         VStack(spacing: 4) {
             if showsTextInput {
                 TypeToTranslateBar(
@@ -185,7 +208,9 @@ struct ConversationScreen: View {
                 .padding(.horizontal, 16)
                 .transition(.opacity)
             }
+            // The status column is free this far down, so the mic centers on the screen.
             controlRow
+                .ignoresSafeArea(edges: column?.edges ?? [])
         }
     }
 

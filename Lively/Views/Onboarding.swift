@@ -9,10 +9,12 @@ struct OnboardingView: View {
     @State private var step: Step = .welcome
     /// Which way the last step change went, for the slide direction.
     @State private var forward = true
-    /// The safe area insets. The narrower side is padded to match the wider, so
-    /// the tour stays centered on the screen beside a camera or status bar
-    /// column (the iPhone Duo's, or a landscape notch).
+    /// The safe area insets. The narrower side is padded to match the wider,
+    /// so the tour stays centered on the screen beside a landscape notch.
     @State private var insets = EdgeInsets()
+    /// The iPhone Duo's status column, which the tour spans instead, centered
+    /// on the screen.
+    @State private var statusColumn: StatusColumn?
     @Environment(\.colorScheme) private var colorScheme
 
     enum Step: Int, CaseIterable {
@@ -39,10 +41,13 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: 480)
             .frame(maxWidth: .infinity)
-            .padding(.leading, max(0, insets.trailing - insets.leading))
-            .padding(.trailing, max(0, insets.leading - insets.trailing))
+            .padding(.leading, statusColumn == nil ? max(0, insets.trailing - insets.leading) : 0)
+            .padding(.trailing, statusColumn == nil ? max(0, insets.leading - insets.trailing) : 0)
+            .ignoresSafeArea(edges: statusColumn?.edges ?? [])
+            .environment(\.statusColumn, statusColumn)
         }
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets = $0 }
+        .onGeometryChange(for: StatusColumn?.self) { StatusColumn(size: $0.size, insets: $0.safeAreaInsets) } action: { statusColumn = $0 }
         // The sign-in field sits high enough to clear the keyboard; the
         // page dots and Not Now stay put behind it.
         .ignoresSafeArea(.keyboard)
@@ -145,6 +150,7 @@ private struct OnboardingPage<Art: View>: View {
     var light = false
     @ViewBuilder var art: Art
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.statusColumn) private var statusColumn
     /// The picture's own height, and the height it has room for.
     @State private var artHeight: CGFloat = 0
     @State private var room: CGFloat = 0
@@ -162,6 +168,9 @@ private struct OnboardingPage<Art: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             art
+                // Beside the iPhone Duo's status icons, the picture keeps clear
+                // of them on both sides, so it stays centered on the screen.
+                .padding(.horizontal, statusColumn?.width ?? 0)
                 .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { artHeight = $0 }
                 .scaleEffect(artScale)
