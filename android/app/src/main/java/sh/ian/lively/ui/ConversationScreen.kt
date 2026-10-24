@@ -135,7 +135,6 @@ fun ConversationScreen(
                     onEndEditing = endEditing,
                     onShowTranscript = { onShowsTranscriptChange(true) },
                     onShowSettings = onShowSettings,
-                    modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                     contentPadding = WindowInsets.safeDrawing.asPaddingValues(),
                 )
             } else {

@@ -117,6 +117,8 @@ private extension View {
         listStyle(.plain)
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, 0)
+            // Turns fade out under the top and bottom bars.
+            .scrollEdgeEffectStyle(.soft, for: .vertical)
     }
 }
 

@@ -9,6 +9,10 @@ struct OnboardingView: View {
     @State private var step: Step = .welcome
     /// Which way the last step change went, for the slide direction.
     @State private var forward = true
+    /// The safe area insets. The narrower side is padded to match the wider, so
+    /// the tour stays centered on the screen beside a camera or status bar
+    /// column (the iPhone Duo's, or a landscape notch).
+    @State private var insets = EdgeInsets()
     @Environment(\.colorScheme) private var colorScheme
 
     enum Step: Int, CaseIterable {
@@ -35,7 +39,10 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: 480)
             .frame(maxWidth: .infinity)
+            .padding(.leading, max(0, insets.trailing - insets.leading))
+            .padding(.trailing, max(0, insets.leading - insets.trailing))
         }
+        .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets = $0 }
         // The sign-in field sits high enough to clear the keyboard; the
         // page dots and Not Now stay put behind it.
         .ignoresSafeArea(.keyboard)

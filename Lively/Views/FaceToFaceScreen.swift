@@ -17,6 +17,9 @@ struct FaceToFaceScreen: View {
     var onEdit: (Utterance) -> Void
     var onShowTranscript: () -> Void
     var onShowSettings: () -> Void
+    /// Small screens, such as the iPhone Duo beside its status bar column,
+    /// get tighter spacing, so the mic stays centered.
+    @State private var narrow = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,9 +44,11 @@ struct FaceToFaceScreen: View {
     }
 
     private var controlStrip: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 10) {
+        HStack(spacing: narrow ? 8 : 12) {
+            HStack(spacing: narrow ? 6 : 10) {
+                // Never truncated: on narrow screens it keeps its width over the spacing.
                 StatusPill(status: store.status, isListening: store.isListening, compact: true)
+                    .fixedSize()
                 GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
                     onSetTextInput(!showsTextInput)
                 }
@@ -52,7 +57,7 @@ struct FaceToFaceScreen: View {
             MicButton(isListening: store.isListening, level: store.level, isHearing: store.isHearing) {
                 store.toggleListening()
             }
-            HStack(spacing: 10) {
+            HStack(spacing: narrow ? 6 : 10) {
                 GlassIconButton(systemImage: "trash", label: "Clear conversation") {
                     withAnimation(.snappy) { store.clear() }
                 }
@@ -78,15 +83,19 @@ struct FaceToFaceScreen: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, narrow ? 12 : 16)
         .padding(.vertical, 8)
+        .onGeometryChange(for: Bool.self) { $0.size.width < 400 } action: { narrow = $0 }
         .background {
             // Hairlines separate the two readers' halves.
+            // They run edge to edge, through any side inset such as the
+            // iPhone Duo's status bar column.
             VStack {
                 Divider()
                 Spacer()
                 Divider()
             }
+            .ignoresSafeArea(edges: .horizontal)
         }
     }
 }
@@ -112,17 +121,21 @@ private struct FaceToFaceHalf: View {
                 }
             }
             .padding(.horizontal, 24)
-            .padding(.vertical, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 20)
             .animation(.snappy, value: store.visibleUtterances.count)
         }
         .defaultScrollAnchor(.bottom)
         .defaultScrollAnchor(.bottom, for: .sizeChanges)
         .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .overlay {
             if store.visibleUtterances.isEmpty { emptyState }
         }
-        .overlay(alignment: .topLeading) {
-            LanguageTag(language: language, showsIcon: false).padding(14)
+        // Older lines scroll away under a fade, clear of the tag.
+        .safeAreaBar(edge: .top, alignment: .leading, spacing: 0) {
+            LanguageTag(language: language, showsIcon: false)
+                .padding([.horizontal, .top], 14)
         }
         .environment(\.locale, language.locale)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

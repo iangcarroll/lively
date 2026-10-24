@@ -28,6 +28,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -150,10 +154,17 @@ fun OnboardingScreen(settings: AppSettings, account: Account?, onFinish: () -> U
         val gradientAlpha by animateFloatAsState(welcomeShown, label = "gradient")
         if (gradientAlpha > 0f) LivelyGradient(Modifier.fillMaxSize().alpha(gradientAlpha))
 
+        // The narrower side is padded to match the wider, so the tour stays
+        // centered on the screen beside a display cutout in landscape.
+        val sideInset = with(LocalDensity.current) {
+            val insets = WindowInsets.safeDrawing
+            maxOf(insets.getLeft(this, LayoutDirection.Ltr), insets.getRight(this, LayoutDirection.Ltr)).toDp()
+        }
         Column(
             Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing),
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical))
+                .padding(horizontal = sideInset),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), beyondViewportPageCount = 1) { index ->

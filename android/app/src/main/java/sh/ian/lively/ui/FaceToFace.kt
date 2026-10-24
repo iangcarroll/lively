@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,6 +48,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -90,25 +93,33 @@ fun FaceToFaceScreen(
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val far = pair.other(nearLanguage)
+    // Side insets (a display cutout in landscape) pad the content, but not
+    // the hairlines, which run edge to edge.
+    val direction = LocalLayoutDirection.current
+    val sides = Modifier.padding(
+        start = contentPadding.calculateStartPadding(direction),
+        end = contentPadding.calculateEndPadding(direction),
+    )
     Column(modifier.fillMaxSize()) {
         FaceToFaceHalf(
             store, far, pair, script,
             Modifier
                 .weight(1f)
+                .then(sides)
                 .rotate(180f),
             // Rotated, its bottom edge is the top of the screen.
             edgePadding = contentPadding.calculateTopPadding(),
         )
-        ControlStrip(store, onSwap, showsTextInput, onShowsTextInputChange, onShowTranscript, onShowSettings)
+        ControlStrip(store, onSwap, showsTextInput, onShowsTextInputChange, onShowTranscript, onShowSettings, sides)
         val bottom = contentPadding.calculateBottomPadding()
-        FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f), edgePadding = if (showsTextInput) 0.dp else bottom, onEdit = onEdit)
+        FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f).then(sides), edgePadding = if (showsTextInput) 0.dp else bottom, onEdit = onEdit)
         // The near person types; the far side reads the translation. The
         // bottom padding includes the keyboard, so the halves make room for it.
         AnimatedVisibility(showsTextInput, enter = fadeIn(), exit = fadeOut()) {
             TypeToTranslateBar(
                 store, nearLanguage,
                 onClose = { onShowsTextInputChange(false) },
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottom + 8.dp),
+                modifier = sides.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottom + 8.dp),
                 editing = editing,
                 onEndEditing = onEndEditing,
             )
@@ -124,15 +135,17 @@ private fun ControlStrip(
     onShowsTextInputChange: (Boolean) -> Unit,
     onShowTranscript: () -> Unit,
     onShowSettings: () -> Unit,
+    /** Side insets for the controls; the hairlines ignore them. */
+    sides: Modifier,
 ) {
     val view = LocalView.current
-    BoxWithConstraints {
-        // Small phones get smaller controls, so the mic stays centered.
-        val narrow = maxWidth < 380.dp
-        val buttonSize = if (narrow) 44.dp else 48.dp
-        Column {
-            // Hairlines separate the two readers' halves.
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    Column {
+        // Hairlines separate the two readers' halves.
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        BoxWithConstraints(sides) {
+            // Small phones get smaller controls, so the mic stays centered.
+            val narrow = maxWidth < 380.dp
+            val buttonSize = if (narrow) 44.dp else 48.dp
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -181,8 +194,8 @@ private fun ControlStrip(
                     }
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
