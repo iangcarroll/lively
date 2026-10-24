@@ -24,8 +24,11 @@ translation behaviour, and bug fixes that aren't specific to one platform.
   on Android for on-device translation).
 - Build both apps before finishing: the Xcode `Lively` scheme for an iOS
   simulator and for macOS, plus `cd android && ./gradlew :app:assembleDebug
-  :app:testDebugUnitTest`. Try the change in demo mode on each when it's
-  visible (`-LivelyDemo YES` on iOS, `--ez LivelyDemo true` on Android).
+  :app:testDebugUnitTest`.
+- Test every change in the iOS simulator and the Android emulator before
+  calling it done, not just build it: run the app and exercise the change
+  (use demo mode where it helps: `-LivelyDemo YES` on iOS, `--ez LivelyDemo
+  true` on Android). If a change can't be exercised there, say so and why.
 - If something truly can't be done on one platform, tell the user what is
   missing and why, rather than shipping one side silently.
 - Update both READMEs when behaviour they describe changes.
