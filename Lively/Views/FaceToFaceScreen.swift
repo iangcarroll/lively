@@ -97,13 +97,16 @@ private struct FaceToFaceHalf: View {
     let language: Language
     /// Set on the near half, whose reader can correct their own turns.
     var onEdit: ((Utterance) -> Void)?
+    /// The newest line's size and the size older lines settle to.
+    @ScaledMetric(relativeTo: .title) private var largestSize: CGFloat = 28
+    @ScaledMetric(relativeTo: .title3) private var smallestSize: CGFloat = 20
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
                 let recent = Array(store.visibleUtterances.suffix(12))
-                ForEach(recent) { utterance in
-                    line(utterance, isLatest: utterance === recent.last)
+                ForEach(Array(recent.enumerated()), id: \.element.id) { index, utterance in
+                    line(utterance, age: recent.count - 1 - index)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
@@ -125,10 +128,15 @@ private struct FaceToFaceHalf: View {
     }
 
     @ViewBuilder
-    private func line(_ utterance: Utterance, isLatest: Bool) -> some View {
+    private func line(_ utterance: Utterance, age: Int) -> some View {
         let text = utterance.text(in: language)
         // Your own words are quiet; what the other person said is prominent.
         let ownWords = utterance.language == language
+        // Lines shrink and fade over a few turns rather than all at once, so a
+        // line still being read stays legible when a stray turn lands below it.
+        let prominence = max(0, 1 - Double(age) / 3)
+        let size = smallestSize + (largestSize - smallestSize) * prominence
+        let weight: Font.Weight = !ownWords && age < 2 ? .semibold : .regular
         VStack(alignment: .leading, spacing: 4) {
             if text.isEmpty {
                 TypingDots(color: language.ink)
@@ -136,7 +144,7 @@ private struct FaceToFaceHalf: View {
             } else {
                 HStack(alignment: .lastTextBaseline, spacing: 6) {
                     Text(text)
-                        .font(isLatest ? .title.weight(ownWords ? .regular : .semibold) : .title3)
+                        .font(.system(size: size, weight: weight))
                         .foregroundStyle(ownWords ? AnyShapeStyle(.secondary) : AnyShapeStyle(language.ink))
                         .fixedSize(horizontal: false, vertical: true)
                     if ownWords && !utterance.isFinal { TypingDots(color: language.ink) }
@@ -145,8 +153,9 @@ private struct FaceToFaceHalf: View {
             if !ownWords { statusLine(utterance) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .opacity(isLatest ? 1 : 0.55)
+        .opacity(0.55 + 0.45 * prominence)
         .animation(.snappy(duration: 0.25), value: text)
+        .animation(.snappy, value: age)
         .modifier(EditMenu(utterance: utterance, onEdit: ownWords ? onEdit : nil))
     }
 

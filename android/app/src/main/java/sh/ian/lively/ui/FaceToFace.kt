@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -212,8 +213,8 @@ private fun FaceToFaceHalf(
                 contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 44.dp, bottom = 20.dp + edgePadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Bottom),
             ) {
-                items(recent.asReversed(), key = { it.id }) { utterance ->
-                    Line(utterance, language, pair, phrases.waitingForConnection, phrases.translationFailed, isLatest = utterance === recent.last(), compact = compact, onRetry = { store.retryTranslation(utterance) }, onEdit = onEdit, modifier = Modifier.animateItem())
+                itemsIndexed(recent.asReversed(), key = { _, it -> it.id }) { age, utterance ->
+                    Line(utterance, language, pair, phrases.waitingForConnection, phrases.translationFailed, age = age, compact = compact, onRetry = { store.retryTranslation(utterance) }, onEdit = onEdit, modifier = Modifier.animateItem())
                 }
             }
             if (recent.isEmpty()) {
@@ -269,7 +270,7 @@ private fun Line(
     pair: LanguagePair,
     waitingText: String,
     failedText: String,
-    isLatest: Boolean,
+    age: Int,
     compact: Boolean,
     onRetry: () -> Unit,
     onEdit: ((Utterance) -> Unit)?,
@@ -278,7 +279,10 @@ private fun Line(
     val text = utterance.text(language)
     // Your own words are quiet; what the other person said is prominent.
     val ownWords = utterance.language == language
-    val alpha by animateFloatAsState(if (isLatest) 1f else 0.55f, label = "age")
+    // Lines shrink and fade over a few turns rather than all at once, so a
+    // line still being read stays legible when a stray turn lands below it.
+    val prominence by animateFloatAsState((1f - age / 3f).coerceAtLeast(0f), label = "age")
+    val alpha = 0.55f + 0.45f * prominence
     // Long-press to correct a finished turn's transcript, where editing is offered.
     val editable = onEdit != null && ownWords && utterance.isFinal
     var menu by remember { mutableStateOf(false) }
@@ -309,14 +313,16 @@ private fun Line(
             } else {
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     val type = MaterialTheme.typography
-                    val style = when {
-                        compact -> if (isLatest) type.titleLarge else type.titleMedium
-                        else -> if (isLatest) type.headlineMedium else type.titleLarge
+                    // The newest line's size and the size older lines settle to.
+                    val style = if (compact) {
+                        lerp(type.titleMedium, type.titleLarge, prominence)
+                    } else {
+                        lerp(type.titleLarge, type.headlineMedium, prominence)
                     }
                     Text(
                         text,
                         style = style.copy(localeList = language.localeList()),
-                        fontWeight = if (isLatest && !ownWords) FontWeight.SemiBold else FontWeight.Normal,
+                        fontWeight = if (age < 2 && !ownWords) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (ownWords) MaterialTheme.colorScheme.onSurfaceVariant else language.ink(pair),
                         modifier = Modifier.weight(1f, fill = false),
                     )
