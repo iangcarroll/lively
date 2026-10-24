@@ -145,9 +145,12 @@ fun TypingDots(color: Color, modifier: Modifier = Modifier, dotSize: Dp = 6.dp) 
     }
 }
 
-/** The one big button: start and stop listening. A ring breathes with the mic level. */
+/**
+ * The one big button: start and stop listening. A ring breathes with the mic
+ * level, and fades while the noise gate is holding back distant sound.
+ */
 @Composable
-fun MicButton(isListening: Boolean, level: Float, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 76.dp) {
+fun MicButton(isListening: Boolean, level: Float, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 76.dp, isHearing: Boolean = true) {
     val view = LocalView.current
     val primary = MaterialTheme.colorScheme.primary
     val container by animateColorAsState(
@@ -155,6 +158,7 @@ fun MicButton(isListening: Boolean, level: Float, onClick: () -> Unit, modifier:
         label = "mic container",
     )
     val ringScale by animateFloatAsState(1f + level * 0.35f, tween(120), label = "ring")
+    val ringAlpha by animateFloatAsState(if (isHearing) 0.35f else 0.12f, tween(200), label = "ring alpha")
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(if (pressed) 0.94f else 1f, spring(stiffness = 800f), label = "press")
@@ -164,7 +168,7 @@ fun MicButton(isListening: Boolean, level: Float, onClick: () -> Unit, modifier:
                 Modifier
                     .size(size)
                     .scale(ringScale)
-                    .border(3.dp, primary.copy(alpha = 0.35f), CircleShape),
+                    .border(3.dp, primary.copy(alpha = ringAlpha), CircleShape),
             )
         }
         Surface(

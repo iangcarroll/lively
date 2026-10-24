@@ -43,6 +43,11 @@ final class AppSettings {
         languages = pair
     }
 
+    /// How far away the mic listens; quieter sound is sent as silence.
+    var pickupRange: PickupRange {
+        didSet { defaults.set(pickupRange.rawValue, forKey: "pickupRange") }
+    }
+
     var chineseScript: ChineseScript {
         didSet { defaults.set(chineseScript.rawValue, forKey: "chineseScript") }
     }
@@ -78,6 +83,7 @@ final class AppSettings {
         )
         languages = SpeechProvider.with(id: providerID).supports(stored) && stored.first != stored.second ? stored : .default
         latency = Latency(rawValue: defaults.integer(forKey: "latency")) ?? .fastest
+        pickupRange = PickupRange(rawValue: defaults.string(forKey: "pickupRange") ?? "") ?? .default
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel
         for credential in SpeechProvider.allCredentials {

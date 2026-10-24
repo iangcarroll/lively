@@ -147,7 +147,7 @@ private fun ControlStrip(
                     StatusPill(store.status, store.isListening, compact = true)
                     TextInputToggle(showsTextInput, onShowsTextInputChange, size = buttonSize)
                 }
-                MicButton(store.isListening, store.level, onClick = store::toggleListening, size = if (narrow) 66.dp else 76.dp)
+                MicButton(store.isListening, store.level, onClick = store::toggleListening, size = if (narrow) 66.dp else 76.dp, isHearing = store.isHearing)
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(if (narrow) 6.dp else 10.dp, Alignment.End)) {
                     TonalIconButton(Icons.Rounded.SwapVert, "Swap sides", size = buttonSize, onClick = {
                         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)

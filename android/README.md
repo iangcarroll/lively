@@ -102,6 +102,7 @@ draws the same bubbles as the iOS icon.
 | iOS | Android |
 |---|---|
 | `Audio/MicCapture.swift` | `audio/MicCapture.kt` (AudioRecord, `VOICE_RECOGNITION`, 80 ms chunks) |
+| `Audio/NoiseGate.swift` | `audio/NoiseGate.kt` (same thresholds) |
 | `Networking/ResilientSocket.swift` | `net/ResilientSocket.kt` (OkHttp WebSockets) |
 | `Networking/SonioxTranscriber.swift`, `SonioxKeyProvider.swift`, `RegionProber.swift` | `net/` files of the same names |
 | `Networking/RealtimeTranscriber.swift`, `Translator.swift` | `net/RealtimeTranscriber.kt`, `net/MistralTranslator.kt`, `net/BrokerTranslator.kt`, `net/OnDeviceTranslator.kt` |

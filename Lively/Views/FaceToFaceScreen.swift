@@ -49,7 +49,7 @@ struct FaceToFaceScreen: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            MicButton(isListening: store.isListening, level: store.level) {
+            MicButton(isListening: store.isListening, level: store.level, isHearing: store.isHearing) {
                 store.toggleListening()
             }
             HStack(spacing: 10) {

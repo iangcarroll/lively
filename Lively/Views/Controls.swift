@@ -1,10 +1,12 @@
 import SwiftUI
 import Translation
 
-/// The one big button: start and stop listening. A ring breathes with the mic level.
+/// The one big button: start and stop listening. A ring breathes with the mic
+/// level, and fades while the noise gate is holding back distant sound.
 struct MicButton: View {
     let isListening: Bool
     let level: Float
+    var isHearing = true
     let action: () -> Void
 
     var body: some View {
@@ -12,9 +14,10 @@ struct MicButton: View {
             ZStack {
                 if isListening {
                     Circle()
-                        .stroke(Color.accentColor.opacity(0.35), lineWidth: 3)
+                        .stroke(Color.accentColor.opacity(isHearing ? 0.35 : 0.12), lineWidth: 3)
                         .scaleEffect(1 + CGFloat(level) * 0.35)
                         .animation(.easeOut(duration: 0.12), value: level)
+                        .animation(.easeOut(duration: 0.2), value: isHearing)
                 }
                 Image(systemName: isListening ? "stop.fill" : "mic.fill")
                     .font(.system(size: 28, weight: .semibold))

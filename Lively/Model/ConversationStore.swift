@@ -30,6 +30,8 @@ final class ConversationStore {
     var isConnecting: Bool { isListening && (status == .connecting || status == .reconnecting) }
     /// Smoothed mic level for the meter, 0...1.
     private(set) var level: Float = 0
+    /// The noise gate is letting the mic through: someone is close enough to translate.
+    private(set) var isHearing = false
     var alert: String?
 
     private let settings: AppSettings
@@ -56,6 +58,8 @@ final class ConversationStore {
     private var interface: NWInterface.InterfaceType?
     private var demo: DemoConversation?
     private var audioPump: Task<Void, Never>?
+    /// Sends quiet chunks as silence, per the pickup range in Settings.
+    private var gate = NoiseGate()
     /// Ends a paused engine's session once it's been idle for `warmPause`.
     private var idleTeardown: Task<Void, Never>?
     /// How long a paused session stays open for a quick resume. Soniox bills
@@ -74,13 +78,17 @@ final class ConversationStore {
 
         // One stream keeps chunks in order on their way from the audio thread.
         let (chunks, continuation) = AsyncStream<(Data, Float)>.makeStream(bufferingPolicy: .bufferingNewest(500))
-        mic.onChunk = { chunk, level in continuation.yield((chunk, level)) }
+        mic.onChunk = { chunk, decibels in continuation.yield((chunk, decibels)) }
         audioPump = Task { [weak self] in
-            for await (chunk, level) in chunks {
+            for await (chunk, decibels) in chunks {
                 guard let self else { return }
                 guard self.isListening else { continue }
-                self.engine?.send(chunk)
-                self.level = self.level * 0.6 + level * 0.4
+                // Gated chunks go as silence rather than not at all, so the
+                // engine still hears the pause and ends the turn.
+                let heard = self.gate.process(decibels, range: self.settings.pickupRange)
+                self.isHearing = heard
+                self.engine?.send(heard ? chunk : Data(count: chunk.count))
+                self.level = self.level * 0.6 + MicCapture.meterLevel(decibels) * 0.4
             }
         }
         mic.onInterrupted = { [weak self] in
@@ -158,6 +166,7 @@ final class ConversationStore {
             }
             guard !isListening else { return }
             isListening = true
+            gate.reset()
             Self.keepScreenAwake(true)
             // Connect while the mic starts up. Audio that arrives before the
             // session is ready waits in the socket's backlog.
@@ -211,6 +220,7 @@ final class ConversationStore {
         mic.stop()
         pauseEngine()
         level = 0
+        isHearing = false
         Self.keepScreenAwake(false)
         finalizeCurrent()
         refreshStatus()

@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import sh.ian.lively.audio.PickupRange
 import sh.ian.lively.support.Preferences
 import sh.ian.lively.support.SecretStore
 
@@ -57,6 +58,16 @@ class AppSettings(
     fun setLanguage(language: Language, side: LanguageSide) {
         languages = languages.with(language, side)
     }
+
+    private var _pickupRange by mutableStateOf(PickupRange.from(prefs.string("pickupRange")))
+
+    /** How far away the mic listens; quieter sound is sent as silence. */
+    var pickupRange: PickupRange
+        get() = _pickupRange
+        set(value) {
+            _pickupRange = value
+            prefs.putString("pickupRange", value.id)
+        }
 
     private var _chineseScript by mutableStateOf(ChineseScript.from(prefs.string("chineseScript")))
     var chineseScript: ChineseScript

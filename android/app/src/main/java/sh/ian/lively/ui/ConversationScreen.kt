@@ -240,7 +240,7 @@ private fun TranscriptLayout(
             ) {
                 TonalIconButton(Icons.Rounded.DeleteOutline, "Clear conversation", store::clear, enabled = store.utterances.isNotEmpty())
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    MicButton(store.isListening, store.level, onClick = store::toggleListening)
+                    MicButton(store.isListening, store.level, onClick = store::toggleListening, isHearing = store.isHearing)
                 }
                 TextInputToggle(showsTextInput, onShowsTextInputChange)
             }

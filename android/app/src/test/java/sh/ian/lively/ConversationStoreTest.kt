@@ -103,9 +103,19 @@ class ConversationStoreTest {
         assertTrue(host.listening)
         assertEquals(1, engine.started)
         assertEquals(ConnectionStatus.Live, store.status)
-        host.onChunk!!(ByteArray(4), 0.5f)
+        host.onChunk!!(ByteArray(4), -20f)
         runCurrent()
         assertEquals(1, engine.sent.size)
+    }
+
+    @Test fun distantSoundIsSentAsSilence() = runTest {
+        val (store, _) = store()
+        store.startListening()
+        runCurrent()
+        host.onChunk!!(byteArrayOf(1, 2, 3, 4), -55f)
+        runCurrent()
+        assertTrue(engine.sent.single().all { it == 0.toByte() })
+        assertFalse(store.isHearing)
     }
 
     @Test fun deniedMicExplainsItself() = runTest {

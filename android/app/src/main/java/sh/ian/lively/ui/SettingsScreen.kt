@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Hearing
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Person
@@ -80,6 +81,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import sh.ian.lively.BuildConfig
+import sh.ian.lively.audio.PickupRange
 import sh.ian.lively.model.Account
 import sh.ian.lively.model.AppSettings
 import sh.ian.lively.model.ChineseScript
@@ -92,6 +94,7 @@ import sh.ian.lively.model.ProviderOption
 private val Orange = Color(0xFFFF9500)
 private val Teal = Color(0xFF30B0C7)
 private val Purple = Color(0xFFAF52DE)
+private val Green = Color(0xFF34C759)
 private val Gray = Color(0xFF8E8E93)
 private val Indigo = Color(0xFF5856D6)
 private val Pink = Color(0xFFFF2D55)
@@ -123,6 +126,7 @@ fun SettingsScreen(
     }
     DisposableEffect(Unit) { onDispose { save() } }
     var choosingEngine by remember { mutableStateOf(false) }
+    var choosingPickupRange by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
@@ -188,6 +192,15 @@ fun SettingsScreen(
                         }
                         ScriptPicker(settings, Modifier.padding(start = 68.dp, end = 16.dp, bottom = 14.dp))
                     }
+                }
+
+                Group(header = "Microphone", footer = settings.pickupRange.summary) {
+                    Item(
+                        icon = { SettingsIcon(Icons.Rounded.Hearing, Green) },
+                        title = "Pickup range",
+                        value = settings.pickupRange.label,
+                        onClick = { choosingPickupRange = true },
+                    )
                 }
 
                 Group(header = "Speech engine", footer = engineFooter(settings)) {
@@ -270,6 +283,16 @@ fun SettingsScreen(
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
         }
+    }
+
+    if (choosingPickupRange) {
+        ChoiceDialog(
+            title = "Pickup range",
+            options = PickupRange.entries.map { it to it.label },
+            selected = settings.pickupRange,
+            onSelect = { settings.pickupRange = it; choosingPickupRange = false },
+            onDismiss = { choosingPickupRange = false },
+        )
     }
 
     if (choosingEngine) {

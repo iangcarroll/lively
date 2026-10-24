@@ -10,7 +10,7 @@ nonisolated final class MicCapture: @unchecked Sendable {
     static let chunkDuration: Double = 0.08
     private static let chunkBytes = Int(sampleRate * chunkDuration) * MemoryLayout<Int16>.size
 
-    /// Called on the audio thread with a PCM16 chunk and its RMS level (0...1).
+    /// Called on the audio thread with a PCM16 chunk and its level in dBFS.
     var onChunk: (@Sendable (Data, Float) -> Void)?
     /// Called on the main thread if capture stops for a reason outside our control.
     var onInterrupted: (@Sendable () -> Void)?
@@ -111,7 +111,6 @@ nonisolated final class MicCapture: @unchecked Sendable {
     }
 
     private func process(_ buffer: AVAudioPCMBuffer) {
-        let level = Self.rms(buffer)
         guard let converter = state.withLock({ $0.converter }) else { return }
 
         let ratio = outputFormat.sampleRate / buffer.format.sampleRate
@@ -141,7 +140,10 @@ nonisolated final class MicCapture: @unchecked Sendable {
             }
             return ready
         }
-        for chunk in chunks { onChunk?(Data(chunk), level) }
+        for chunk in chunks {
+            let chunk = Data(chunk)
+            onChunk?(chunk, Self.decibels(chunk))
+        }
     }
 
     #if DEBUG
@@ -182,7 +184,7 @@ nonisolated final class MicCapture: @unchecked Sendable {
                 chunk.replaceSubrange(0..<piece.count, with: piece)
                 offset += Self.chunkBytes
             }
-            self?.onChunk?(chunk, 0.5)
+            self?.onChunk?(chunk, Self.decibels(chunk))
         }
         fileTimer = timer
         timer.resume()
@@ -222,15 +224,22 @@ nonisolated final class MicCapture: @unchecked Sendable {
         }
     }
 
-    private static func rms(_ buffer: AVAudioPCMBuffer) -> Float {
-        guard let data = buffer.floatChannelData, buffer.frameLength > 0 else { return 0 }
-        let n = Int(buffer.frameLength)
-        var sum: Float = 0
-        for i in 0..<n { sum += data[0][i] * data[0][i] }
-        let rms = sqrt(sum / Float(n))
-        // Map roughly -50 dB...0 dB onto 0...1 for the level meter.
-        let db = 20 * log10(max(rms, 1e-6))
-        return max(0, min(1, (db + 50) / 50))
+    /// The RMS level of a PCM16 chunk in dBFS, from about -120 (silence) to 0.
+    static func decibels(_ chunk: Data) -> Float {
+        let count = chunk.count / MemoryLayout<Int16>.size
+        guard count > 0 else { return -120 }
+        let sum: Float = chunk.withUnsafeBytes { raw in
+            raw.bindMemory(to: Int16.self).reduce(0) { total, sample in
+                let value = Float(Int16(littleEndian: sample)) / 32768
+                return total + value * value
+            }
+        }
+        return 20 * log10(max(sqrt(sum / Float(count)), 1e-6))
+    }
+
+    /// Maps roughly -50 dB...0 dB onto 0...1 for the level meter.
+    static func meterLevel(_ decibels: Float) -> Float {
+        max(0, min(1, (decibels + 50) / 50))
     }
 
     enum CaptureError: LocalizedError {

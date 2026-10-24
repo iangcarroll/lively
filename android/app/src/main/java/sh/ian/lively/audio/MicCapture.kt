@@ -29,7 +29,7 @@ import kotlin.math.sqrt
  * Reads on its own high-priority thread; [onChunk] is called there.
  */
 class MicCapture {
-    /** Called on the capture thread with a PCM16 chunk and its level (0…1). */
+    /** Called on the capture thread with a PCM16 chunk and its level in dBFS. */
     var onChunk: ((ByteArray, Float) -> Unit)? = null
     /** Called on the main thread if capture stops for a reason outside our control. */
     var onInterrupted: (() -> Unit)? = null
@@ -131,7 +131,7 @@ class MicCapture {
                 }
                 filled += read
             }
-            if (filled == CHUNK_BYTES) onChunk?.invoke(buffer.copyOf(), level(buffer))
+            if (filled == CHUNK_BYTES) onChunk?.invoke(buffer.copyOf(), decibels(buffer))
         }
     }
 
@@ -152,7 +152,7 @@ class MicCapture {
                 System.arraycopy(pcm, offset, chunk, 0, n)
                 offset += CHUNK_BYTES
             }
-            onChunk?.invoke(chunk, 0.5f)
+            onChunk?.invoke(chunk, decibels(chunk))
         }, 0, (CHUNK_DURATION * 1000).toLong(), TimeUnit.MILLISECONDS)
         fileTimer = timer
     }
@@ -162,18 +162,20 @@ class MicCapture {
         const val CHUNK_DURATION = 0.08
         const val CHUNK_BYTES = (SAMPLE_RATE * CHUNK_DURATION).toInt() * 2
 
-        /** Maps roughly -50 dB…0 dB onto 0…1 for the level meter. */
-        fun level(chunk: ByteArray): Float {
+        /** The RMS level of a PCM16 chunk in dBFS, from about -120 (silence) to 0. */
+        fun decibels(chunk: ByteArray): Float {
             var sum = 0.0
             val samples = chunk.size / 2
             for (i in 0 until samples) {
                 val sample = ((chunk[2 * i + 1].toInt() shl 8) or (chunk[2 * i].toInt() and 0xFF)).toShort() / 32768.0
                 sum += sample * sample
             }
-            val rms = sqrt(sum / max(1, samples))
-            val db = 20 * log10(max(rms, 1e-6))
-            return ((db + 50) / 50).toFloat().coerceIn(0f, 1f)
+            if (samples == 0) return -120f
+            return (20 * log10(max(sqrt(sum / samples), 1e-6))).toFloat()
         }
+
+        /** Maps roughly -50 dB…0 dB onto 0…1 for the level meter. */
+        fun meterLevel(decibels: Float): Float = ((decibels + 50) / 50).coerceIn(0f, 1f)
 
         /** A 16-bit PCM WAV file as 16 kHz mono PCM16, resampled linearly. */
         fun readWav(file: File): ByteArray {

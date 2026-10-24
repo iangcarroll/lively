@@ -28,6 +28,14 @@ for Edit and Delete. Edit fixes a misheard transcript, such as a name, and
 translates the corrected text again the same way as typed lines. In face-to-face,
 long-press one of your own lines to edit it.
 
+Settings › Pickup range keeps distant conversations out of the transcript.
+Audio quieter than the range's threshold is sent to the engine as silence, and
+the ring around the mic button fades while that happens. **Nearby** (the
+default) hears people around the table, **Close** only those right by the
+phone, and **Whole room** everything. **Auto** tracks the room's background
+level and only hears speech well above it, never laxer than Nearby. The
+thresholds live in `Audio/NoiseGate.swift`.
+
 Soniox only outputs Simplified Chinese. When Settings › Chinese is 繁體, Lively
 converts its output on the device.
 
@@ -63,6 +71,7 @@ when the conversation screen appears.
 | Stage | Where |
 |---|---|
 | Mic → 16 kHz PCM16, 80 ms chunks | `Audio/MicCapture.swift` |
+| Pickup range: quiet chunks sent as silence | `Audio/NoiseGate.swift` |
 | Engine registry: names, keys, which settings apply, how to build each pipeline | `Model/SpeechProvider.swift` |
 | Engine interface and events | `Networking/SpeechEngine.swift` |
 | Reconnects, pings, audio backlog, shared by every engine | `Networking/ResilientSocket.swift` |

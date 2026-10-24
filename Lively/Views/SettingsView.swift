@@ -56,6 +56,18 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Picker(selection: $settings.pickupRange) {
+                        ForEach(PickupRange.allCases) { Text($0.label).tag($0) }
+                    } label: {
+                        Label { Text("Pickup range") } icon: { SettingsIcon(systemImage: "ear.fill", color: .green) }
+                    }
+                } header: {
+                    Text("Microphone")
+                } footer: {
+                    Text(settings.pickupRange.summary)
+                }
+
+                Section {
                     Picker(selection: $settings.providerID) {
                         ForEach(SpeechProvider.all) { Text($0.name).tag($0.id) }
                     } label: {

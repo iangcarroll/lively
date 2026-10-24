@@ -194,7 +194,7 @@ struct ConversationScreen: View {
             .disabled(store.utterances.isEmpty)
             .opacity(store.utterances.isEmpty ? 0.4 : 1)
             Spacer()
-            MicButton(isListening: store.isListening, level: store.level) {
+            MicButton(isListening: store.isListening, level: store.level, isHearing: store.isHearing) {
                 store.toggleListening()
             }
             Spacer()

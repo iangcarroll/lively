@@ -14,6 +14,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import sh.ian.lively.audio.MicCapture
+import sh.ian.lively.audio.NoiseGate
 import sh.ian.lively.net.BrokerTranslationException
 import sh.ian.lively.net.FallbackTranslator
 import sh.ian.lively.net.MistralTranslator
@@ -33,7 +35,7 @@ import java.io.IOException
 interface ConversationHost {
     /** Asks for the mic if needed; true once it's granted. */
     suspend fun requestMicPermission(): Boolean
-    /** Starts capture. Throws when there's no usable mic. */
+    /** Starts capture, passing each chunk with its level in dBFS. Throws when there's no usable mic. */
     @Throws(IOException::class)
     fun startMic(onChunk: (ByteArray, Float) -> Unit, onInterrupted: () -> Unit)
     fun stopMic()
@@ -82,6 +84,9 @@ class ConversationStore(
     /** Smoothed mic level for the meter, 0…1. */
     var level by mutableFloatStateOf(0f)
         private set
+    /** The noise gate is letting the mic through: someone is close enough to translate. */
+    var isHearing by mutableStateOf(false)
+        private set
     var alert by mutableStateOf<String?>(null)
 
     /** Turns with something to show: not empty, and not only filler words. */
@@ -110,16 +115,23 @@ class ConversationStore(
     /** Settings changed while listening, so the engine isn't kept warm. */
     private var engineIsStale = false
 
+    /** Sends quiet chunks as silence, per the pickup range in Settings. */
+    private val gate = NoiseGate()
+
     /** One channel keeps chunks in order on their way from the capture thread. */
     private val chunks = Channel<Pair<ByteArray, Float>>(500, BufferOverflow.DROP_OLDEST)
 
     init {
         if (demo) translator = DemoTranslator()
         scope.launch {
-            for ((chunk, level) in chunks) {
+            for ((chunk, decibels) in chunks) {
                 if (!isListening) continue
-                engine?.send(chunk)
-                this@ConversationStore.level = this@ConversationStore.level * 0.6f + level * 0.4f
+                // Gated chunks go as silence rather than not at all, so the
+                // engine still hears the pause and ends the turn.
+                val heard = gate.process(decibels, settings.pickupRange)
+                isHearing = heard
+                engine?.send(if (heard) chunk else ByteArray(chunk.size))
+                level = level * 0.6f + MicCapture.meterLevel(decibels) * 0.4f
             }
         }
         regionProber?.probe()
@@ -194,13 +206,14 @@ class ConversationStore(
             }
             if (isListening) return@launch
             isListening = true
+            gate.reset()
             host.keepScreenAwake(true)
             // Connect while the mic starts up. Audio that arrives before the
             // session is ready waits in the socket's backlog.
             startEngine(provider)
             try {
                 host.startMic(
-                    onChunk = { chunk, level -> chunks.trySend(chunk to level) },
+                    onChunk = { chunk, decibels -> chunks.trySend(chunk to decibels) },
                     onInterrupted = {
                         stopListening()
                         alert = "The microphone stopped. Tap the mic to start again."
@@ -248,6 +261,7 @@ class ConversationStore(
         if (demo == null) host.stopMic()
         pauseEngine()
         level = 0f
+        isHearing = false
         host.keepScreenAwake(false)
         finalizeCurrent()
         refreshStatus()
