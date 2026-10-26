@@ -51,25 +51,36 @@ struct ConversationScreen: View {
                     // A stable container, so the bars aren't rebuilt when the
                     // first turn replaces the empty state; that would drop a
                     // press on the mic mid-hold.
-                    ZStack { transcript(wide: wide) }
+                    // It spans the iPhone Duo's column, so the bottom bar's
+                    // buttons in it take taps; everything else keeps clear of it.
+                    ZStack { transcript(wide: wide).padding(column?.edges ?? [], column?.width ?? 0) }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .safeAreaBar(edge: .top) { topBar(wide: wide, column: column) }
+                        .safeAreaBar(edge: .top) {
+                            topBar(wide: wide, column: column)
+                                .padding(column?.edges ?? [], column?.width ?? 0)
+                        }
                         .safeAreaBar(edge: .bottom) { controls(column: column) }
+                        .ignoresSafeArea(edges: column?.edges ?? [])
                         .transition(.opacity)
-                    if let column {
-                        // Turns stay clear of the column; its buttons sit in it,
-                        // below the status icons, like the system apps' toolbars.
+                }
+            }
+            .overlayPreferenceValue(KeyboardButtonBounds.self) { keyboard in
+                // In the status column, the other buttons stack above the
+                // keyboard button, clear of however far its status icons
+                // reach, which iOS doesn't report. They're drawn here rather
+                // than on the bottom bar so they take taps outside its bounds.
+                // While typing, the software keyboard lifts the bar too near
+                // the status icons, so they step aside.
+                if column != nil, !textInputFocused, let keyboard {
+                    GeometryReader { proxy in
+                        let bounds = proxy[keyboard]
                         VStack(spacing: 10) { trailingButtons(wide: wide) }
-                            .frame(width: column.width - StatusColumn.itemsInset)
-                            .padding(column.edges, StatusColumn.itemsInset)
-                            .padding(.top, column.itemsHeight)
-                            .frame(
-                                maxWidth: .infinity, maxHeight: .infinity,
-                                alignment: column.edge == .trailing ? .topTrailing : .topLeading
-                            )
-                            .ignoresSafeArea(edges: column.edges)
-                            .transition(.opacity)
+                            .frame(width: bounds.width)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                            .offset(x: bounds.minX, y: bounds.minY - 10 - proxy.size.height)
                     }
+                    .ignoresSafeArea()
+                    .transition(.opacity)
                 }
             }
         }
@@ -220,12 +231,13 @@ struct ConversationScreen: View {
                     editing: $editing, focused: $textInputFocused
                 ) { setTextInput(false) }
                 .padding(.horizontal, 16)
+                .padding(column?.edges ?? [], column?.width ?? 0)
                 .transition(.opacity)
             }
             // The status column is free this far down, so the keyboard button
-            // sits in it, under the status icons.
+            // sits in it, under the status icons, with the column's other
+            // buttons stacked above it.
             controlRow(column: column)
-                .ignoresSafeArea(edges: column?.edges ?? [])
         }
     }
 
@@ -241,6 +253,7 @@ struct ConversationScreen: View {
                 GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
                     setTextInput(!showsTextInput)
                 }
+                .anchorPreference(key: KeyboardButtonBounds.self, value: .bounds) { $0 }
             }
             .padding(.horizontal, 24)
             .padding(column?.edges ?? [], (column?.inset(centering: GlassIconButton.size) ?? 24) - 24)
@@ -288,5 +301,14 @@ struct ConversationScreen: View {
                 Pro.shared.freeLimitReached = false
             }
         })
+    }
+}
+
+/// Where the bottom bar's keyboard button is, for the iPhone Duo's column
+/// buttons that stack above it.
+private struct KeyboardButtonBounds: PreferenceKey {
+    static let defaultValue: Anchor<CGRect>? = nil
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = value ?? nextValue()
     }
 }

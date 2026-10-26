@@ -66,16 +66,11 @@ struct TypingDots: View {
 /// The iPhone Duo shows its camera, clock and status icons in a column down
 /// one side instead of a bar across the top. iOS reports the whole column as
 /// a side safe area inset, but only its top holds anything, so screens let
-/// content below it use the full width and put their own controls in it,
-/// below the status icons.
+/// content below it use the full width and put their own controls low in it,
+/// in line with the status icons.
 nonisolated struct StatusColumn: Equatable, Sendable {
     let edge: HorizontalEdge
     let width: CGFloat
-    /// How far down the camera, clock and status icons reach. iOS doesn't
-    /// report it, so this matches the iPhone Duo: folded, the camera sits
-    /// above the clock; unfolded, the screen is landscape and the column
-    /// holds only the clock and status icons.
-    let itemsHeight: CGFloat
 
     /// The status icons sit a little in from the column's middle, away from
     /// the screen edge. Controls in the column leave this much room on the
@@ -96,7 +91,6 @@ nonisolated struct StatusColumn: Equatable, Sendable {
         } else {
             return nil
         }
-        itemsHeight = size.height > size.width ? 160 : 108
     }
 
     /// The column's side as a set of edges, for padding and safe areas.
