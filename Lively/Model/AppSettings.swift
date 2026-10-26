@@ -29,6 +29,9 @@ final class AppSettings {
         didSet {
             defaults.set(languages.first.rawValue, forKey: "firstLanguage")
             defaults.set(languages.second.rawValue, forKey: "secondLanguage")
+            #if os(iOS)
+            WidgetLanguages.publish(languages)
+            #endif
         }
     }
 
@@ -89,5 +92,9 @@ final class AppSettings {
         for credential in SpeechProvider.allCredentials {
             credentials[credential.id] = Keychain.read(account: credential.id) ?? ""
         }
+        #if os(iOS)
+        // didSet doesn't run here; the widgets may not have this pair yet.
+        WidgetLanguages.publish(languages)
+        #endif
     }
 }

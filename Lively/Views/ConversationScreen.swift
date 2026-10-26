@@ -116,6 +116,7 @@ struct ConversationScreen: View {
             if phase == .background { store.didEnterBackground() }
             #endif
         }
+        .onOpenURL(perform: open)
         .onAppear {
             if forcesOnboarding {
                 showOnboarding = true
@@ -133,6 +134,18 @@ struct ConversationScreen: View {
             } else if !settings.hasCredentials {
                 showSettings = true
             }
+        }
+    }
+
+    /// Links from the home and lock screen widgets: `lively://listen` starts
+    /// listening, `lively://type` opens the text bar. Ignored until the
+    /// welcome tour is done, since it picks the languages.
+    private func open(_ url: URL) {
+        guard url.scheme == "lively", onboardingDone || isDemo, !showOnboarding else { return }
+        switch url.host() {
+        case "listen": store.startListening()
+        case "type": setTextInput(true)
+        default: break
         }
     }
 

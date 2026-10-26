@@ -31,6 +31,14 @@ for Edit and Delete. Edit fixes a misheard transcript, such as a name, and
 translates the corrected text again the same way as typed lines. In face-to-face,
 long-press one of your own lines to edit it.
 
+On iPhone and iPad, Lively has home screen and lock screen widgets
+(`LivelyWidgets/`). They show the conversation's two languages, and tapping one
+opens Lively and starts listening. The medium home screen widget also has a
+Type button that opens the text field. They link with `lively://listen` and
+`lively://type`, and read the language pair from the `group.sh.ian.lively` App
+Group, which the app updates whenever the pair changes
+(`Shared/WidgetLanguages.swift`). The Android app has no widgets yet.
+
 Settings › Pickup range keeps distant conversations out of the transcript.
 Audio quieter than the range's threshold is sent to the engine as silence, and
 the ring around the mic button fades while that happens. **Nearby** (the
