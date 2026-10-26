@@ -80,7 +80,7 @@ struct FaceToFaceScreen: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                        .frame(width: GlassIconButton.size, height: GlassIconButton.size)
                         .contentShape(.circle)
                 }
                 .menuIndicator(.hidden)
@@ -90,7 +90,9 @@ struct FaceToFaceScreen: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, narrow ? 12 : 16)
+        // Beside the iPhone Duo's status column, the More button sits under its
+        // status icons; both sides match, so the mic stays centered.
+        .padding(.horizontal, statusColumn?.inset(centering: GlassIconButton.size) ?? (narrow ? 12 : 16))
         .padding(.vertical, 8)
         .onGeometryChange(for: Bool.self) { $0.size.width < 400 } action: { narrow = $0 }
         .background {

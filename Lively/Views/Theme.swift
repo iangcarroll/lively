@@ -71,33 +71,45 @@ struct TypingDots: View {
 nonisolated struct StatusColumn: Equatable, Sendable {
     let edge: HorizontalEdge
     let width: CGFloat
-
     /// How far down the camera, clock and status icons reach. iOS doesn't
-    /// report it, so this matches the iPhone Duo.
-    static let itemsHeight: CGFloat = 160
+    /// report it, so this matches the iPhone Duo: folded, the camera sits
+    /// above the clock; unfolded, the screen is landscape and the column
+    /// holds only the clock and status icons.
+    let itemsHeight: CGFloat
+
     /// The status icons sit a little in from the column's middle, away from
     /// the screen edge. Controls in the column leave this much room on the
     /// edge side so they line up under them.
     static let itemsInset: CGFloat = 12
 
-    /// The column a view's size and safe area describe, if any: a side inset
-    /// on a portrait screen. Landscape phones inset a side for the notch too,
-    /// but that runs the full height and isn't a column.
+    /// The column a view's size and safe area describe, if any: an inset on
+    /// one side only. Landscape phones inset both sides for the notch, and
+    /// that runs the full height, so it isn't a column.
     init?(size: CGSize, insets: EdgeInsets) {
-        guard size.height > size.width, insets.top == 0 else { return nil }
-        if insets.trailing > 0 {
+        guard insets.top == 0 else { return nil }
+        if insets.trailing > 0, insets.leading == 0 {
             edge = .trailing
             width = insets.trailing
-        } else if insets.leading > 0 {
+        } else if insets.leading > 0, insets.trailing == 0 {
             edge = .leading
             width = insets.leading
         } else {
             return nil
         }
+        itemsHeight = size.height > size.width ? 160 : 108
     }
 
     /// The column's side as a set of edges, for padding and safe areas.
     var edges: Edge.Set { edge == .trailing ? .trailing : .leading }
+
+    /// How far from the screen edge the status icons' center line runs.
+    var itemsCenter: CGFloat { Self.itemsInset + (width - Self.itemsInset) / 2 }
+
+    /// The padding from the screen edge that centers a control this wide
+    /// under the status icons, for rows that span the column.
+    func inset(centering controlWidth: CGFloat) -> CGFloat {
+        itemsCenter - controlWidth / 2
+    }
 }
 
 extension EnvironmentValues {

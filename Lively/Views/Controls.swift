@@ -168,11 +168,13 @@ struct GlassIconButton: View {
     let label: String
     let action: () -> Void
 
+    static let size: CGFloat = 40
+
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 17, weight: .medium))
-                .frame(width: 40, height: 40)
+                .frame(width: Self.size, height: Self.size)
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)

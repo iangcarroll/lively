@@ -62,7 +62,7 @@ struct ConversationScreen: View {
                         VStack(spacing: 10) { trailingButtons(wide: wide) }
                             .frame(width: column.width - StatusColumn.itemsInset)
                             .padding(column.edges, StatusColumn.itemsInset)
-                            .padding(.top, StatusColumn.itemsHeight)
+                            .padding(.top, column.itemsHeight)
                             .frame(
                                 maxWidth: .infinity, maxHeight: .infinity,
                                 alignment: column.edge == .trailing ? .topTrailing : .topLeading
@@ -221,20 +221,29 @@ struct ConversationScreen: View {
                 .padding(.horizontal, 16)
                 .transition(.opacity)
             }
-            // The status column is free this far down, so the mic centers on the screen.
-            controlRow
+            // The status column is free this far down, so the keyboard button
+            // sits in it, under the status icons.
+            controlRow(column: column)
                 .ignoresSafeArea(edges: column?.edges ?? [])
         }
     }
 
-    private var controlRow: some View {
-        HStack {
-            GlassIconButton(systemImage: "trash", label: "Clear conversation") {
-                withAnimation(.snappy) { store.clear() }
+    private func controlRow(column: StatusColumn?) -> some View {
+        ZStack {
+            HStack {
+                GlassIconButton(systemImage: "trash", label: "Clear conversation") {
+                    withAnimation(.snappy) { store.clear() }
+                }
+                .disabled(store.utterances.isEmpty)
+                .opacity(store.utterances.isEmpty ? 0.4 : 1)
+                Spacer()
+                GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
+                    setTextInput(!showsTextInput)
+                }
             }
-            .disabled(store.utterances.isEmpty)
-            .opacity(store.utterances.isEmpty ? 0.4 : 1)
-            Spacer()
+            .padding(.horizontal, 24)
+            .padding(column?.edges ?? [], (column?.inset(centering: GlassIconButton.size) ?? 24) - 24)
+            // The mic centers on the transcript above it, beside the column.
             MicButton(isListening: store.isListening, level: store.level, isHearing: store.isHearing) {
                 store.toggleListening()
             } onHoldStart: {
@@ -242,12 +251,8 @@ struct ConversationScreen: View {
             } onHoldEnd: {
                 store.stopListening()
             }
-            Spacer()
-            GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
-                setTextInput(!showsTextInput)
-            }
+            .padding(column?.edges ?? [], column?.width ?? 0)
         }
-        .padding(.horizontal, 24)
         .padding(.top, 8)
         .padding(.bottom, 12)
     }
