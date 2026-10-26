@@ -59,6 +59,12 @@ final class AppSettings {
         didSet { defaults.set(translationModel, forKey: "translationModel") }
     }
 
+    /// Speech-to-speech mode: translations into the second language are read
+    /// aloud through the speaker. Off unless turned on.
+    var speaksTranslations: Bool {
+        didSet { defaults.set(speaksTranslations, forKey: "speaksTranslations") }
+    }
+
     static let defaultTranslationModel = "mistral-small-latest"
     static let transcriptionModel = "voxtral-mini-transcribe-realtime-3"
 
@@ -89,6 +95,7 @@ final class AppSettings {
         pickupRange = PickupRange(rawValue: defaults.string(forKey: "pickupRange") ?? "") ?? .default
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel
+        speaksTranslations = defaults.bool(forKey: "speaksTranslations")
         for credential in SpeechProvider.allCredentials {
             credentials[credential.id] = Keychain.read(account: credential.id) ?? ""
         }

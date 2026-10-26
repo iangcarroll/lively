@@ -72,6 +72,8 @@ class SonioxKeyProvider(
     }
 
     private val endpoint = brokerURL.trimEnd('/') + "/v1/soniox/key"
+    /** Text-to-Speech keys, for `SonioxSpeaker`. */
+    private val speechEndpoint = brokerURL.trimEnd('/') + "/v1/soniox/tts-key"
     private val client = baseClient.newBuilder().callTimeout(10, TimeUnit.SECONDS).build()
     private var spare: TemporaryKey? = null
     /** The fetch filling [spare], shared by everyone waiting on it. */
@@ -155,6 +157,12 @@ class SonioxKeyProvider(
     }
 
     /**
+     * A Text-to-Speech key for one connection, in the region listening uses.
+     * No spare is kept: the speaker connects only when it has something to say.
+     */
+    suspend fun takeSpeechKey(): Key = requestKey(speechEndpoint).key
+
+    /**
      * The fetch runs in [scope], not the caller, so a caller that gives up
      * (a connection closed meanwhile) doesn't cancel it for everyone else.
      */
@@ -162,7 +170,7 @@ class SonioxKeyProvider(
         filling?.let { return it.await() }
         val fetch = scope.async(start = CoroutineStart.LAZY) {
             try {
-                spare = requestKey()
+                spare = requestKey(endpoint)
             } finally {
                 filling = null
             }
@@ -172,7 +180,7 @@ class SonioxKeyProvider(
         fetch.await()
     }
 
-    private suspend fun requestKey(): TemporaryKey {
+    private suspend fun requestKey(endpoint: String): TemporaryKey {
         val requestedRegion = regions.choice
         val token = identity.accountToken
         val request = Request.Builder()
@@ -192,7 +200,7 @@ class SonioxKeyProvider(
         // A signed-out or expired session: drop it and ask again anonymously.
         if (response.code == 401 && token != null) {
             identity.accountTokenRejected(token)
-            return requestKey()
+            return requestKey(endpoint)
         }
 
         val body = runCatching { Json.parseToJsonElement(response.body) as? JsonObject }.getOrNull()
@@ -214,7 +222,8 @@ class SonioxKeyProvider(
 
         val apiKey = body?.string("api_key") ?: throw IOException("No key in the response")
         val expiresIn = body.int("expires_in_seconds") ?: throw IOException("No expiry in the response")
-        (body["regions"] as? JsonObject)?.let { offered ->
+        // Speech keys list the TTS hosts, which the prober doesn't measure.
+        (body["regions"] as? JsonObject)?.takeIf { endpoint == this.endpoint }?.let { offered ->
             regions.update(offered.mapNotNull { (k, v) -> (v as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { k to it } }.toMap())
         }
         // Time the key by this device's clock, from when it was requested.

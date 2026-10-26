@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -26,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -51,6 +53,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -90,6 +93,7 @@ import sh.ian.lively.model.LanguageSide
 import sh.ian.lively.model.Latency
 import sh.ian.lively.model.Pro
 import sh.ian.lively.model.ProviderOption
+import sh.ian.lively.model.SpeechProviders
 
 private val Orange = Color(0xFFFF9500)
 private val Teal = Color(0xFF30B0C7)
@@ -98,6 +102,7 @@ private val Green = Color(0xFF34C759)
 private val Gray = Color(0xFF8E8E93)
 private val Indigo = Color(0xFF5856D6)
 private val Pink = Color(0xFFFF2D55)
+private val Blue = Color(0xFF007AFF)
 private val Red = Color(0xFFFF3B30)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -203,6 +208,27 @@ fun SettingsScreen(
                     )
                 }
 
+                val canSpeak = hasBroker || settings.credential(SpeechProviders.sonioxCredential(false)).isNotBlank()
+                Group(header = "Speech-to-speech", footer = speechFooter(settings, canSpeak)) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = settings.speaksTranslations,
+                                enabled = canSpeak,
+                                role = Role.Switch,
+                                onValueChange = { settings.speaksTranslations = it },
+                            )
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        SettingsIcon(Icons.AutoMirrored.Rounded.VolumeUp, Blue)
+                        Text("Speak translations aloud", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Switch(checked = settings.speaksTranslations, onCheckedChange = null, enabled = canSpeak)
+                    }
+                }
+
                 Group(header = "Speech engine", footer = engineFooter(settings)) {
                     Item(
                         icon = { SettingsIcon(Icons.Rounded.GraphicEq, Purple) },
@@ -304,6 +330,13 @@ fun SettingsScreen(
             onDismiss = { choosingEngine = false },
         )
     }
+}
+
+private fun speechFooter(settings: AppSettings, canSpeak: Boolean): String {
+    if (!canSpeak) return "Speaking translations aloud needs a Soniox API key."
+    return "Translations into ${settings.languages.second.englishName} are read aloud through the speaker as they arrive. " +
+        "Lively doesn't listen while it speaks, so it won't translate itself, unless you're using headphones. " +
+        "The speaker button on the conversation screen turns it on and off."
 }
 
 private fun engineFooter(settings: AppSettings): String {

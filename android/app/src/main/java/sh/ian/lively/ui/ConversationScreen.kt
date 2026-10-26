@@ -211,6 +211,7 @@ private fun TranscriptLayout(
         ) {
             StatusPill(store.status, store.isListening)
             Spacer(Modifier.weight(1f))
+            SpeakAloudButton(store)
             if (!wide) TonalIconButton(Icons.Rounded.Splitscreen, "Face-to-face mode", onFaceToFace)
             TonalIconButton(Icons.Rounded.Settings, "Settings", onShowSettings)
         }

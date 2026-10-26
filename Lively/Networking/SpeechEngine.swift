@@ -57,6 +57,9 @@ struct SpeechSegment {
     var id: Int
     var source: String
     var translation: String
+    /// The start of `translation` that won't be revised, which speech-to-speech
+    /// can read out before the rest arrives.
+    var stableTranslation: String
     var language: Language?
     var isClosed: Bool
     /// Speech held during a dropout and transcribed late, on its own session,

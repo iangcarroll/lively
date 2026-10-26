@@ -20,11 +20,11 @@ afterEach(() => vi.restoreAllMocks());
 function keyRequest(
   installID: string = crypto.randomUUID(),
   ip = randomIP(),
-  { region, country = "US" }: { region?: string; country?: string } = {},
+  { region, country = "US", path = "/v1/soniox/key" }: { region?: string; country?: string; path?: string } = {},
 ): Request {
   const headers: Record<string, string> = { "Lively-Install-ID": installID, "CF-Connecting-IP": ip };
   if (region !== undefined) headers["Lively-Region"] = region;
-  return new Request("https://broker.test/v1/soniox/key", {
+  return new Request(`https://broker.test${path}`, {
     method: "POST",
     headers,
     cf: { country },
@@ -112,6 +112,39 @@ describe("POST /v1/soniox/key", () => {
     expect(response.headers.get("Content-Security-Policy")).toContain("default-src 'none'");
     expect(await response.text()).toContain(`<h1>${heading}</h1>`);
     expect(soniox).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /v1/soniox/tts-key", () => {
+  const ttsRequest = (installID = crypto.randomUUID(), ip = randomIP()) =>
+    keyRequest(installID, ip, { path: "/v1/soniox/tts-key" });
+
+  it("mints a reusable Text-to-Speech key for the TTS host", async () => {
+    const installID = crypto.randomUUID();
+    const response = await worker.fetch(ttsRequest(installID), env);
+
+    expect(response.status).toBe(200);
+    const body = await response.json<{ api_key: string; websocket_url: string; regions: Record<string, string> }>();
+    expect(body.api_key).toMatch(/^temp:/);
+    expect(body.websocket_url).toBe("wss://tts-rt.soniox.com/tts-websocket");
+    expect(body.regions.us).toBe("wss://tts-rt.soniox.com/tts-websocket");
+    const [, init] = soniox.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      usage_type: "tts_rt",
+      expires_in_seconds: 300,
+      max_session_duration_seconds: 120,
+      client_reference_id: await hash(`install:${installID}`),
+    });
+  });
+
+  it("counts its keys apart from listening keys", async () => {
+    const installID = crypto.randomUUID();
+    const ip = randomIP();
+    for (let i = 0; i < Number(env.PER_INSTALL_KEYS_PER_MINUTE); i++) {
+      expect((await worker.fetch(keyRequest(installID, ip), env)).status).toBe(200);
+    }
+    expect((await worker.fetch(keyRequest(installID, ip), env)).status).toBe(429);
+    expect((await worker.fetch(ttsRequest(installID, ip), env)).status).toBe(200);
   });
 });
 

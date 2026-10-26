@@ -3,6 +3,7 @@ package sh.ian.lively
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -40,6 +41,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
+import sh.ian.lively.audio.SpeechPlayer
 import sh.ian.lively.audio.MicCapture
 import sh.ian.lively.model.ConversationHost
 import sh.ian.lively.model.ConversationStore
@@ -128,6 +130,10 @@ class AndroidConversationHost : ConversationHost {
         this.awake = awake
         activity.get()?.keepScreenAwake(awake)
     }
+
+    /** The app's AudioManager, not the activity's, since the player outlives it. */
+    override fun makeSpeechPlayer() =
+        SpeechPlayer(activity.get()?.applicationContext?.getSystemService(AudioManager::class.java))
 }
 
 class ConversationViewModel(graph: LivelyApp.Graph) : ViewModel() {

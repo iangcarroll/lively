@@ -64,7 +64,9 @@ class SonioxTranscriber(
         var language: Language? = null,
         var isClosed: Boolean = false,
     ) {
-        fun event(isCatchUp: Boolean) = SpeechSegment(id, source, translation, language, isClosed, isCatchUp)
+        /** [stableTranslation] is the final tokens' part, when non-final ones were added to [translation]. */
+        fun event(isCatchUp: Boolean, stableTranslation: String = translation) =
+            SpeechSegment(id, source, translation, stableTranslation, language, isClosed, isCatchUp)
     }
 
     /**
@@ -316,7 +318,12 @@ class SonioxTranscriber(
         if (pendingPreviousTranslation.isNotEmpty()) state.previous?.let { touched += it.id }
 
         state.previous?.takeIf { it.id in touched }?.let { segment ->
-            onEvent(SpeechEvent.Segment(segment.copy(translation = segment.translation + pendingPreviousTranslation).event(state.isCatchUp)))
+            onEvent(
+                SpeechEvent.Segment(
+                    segment.copy(translation = segment.translation + pendingPreviousTranslation)
+                        .event(state.isCatchUp, stableTranslation = segment.translation),
+                ),
+            )
         }
         state.open?.takeIf { it.id in touched }?.let { segment ->
             onEvent(
@@ -325,7 +332,7 @@ class SonioxTranscriber(
                         source = segment.source + pendingSource,
                         translation = segment.translation + pendingOpenTranslation,
                         language = segment.language ?: pendingLanguage,
-                    ).event(state.isCatchUp),
+                    ).event(state.isCatchUp, stableTranslation = segment.translation),
                 ),
             )
         }

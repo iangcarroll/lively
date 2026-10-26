@@ -74,21 +74,11 @@ nonisolated final class MicCapture: @unchecked Sendable {
         }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
-        #if os(iOS)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
+        AudioSessionUsers.end(.mic)
     }
 
     private func configureSession() throws {
-        #if os(iOS)
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playAndRecord, mode: .default,
-            options: [.defaultToSpeaker, .allowBluetoothHFP, .duckOthers]
-        )
-        try session.setPreferredIOBufferDuration(0.02)
-        try session.setActive(true)
-        #endif
+        try AudioSessionUsers.begin(.mic)
     }
 
     private func startEngine() throws {
@@ -245,5 +235,41 @@ nonisolated final class MicCapture: @unchecked Sendable {
     enum CaptureError: LocalizedError {
         case noInput
         var errorDescription: String? { "No microphone is available." }
+    }
+}
+
+/// The mic and `SpeechPlayer` share iOS's audio session. Whichever finishes
+/// last deactivates it, so a translation still being spoken isn't cut off
+/// when listening stops. macOS has no audio session, so this does nothing there.
+nonisolated enum AudioSessionUsers {
+    enum User { case mic, speech }
+
+    private static let users = OSAllocatedUnfairLock(initialState: Set<User>())
+
+    static func begin(_ user: User) throws {
+        #if os(iOS)
+        // The mic always sets it up, as after a media services reset; the
+        // player leaves a running mic's session alone.
+        if user == .mic || users.withLock({ $0.isEmpty }) {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(
+                .playAndRecord, mode: .default,
+                options: [.defaultToSpeaker, .allowBluetoothHFP, .duckOthers]
+            )
+            try session.setPreferredIOBufferDuration(0.02)
+        }
+        try AVAudioSession.sharedInstance().setActive(true)
+        #endif
+        users.withLock { _ = $0.insert(user) }
+    }
+
+    static func end(_ user: User) {
+        let empty = users.withLock { users in
+            guard users.remove(user) != nil else { return false }
+            return users.isEmpty
+        }
+        #if os(iOS)
+        if empty { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
+        #endif
     }
 }

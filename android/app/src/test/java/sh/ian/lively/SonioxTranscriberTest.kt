@@ -37,7 +37,7 @@ class SonioxTranscriberTest {
 
     @Test fun finalAndPendingTokensMakeOneSegment() {
         receive(token("Hello", true, "en"), token(" there", false, "en"))
-        assertEquals(SpeechSegment(0, "Hello there", "", Language.ENGLISH, isClosed = false), segments.last())
+        assertEquals(SpeechSegment(0, "Hello there", "", language = Language.ENGLISH, isClosed = false), segments.last())
         // The next response replaces the pending words.
         receive(token(" there,", true, "en"), token(" friend", false, "en"))
         assertEquals("Hello there, friend", segments.last().source)

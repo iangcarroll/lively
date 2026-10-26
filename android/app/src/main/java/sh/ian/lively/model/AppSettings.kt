@@ -85,6 +85,19 @@ class AppSettings(
             prefs.putString("translationModel", value)
         }
 
+    private var _speaksTranslations by mutableStateOf(prefs.bool("speaksTranslations"))
+
+    /**
+     * Speech-to-speech mode: translations into the second language are read
+     * aloud through the speaker. Off unless turned on.
+     */
+    var speaksTranslations: Boolean
+        get() = _speaksTranslations
+        set(value) {
+            _speaksTranslations = value
+            prefs.putBool("speaksTranslations", value)
+        }
+
     fun credential(credential: ProviderCredential): String = credentials[credential.id] ?: ""
 
     fun setCredential(value: String, credential: ProviderCredential) {

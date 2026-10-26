@@ -55,6 +55,8 @@ final class SonioxKeyProvider {
     let regions = RegionProber()
 
     private let endpoint: URL
+    /// Text-to-Speech keys, for `SonioxSpeaker`.
+    private let speechEndpoint: URL
     private let session: URLSession
     private var spare: TemporaryKey?
     /// The fetch filling `spare`, shared by everyone waiting on it.
@@ -63,6 +65,7 @@ final class SonioxKeyProvider {
 
     private init(brokerURL: URL) {
         endpoint = brokerURL.appending(path: "v1/soniox/key")
+        speechEndpoint = brokerURL.appending(path: "v1/soniox/tts-key")
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 10
         session = URLSession(configuration: configuration)
@@ -133,17 +136,23 @@ final class SonioxKeyProvider {
         throw URLError(.cannotLoadFromNetwork)
     }
 
+    /// A Text-to-Speech key for one connection, in the region listening uses.
+    /// No spare is kept: the speaker connects only when it has something to say.
+    func takeSpeechKey() async throws -> Key {
+        try await requestKey(from: speechEndpoint).key
+    }
+
     private func fillSpare() async throws {
         if let filling { return try await filling.value }
         let task = Task {
             defer { filling = nil }
-            spare = try await requestKey()
+            spare = try await requestKey(from: endpoint)
         }
         filling = task
         try await task.value
     }
 
-    private func requestKey() async throws -> TemporaryKey {
+    private func requestKey(from endpoint: URL) async throws -> TemporaryKey {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue(Self.installID, forHTTPHeaderField: "Lively-Install-ID")
@@ -162,7 +171,7 @@ final class SonioxKeyProvider {
         // A signed-out or expired session: drop it and ask again anonymously.
         if http.statusCode == 401, let token {
             Account.shared?.tokenWasRejected(token)
-            return try await requestKey()
+            return try await requestKey(from: endpoint)
         }
 
         guard http.statusCode == 200 else {
@@ -182,7 +191,8 @@ final class SonioxKeyProvider {
         }
 
         let body = try JSONDecoder().decode(BrokerKey.self, from: data)
-        regions.update(regions: (body.regions ?? [:]).compactMapValues(URL.init(string:)))
+        // Speech keys list the TTS hosts, which the prober doesn't measure.
+        if endpoint == self.endpoint { regions.update(regions: (body.regions ?? [:]).compactMapValues(URL.init(string:))) }
         // Time the key by this device's clock, from when it was requested.
         return TemporaryKey(
             key: Key(

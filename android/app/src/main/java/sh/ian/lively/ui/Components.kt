@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
@@ -68,12 +70,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import sh.ian.lively.model.ConnectionStatus
+import sh.ian.lively.model.ConversationStore
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguagePair
 import kotlinx.coroutines.delay
@@ -342,20 +346,46 @@ fun TonalIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     size: Dp = 48.dp,
+    /** Set for a toggle, which is tinted while on. */
+    isOn: Boolean? = null,
 ) {
     Surface(
         onClick = onClick,
         enabled = enabled,
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        color = if (isOn == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (isOn == true) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
         modifier = modifier
             .size(size)
             .alpha(if (enabled) 1f else 0.4f)
-            .semantics { contentDescription = label },
+            .semantics {
+                contentDescription = label
+                if (isOn != null) selected = isOn
+            },
     ) {
         Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp)) }
     }
+}
+
+/**
+ * Switches speech-to-speech mode: translations into the second language
+ * are read aloud. Hidden when there's no Soniox key to speak with.
+ */
+@Composable
+fun SpeakAloudButton(store: ConversationStore, size: Dp = 48.dp) {
+    if (!store.canSpeakTranslations) return
+    val on = store.speaksTranslations
+    val view = LocalView.current
+    TonalIconButton(
+        if (on) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff,
+        if (on) "Stop speaking translations aloud" else "Speak translations aloud",
+        onClick = {
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            store.setSpeaksTranslations(!on)
+        },
+        size = size,
+        isOn = on,
+    )
 }
 
 /** A settings-style round badge with a white symbol. */

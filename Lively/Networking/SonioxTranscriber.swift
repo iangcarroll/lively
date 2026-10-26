@@ -46,8 +46,12 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         var language: Language?
         var isClosed = false
 
-        func event(isCatchUp: Bool) -> SpeechSegment {
-            SpeechSegment(id: id, source: source, translation: translation, language: language, isClosed: isClosed, isCatchUp: isCatchUp)
+        /// `stableTranslation` is the final tokens' part, when non-final ones were added to `translation`.
+        func event(isCatchUp: Bool, stableTranslation: String? = nil) -> SpeechSegment {
+            SpeechSegment(
+                id: id, source: source, translation: translation, stableTranslation: stableTranslation ?? translation,
+                language: language, isClosed: isClosed, isCatchUp: isCatchUp
+            )
         }
     }
 
@@ -293,14 +297,16 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         if !pendingPreviousTranslation.isEmpty, let id = state.previous?.id { touched.insert(id) }
 
         if var segment = state.previous, touched.contains(segment.id) {
+            let stable = segment.translation
             segment.translation += pendingPreviousTranslation
-            onEvent(.segment(segment.event(isCatchUp: state.isCatchUp)))
+            onEvent(.segment(segment.event(isCatchUp: state.isCatchUp, stableTranslation: stable)))
         }
         if var segment = state.open, touched.contains(segment.id) {
+            let stable = segment.translation
             segment.source += pendingSource
             segment.translation += pendingOpenTranslation
             segment.language = segment.language ?? pendingLanguage
-            onEvent(.segment(segment.event(isCatchUp: state.isCatchUp)))
+            onEvent(.segment(segment.event(isCatchUp: state.isCatchUp, stableTranslation: stable)))
         }
         return endedUtterance
     }

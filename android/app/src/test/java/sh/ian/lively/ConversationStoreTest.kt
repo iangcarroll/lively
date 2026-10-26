@@ -93,7 +93,7 @@ class ConversationStoreTest {
     }
 
     private fun segment(id: Int, source: String, translation: String = "", closed: Boolean = false, catchUp: Boolean = false, language: Language? = null) =
-        SpeechEvent.Segment(SpeechSegment(id, source, translation, language, closed, catchUp))
+        SpeechEvent.Segment(SpeechSegment(id, source, translation, language = language, isClosed = closed, isCatchUp = catchUp))
 
     @Test fun listeningStartsMicAndEngine() = runTest {
         val (store, _) = store()

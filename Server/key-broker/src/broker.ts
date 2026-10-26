@@ -11,6 +11,11 @@
  *   → 200 {api_key, expires_at, expires_in_seconds, max_session_seconds,
  *          region, websocket_url, regions, plan}
  *
+ *   POST /v1/soniox/tts-key   (same headers and response)
+ *   A Text-to-Speech key, for speaking translations aloud. It isn't single-use:
+ *   one connection opens a stream per sentence. `websocket_url` and `regions`
+ *   are the TTS hosts. Its keys are counted apart from listening keys.
+ *
  * Soniox regions are separate projects with region-scoped keys, so there is
  * one master key per region, and a temporary key works only on its region's
  * WebSocket host.
@@ -95,9 +100,17 @@ export interface Env {
 export type Region = "us" | "jp";
 
 /** Hostnames per region, from https://soniox.com/docs/data-residency. */
-export const REGIONS: Record<Region, { api: string; websocket: string }> = {
-  us: { api: "https://api.soniox.com", websocket: "wss://stt-rt.soniox.com/transcribe-websocket" },
-  jp: { api: "https://api.jp.soniox.com", websocket: "wss://stt-rt.jp.soniox.com/transcribe-websocket" },
+export const REGIONS: Record<Region, { api: string; websocket: string; ttsWebsocket: string }> = {
+  us: {
+    api: "https://api.soniox.com",
+    websocket: "wss://stt-rt.soniox.com/transcribe-websocket",
+    ttsWebsocket: "wss://tts-rt.soniox.com/tts-websocket",
+  },
+  jp: {
+    api: "https://api.jp.soniox.com",
+    websocket: "wss://stt-rt.jp.soniox.com/transcribe-websocket",
+    ttsWebsocket: "wss://tts-rt.jp.soniox.com/tts-websocket",
+  },
 };
 
 /** Countries closer to Tokyo than to Virginia (§4 of Tools/probe/ASIA_LATENCY.md). */
@@ -242,14 +255,30 @@ export async function applyCharges(
   );
 }
 
-export async function issueSonioxKey(request: Request, env: Env, now: number): Promise<Response> {
+export function issueSonioxKey(request: Request, env: Env, now: number): Promise<Response> {
+  return issueKey(request, env, now, "stt");
+}
+
+/**
+ * Text-to-Speech keys for speaking translations aloud. They have the same
+ * budgets as listening keys, counted separately, so speaking never eats into
+ * listening time.
+ */
+export function issueSonioxSpeechKey(request: Request, env: Env, now: number): Promise<Response> {
+  return issueKey(request, env, now, "tts");
+}
+
+/** Each TTS stream is one sentence; Soniox caps a stream's audio at 2 minutes anyway. */
+const TTS_STREAM_SECONDS = 120;
+
+async function issueKey(request: Request, env: Env, now: number, service: "stt" | "tts"): Promise<Response> {
   const caller = await identify(request, env, now);
   if (caller instanceof Response) return caller;
   const { installHash, userHash, subscriptionHash, plan } = caller;
 
   // Keys per minute count 1; minutes per day are tracked in charged seconds.
   const limits = readLimits(env);
-  const charges = chargesFor(caller, now, "", limits.chargeSeconds, {
+  const charges = chargesFor(caller, now, service === "tts" ? "tts:" : "", limits.chargeSeconds, {
     owner:
       plan === "pro"
         ? { perMinute: limits.proKeysPerMinute, perDay: limits.proSecondsPerDay }
@@ -271,13 +300,25 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
   const maxSession = Math.max(1, Math.min(limits.maxSessionSeconds, remaining));
 
   const regions = regionOrder(request, env);
-  const minted = await mint(env, regions, {
-    usage_type: "transcribe_websocket",
-    expires_in_seconds: limits.keyTTLSeconds,
-    single_use: true,
-    max_session_duration_seconds: maxSession,
-    client_reference_id: subscriptionHash ?? userHash ?? installHash,
-  });
+  const minted = await mint(
+    env,
+    regions,
+    service === "tts"
+      ? {
+          // One connection, a stream per sentence, so not single-use.
+          usage_type: "tts_rt",
+          expires_in_seconds: limits.keyTTLSeconds,
+          max_session_duration_seconds: Math.min(maxSession, TTS_STREAM_SECONDS),
+          client_reference_id: subscriptionHash ?? userHash ?? installHash,
+        }
+      : {
+          usage_type: "transcribe_websocket",
+          expires_in_seconds: limits.keyTTLSeconds,
+          single_use: true,
+          max_session_duration_seconds: maxSession,
+          client_reference_id: subscriptionHash ?? userHash ?? installHash,
+        },
+  );
   if (!minted.ok) {
     await refund(env, charges);
     return error(502, "upstream", minted.unreachable ? "Couldn't reach Soniox." : "Soniox didn't issue a key.", minted.unreachable ? 2 : 5);
@@ -291,10 +332,14 @@ export async function issueSonioxKey(request: Request, env: Env, now: number): P
     expires_in_seconds: limits.keyTTLSeconds,
     max_session_seconds: maxSession,
     region: minted.region,
-    websocket_url: REGIONS[minted.region].websocket,
-    regions: Object.fromEntries(regions.map((r) => [r, REGIONS[r].websocket])),
+    websocket_url: websocketOf(minted.region, service),
+    regions: Object.fromEntries(regions.map((r) => [r, websocketOf(r, service)])),
     plan,
   });
+}
+
+function websocketOf(region: Region, service: "stt" | "tts"): string {
+  return service === "tts" ? REGIONS[region].ttsWebsocket : REGIONS[region].websocket;
 }
 
 type Minted =

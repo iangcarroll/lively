@@ -166,6 +166,8 @@ struct StatusPill: View {
 struct GlassIconButton: View {
     let systemImage: String
     let label: String
+    /// Set for a toggle, which is tinted while on.
+    var isOn: Bool?
     let action: () -> Void
 
     static let size: CGFloat = 40
@@ -174,13 +176,37 @@ struct GlassIconButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(isOn == true ? .white : .primary)
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: Self.size, height: Self.size)
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .circle)
+        .glassEffect(isOn == true ? .regular.tint(.accentColor).interactive() : .regular.interactive(), in: .circle)
         .accessibilityLabel(label)
+        .accessibilityAddTraits(isOn == true ? .isSelected : [])
         .help(label)
+    }
+}
+
+/// Switches speech-to-speech mode: translations into the second language
+/// are read aloud. Hidden when there's no Soniox key to speak with.
+struct SpeakAloudButton: View {
+    let store: ConversationStore
+    var settings: AppSettings = .shared
+
+    var body: some View {
+        if store.canSpeakTranslations {
+            let on = settings.speaksTranslations
+            GlassIconButton(
+                systemImage: on ? "speaker.wave.2.fill" : "speaker.slash",
+                label: on ? "Stop speaking translations aloud" : "Speak translations aloud",
+                isOn: on
+            ) {
+                store.setSpeaksTranslations(!on)
+            }
+            .sensoryFeedback(.selection, trigger: on)
+        }
     }
 }
 

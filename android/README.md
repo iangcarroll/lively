@@ -15,6 +15,9 @@ broker, account and Pro allowance:
   Swift code, file by file (see the table below).
 - Tap the mic to start and stop, or hold it to listen only while it's
   pressed, as on iOS.
+- Speech-to-speech, off by default: the speaker button (or Settings) reads
+  translations into the second language aloud with Soniox Text-to-Speech,
+  muting the mic while it speaks unless headphones are connected.
 - Typing instead of speaking from the keyboard button, translated by
   DeepSeek through the key broker, falling back to ML Kit on the device
   (Apple's Translation framework on iOS).
@@ -109,6 +112,8 @@ draws the same bubbles as the iOS icon.
 | `Networking/SonioxTranscriber.swift`, `SonioxKeyProvider.swift`, `RegionProber.swift` | `net/` files of the same names |
 | `Networking/RealtimeTranscriber.swift`, `Translator.swift` | `net/RealtimeTranscriber.kt`, `net/MistralTranslator.kt`, `net/BrokerTranslator.kt`, `net/OnDeviceTranslator.kt` |
 | `Model/ConversationStore.swift` | `model/ConversationStore.kt` |
+| `Networking/SonioxSpeaker.swift` | `net/SonioxSpeaker.kt` (OkHttp WebSocket) |
+| `Audio/SpeechPlayer.swift` (AVAudioEngine) | `audio/SpeechPlayer.kt` (AudioTrack; no shared audio session to coordinate) |
 | `Model/Account.swift`, `Pro.swift` | `model/Account.kt`, `model/Pro.kt` (Play Billing) |
 | `Support/Keychain.swift` | `support/Stores.kt` (Keystore-sealed preferences, kept out of backups) |
 | `NLLanguageRecognizer` | `model/LanguageDetector.kt` (script counting, then `TextClassifier`) |

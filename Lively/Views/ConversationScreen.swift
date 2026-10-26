@@ -192,6 +192,7 @@ struct ConversationScreen: View {
 
     @ViewBuilder
     private func trailingButtons(wide: Bool) -> some View {
+        SpeakAloudButton(store: store, settings: settings)
         if !wide {
             GlassIconButton(systemImage: "rectangle.split.1x2", label: "Face-to-face mode") {
                 withAnimation(.snappy) { phoneShowsTranscript = false }

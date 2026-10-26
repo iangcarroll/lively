@@ -1,6 +1,6 @@
 import { appStoreNotification } from "./appstore";
 import { deleteAccount, deleteExpiredAuth, logout, me, startEmailSignIn, verifyEmailSignIn } from "./auth";
-import { error, issueSonioxKey, json, nowSeconds, type Env } from "./broker";
+import { error, issueSonioxKey, issueSonioxSpeechKey, json, nowSeconds, type Env } from "./broker";
 import { translate } from "./translate";
 
 const SUPPORT_EMAIL = "support@lively.ian.sh";
@@ -77,6 +77,7 @@ const terms = page(
 
 const ROUTES: Record<string, { method: string; handle: (request: Request, env: Env, now: number) => Promise<Response> }> = {
   "/v1/soniox/key": { method: "POST", handle: issueSonioxKey },
+  "/v1/soniox/tts-key": { method: "POST", handle: issueSonioxSpeechKey },
   "/v1/translate": { method: "POST", handle: translate },
   "/v1/auth/email/start": { method: "POST", handle: startEmailSignIn },
   "/v1/auth/email/verify": { method: "POST", handle: verifyEmailSignIn },

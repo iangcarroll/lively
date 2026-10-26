@@ -86,3 +86,17 @@ class LanguagePairTest {
         assertEquals("FR", Language("fr").tag)
     }
 }
+
+class SentenceTest {
+    private fun ready(text: String) = sh.ian.lively.model.ConversationStore.completeSentences(text)
+
+    @Test fun keepsUpToTheLastSentenceEnd() = assertEquals("Hi there. How are you?", ready("Hi there. How are you? I was"))
+
+    @Test fun nothingWithoutAnEnd() = assertEquals("", ready("I was going to"))
+
+    @Test fun chinesePunctuationNeedsNoSpace() = assertEquals("你好。我们走吧！", ready("你好。我们走吧！然后"))
+
+    @Test fun aPeriodAfterADigitAtTheEndMayBeADecimal() = assertEquals("", ready("It costs 3."))
+
+    @Test fun aClosingPeriodCountsAtTheEnd() = assertEquals("See you there.", ready("See you there."))
+}

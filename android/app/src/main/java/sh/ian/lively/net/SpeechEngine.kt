@@ -65,6 +65,11 @@ data class SpeechSegment(
     val id: Int,
     val source: String,
     val translation: String,
+    /**
+     * The start of [translation] that won't be revised, which speech-to-speech
+     * can read out before the rest arrives.
+     */
+    val stableTranslation: String = translation,
     val language: Language?,
     val isClosed: Boolean,
     /**

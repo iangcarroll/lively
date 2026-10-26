@@ -47,6 +47,17 @@ phone, and **Whole room** everything. **Auto** tracks the room's background
 level and only hears speech well above it, never laxer than Nearby. The
 thresholds live in `Audio/NoiseGate.swift`.
 
+**Speech-to-speech** (off by default) reads translations into the second
+language aloud through the speaker with Soniox Text-to-Speech (`tts-rt-v2`),
+following [Soniox's speech-to-speech guide](https://soniox.com/docs/translation/sts-translation).
+Turn it on and off with the speaker button (top bar in the transcript, beside
+the mic in face-to-face, where Clear moves into the ••• menu) or in Settings ›
+Speech-to-Speech. Each sentence is spoken as soon as its translation is final,
+on its own stream over one WebSocket. While it speaks, the mic sends silence so
+Lively doesn't translate its own voice, unless audio goes to headphones; tapping
+or holding the mic cuts it off. It works with either engine whenever a Soniox
+key is available (the broker's `/v1/soniox/tts-key`, or a key in Settings).
+
 Soniox only outputs Simplified Chinese. When Settings › Chinese is 繁體, Lively
 converts its output on the device.
 
@@ -93,7 +104,9 @@ when the conversation screen appears.
 | Soniox: temporary keys from the broker, with one spare kept ready | `Networking/SonioxKeyProvider.swift` |
 | Soniox: picks the region (US or Japan) with the shortest round trip | `Networking/RegionProber.swift` |
 | Key broker: Cloudflare Worker that mints temporary Soniox keys and translates text | `Server/key-broker/` |
-| Turns, utterances, translation scheduling | `Model/ConversationStore.swift` |
+| Turns, utterances, translation scheduling, which sentences to speak | `Model/ConversationStore.swift` |
+| Speech-to-speech: Soniox `tts-rt-v2`, a stream per sentence | `Networking/SonioxSpeaker.swift` |
+| Speech-to-speech: 24 kHz playback, mutes the mic while audible | `Audio/SpeechPlayer.swift` |
 
 Engines report events in one of two ways:
 

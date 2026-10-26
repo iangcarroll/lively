@@ -67,10 +67,21 @@ final class ConversationStore {
     private static let warmPause: Duration = .seconds(60)
     /// Settings changed while listening, so the engine isn't kept warm.
     private var engineIsStale = false
+    /// Speech-to-speech: reads translations into the second language aloud.
+    /// Made when first needed.
+    private var speaker: SonioxSpeaker?
+    /// Characters of each turn's translation already sent to the speaker;
+    /// `Int.max` once the whole turn has been.
+    private var spoken: [UUID: Int] = [:]
+    /// Speaks a translation's unpunctuated tail once it stops growing.
+    private var speechFlushes: [UUID: Task<Void, Never>] = [:]
+    /// Turns from before speech-to-speech was switched on aren't read out.
+    private var speakingSince: Date?
 
     init(settings: AppSettings = .shared, demo: Bool = false) {
         self.settings = settings
         languages = settings.languages
+        if settings.speaksTranslations { speakingSince = .now }
         if demo {
             self.demo = DemoConversation()
             self.translator = DemoTranslator()
@@ -85,7 +96,10 @@ final class ConversationStore {
                 guard self.isListening else { continue }
                 // Gated chunks go as silence rather than not at all, so the
                 // engine still hears the pause and ends the turn.
+                // While a translation is read aloud the mic would hear it and
+                // translate it back, so it sends silence (but not into headphones).
                 let heard = self.gate.process(decibels, range: self.settings.pickupRange)
+                    && !(self.speaker?.player.mutesMic ?? false)
                 self.isHearing = heard
                 self.engine?.send(heard ? chunk : Data(count: chunk.count))
                 self.level = self.level * 0.6 + MicCapture.meterLevel(decibels) * 0.4
@@ -167,6 +181,8 @@ final class ConversationStore {
             guard !isListening else { return }
             isListening = true
             gate.reset()
+            // Someone wants to talk: cut off a translation being read out.
+            speaker?.player.stop()
             Self.keepScreenAwake(true)
             // Connect while the mic starts up. Audio that arrives before the
             // session is ready waits in the socket's backlog.
@@ -256,6 +272,10 @@ final class ConversationStore {
             stopListening()
             clear()
         }
+        // The Soniox key may have changed.
+        speaker?.stop()
+        speaker = nil
+        speechSettingChanged()
         if isListening { engineIsStale = true } else { releaseEngine() }
     }
 
@@ -271,6 +291,10 @@ final class ConversationStore {
     }
 
     func clear() {
+        speaker?.stop()
+        spoken.removeAll()
+        speechFlushes.values.forEach { $0.cancel() }
+        speechFlushes.removeAll()
         translations.values.forEach { $0.cancel() }
         debounces.values.forEach { $0.cancel() }
         translations.removeAll()
@@ -289,6 +313,8 @@ final class ConversationStore {
         guard let index = utterances.firstIndex(where: { $0 === utterance }) else { return }
         translations.removeValue(forKey: utterance.id)?.cancel()
         debounces.removeValue(forKey: utterance.id)?.cancel()
+        speechFlushes.removeValue(forKey: utterance.id)?.cancel()
+        spoken[utterance.id] = Int.max
         if current === utterance { current = nil }
         utterances.remove(at: index)
         if let dropoutIndex, index < dropoutIndex { self.dropoutIndex = dropoutIndex - 1 }
@@ -430,6 +456,7 @@ final class ConversationStore {
             current = utterance
             armSilenceFallback()
         }
+        if utterance.hasContent { speak(utterance, stable: segment.stableTranslation, complete: false) }
     }
 
     /// Shows a segment of speech from a dropout where the dropout happened,
@@ -459,6 +486,7 @@ final class ConversationStore {
             utterances.removeAll { $0 === utterance }
             dropoutIndex = dropoutIndex.map { max(0, $0 - 1) }
         }
+        if utterance.hasContent { speak(utterance, stable: segment.stableTranslation, complete: false) }
     }
 
     private func show(_ segment: SpeechSegment, in utterance: Utterance) {
@@ -497,7 +525,13 @@ final class ConversationStore {
             utterances.removeAll { $0 === utterance }
             return
         }
-        if utterance.needsTranslation { scheduleTranslation(utterance, after: .zero) }
+        if utterance.needsTranslation {
+            scheduleTranslation(utterance, after: .zero)
+        } else if translator != nil, utterance.translationState == .current {
+            // Translated while it was spoken. A translating engine's turns
+            // are read out as their segments arrive instead.
+            speak(utterance, stable: utterance.translation, complete: true)
+        }
     }
 
     // MARK: - Translation
@@ -554,6 +588,9 @@ final class ConversationStore {
                     utterance.translatedSource = text
                     utterance.translationState = utterance.needsTranslation ? .working : .current
                     self?.translations[utterance.id] = nil
+                    if utterance.isFinal && utterance.translationState == .current {
+                        self?.speak(utterance, stable: utterance.translation, complete: true)
+                    }
                     // The speaker kept talking while we translated; catch up.
                     if utterance.needsTranslation { self?.translate(utterance) }
                     return
@@ -572,6 +609,92 @@ final class ConversationStore {
                 }
             }
         }
+    }
+
+    // MARK: - Speech-to-speech
+
+    /// Switches speech-to-speech mode, from the speaker button or Settings.
+    func setSpeaksTranslations(_ on: Bool) {
+        settings.speaksTranslations = on
+        speechSettingChanged()
+    }
+
+    /// True when a Soniox key is available for speech, from Settings or the broker.
+    var canSpeakTranslations: Bool { SonioxSpeaker.credential(settings) != nil }
+
+    private func speechSettingChanged() {
+        if settings.speaksTranslations {
+            if speakingSince == nil { speakingSince = .now }
+        } else {
+            speakingSince = nil
+            speaker?.stop()
+            speechFlushes.values.forEach { $0.cancel() }
+            speechFlushes.removeAll()
+        }
+    }
+
+    /// Reads a turn's translation aloud if it's into the second language,
+    /// a sentence at a time. `stable` is the part of the translation that
+    /// won't change; `complete` means nothing more is coming.
+    private func speak(_ utterance: Utterance, stable: String, complete: Bool) {
+        guard settings.speaksTranslations, let speakingSince, utterance.createdAt >= speakingSince,
+              utterance.target == languages.second else { return }
+        let sent = spoken[utterance.id] ?? 0
+        guard stable.count > sent else { return }
+        let fresh = String(stable.dropFirst(sent))
+        let ready = complete ? fresh : Self.completeSentences(in: fresh)
+        if !ready.isEmpty {
+            guard let speaker = activeSpeaker() else { return }
+            speaker.speak(ready, in: utterance.target)
+        }
+        speechFlushes.removeValue(forKey: utterance.id)?.cancel()
+        if complete {
+            spoken[utterance.id] = Int.max
+        } else {
+            spoken[utterance.id] = sent + ready.count
+            // A last sentence without closing punctuation is read once the
+            // turn has ended and its translation stops growing.
+            guard ready.count < fresh.count, utterance.isFinal else { return }
+            speechFlushes[utterance.id] = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(1.5))
+                guard !Task.isCancelled, let self else { return }
+                self.speechFlushes[utterance.id] = nil
+                self.speak(utterance, stable: stable, complete: true)
+            }
+        }
+    }
+
+    private func activeSpeaker() -> SonioxSpeaker? {
+        if let speaker { return speaker }
+        guard let credential = SonioxSpeaker.credential(settings) else { return nil }
+        let speaker = SonioxSpeaker(credential: credential)
+        speaker.onError = { [weak self] message in
+            self?.setSpeaksTranslations(false)
+            self?.alert = message
+        }
+        self.speaker = speaker
+        return speaker
+    }
+
+    /// The text up to and including the last sentence end, or "" if none.
+    /// A period after a digit may be a decimal point, so it doesn't count
+    /// at the very end.
+    static func completeSentences(in text: String) -> String {
+        let enders: Set<Character> = [".", "!", "?", "。", "！", "？", "…", ";", "；", "؟", "।"]
+        var end: String.Index?
+        var index = text.startIndex
+        while index < text.endIndex {
+            let next = text.index(after: index)
+            if enders.contains(text[index]) {
+                let atEnd = next == text.endIndex
+                let followedBySpace = !atEnd && text[next].isWhitespace
+                let wide = !text[index].isASCII
+                let afterDigit = index > text.startIndex && text[text.index(before: index)].isNumber
+                if wide || followedBySpace || (atEnd && !afterDigit) { end = next }
+            }
+            index = next
+        }
+        return end.map { String(text[..<$0]) } ?? ""
     }
 
     // MARK: - Status

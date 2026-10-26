@@ -18,6 +18,14 @@ Lively-Region: jp                      (optional)
      "plan": "free"}
 ```
 
+`POST /v1/soniox/tts-key` takes the same headers and returns the same shape
+with a Text-to-Speech key for speech-to-speech mode: `usage_type` `tts_rt`, not
+single-use (one connection opens a stream per sentence),
+`max_session_duration_seconds` 120, and `websocket_url`/`regions` pointing at
+`wss://tts-rt[.jp].soniox.com/tts-websocket`. Its keys are counted under a
+separate `tts:` prefix with the same limits, so speaking never uses up
+listening time.
+
 For each request the Worker calls Soniox's
 `POST https://api[.<region>].soniox.com/v1/auth/temporary-api-key` with:
 

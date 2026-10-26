@@ -68,6 +68,17 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle(isOn: $settings.speaksTranslations) {
+                        Label { Text("Speak translations aloud") } icon: { SettingsIcon(systemImage: "speaker.wave.2.fill", color: .blue) }
+                    }
+                    .disabled(SonioxSpeaker.credential(settings) == nil)
+                } header: {
+                    Text("Speech-to-Speech")
+                } footer: {
+                    Text(speechFooter)
+                }
+
+                Section {
                     Picker(selection: $settings.providerID) {
                         ForEach(SpeechProvider.all) { Text($0.name).tag($0.id) }
                     } label: {
@@ -174,6 +185,15 @@ struct SettingsView: View {
             lines.append("Faster speed shows words sooner; Accurate waits a little longer for better transcripts.")
         }
         return lines.joined(separator: " ")
+    }
+
+    private var speechFooter: String {
+        guard SonioxSpeaker.credential(settings) != nil else {
+            return "Speaking translations aloud needs a Soniox API key."
+        }
+        return "Translations into \(settings.languages.second.englishName) are read aloud through the speaker as they arrive. "
+            + "Lively doesn't listen while it speaks, so it won't translate itself, unless you're using headphones. "
+            + "The speaker button on the conversation screen turns it on and off."
     }
 
     private var versionLine: String {

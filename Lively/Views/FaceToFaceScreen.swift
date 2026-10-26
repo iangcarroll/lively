@@ -65,16 +65,18 @@ struct FaceToFaceScreen: View {
                 store.stopListening()
             }
             HStack(spacing: narrow ? 6 : 10) {
-                GlassIconButton(systemImage: "trash", label: "Clear conversation") {
-                    withAnimation(.snappy) { store.clear() }
-                }
-                .disabled(store.utterances.isEmpty)
-                .opacity(store.utterances.isEmpty ? 0.4 : 1)
+                // Speech-to-speech is toggled mid-conversation, so it gets a
+                // button; clearing, which happens less, is in the menu.
+                SpeakAloudButton(store: store)
                 Menu {
                     Button("Transcript View", systemImage: "list.bullet", action: onShowTranscript)
                     Button("Swap Sides", systemImage: "arrow.up.arrow.down") {
                         nearLanguage = languages.other(than: nearLanguage)
                     }
+                    Button("Clear Conversation", systemImage: "trash", role: .destructive) {
+                        withAnimation(.snappy) { store.clear() }
+                    }
+                    .disabled(store.utterances.isEmpty)
                     Divider()
                     Button("Settings", systemImage: "gearshape", action: onShowSettings)
                 } label: {

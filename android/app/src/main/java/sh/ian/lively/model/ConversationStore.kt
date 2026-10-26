@@ -16,6 +16,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import sh.ian.lively.audio.MicCapture
 import sh.ian.lively.audio.NoiseGate
+import sh.ian.lively.audio.SpeechPlayer
 import sh.ian.lively.net.BrokerTranslationException
 import sh.ian.lively.net.FallbackTranslator
 import sh.ian.lively.net.MistralTranslator
@@ -23,6 +24,7 @@ import sh.ian.lively.net.OnDeviceTranslationException
 import sh.ian.lively.net.OnDeviceTranslator
 import sh.ian.lively.net.RegionProber
 import sh.ian.lively.net.SonioxKeyProvider
+import sh.ian.lively.net.SonioxSpeaker
 import sh.ian.lively.net.SpeechEngine
 import sh.ian.lively.net.SpeechEngineStatus
 import sh.ian.lively.net.SpeechEvent
@@ -40,6 +42,8 @@ interface ConversationHost {
     fun startMic(onChunk: (ByteArray, Float) -> Unit, onInterrupted: () -> Unit)
     fun stopMic()
     fun keepScreenAwake(awake: Boolean)
+    /** Plays spoken translations, for speech-to-speech mode. */
+    fun makeSpeechPlayer(): SpeechPlayer = SpeechPlayer(audioManager = null)
 }
 
 sealed interface ConnectionStatus {
@@ -114,6 +118,20 @@ class ConversationStore(
     private var idleTeardown: Job? = null
     /** Settings changed while listening, so the engine isn't kept warm. */
     private var engineIsStale = false
+    /**
+     * Speech-to-speech: reads translations into the second language aloud.
+     * Made when first needed.
+     */
+    private var speaker: SonioxSpeaker? = null
+    /**
+     * Characters of each turn's translation already sent to the speaker;
+     * [Int.MAX_VALUE] once the whole turn has been.
+     */
+    private val spoken = mutableMapOf<String, Int>()
+    /** Speaks a translation's unpunctuated tail once it stops growing. */
+    private val speechFlushes = mutableMapOf<String, Job>()
+    /** Turns from before speech-to-speech was switched on aren't read out. */
+    private var speakingSince: Long? = if (settings.speaksTranslations) System.currentTimeMillis() else null
 
     /** Sends quiet chunks as silence, per the pickup range in Settings. */
     private val gate = NoiseGate()
@@ -128,7 +146,9 @@ class ConversationStore(
                 if (!isListening) continue
                 // Gated chunks go as silence rather than not at all, so the
                 // engine still hears the pause and ends the turn.
-                val heard = gate.process(decibels, settings.pickupRange)
+                // While a translation is read aloud the mic would hear it and
+                // translate it back, so it sends silence (but not into headphones).
+                val heard = gate.process(decibels, settings.pickupRange) && speaker?.player?.mutesMic != true
                 isHearing = heard
                 engine?.send(if (heard) chunk else ByteArray(chunk.size))
                 level = level * 0.6f + MicCapture.meterLevel(decibels) * 0.4f
@@ -207,6 +227,8 @@ class ConversationStore(
             if (isListening) return@launch
             isListening = true
             gate.reset()
+            // Someone wants to talk: cut off a translation being read out.
+            speaker?.player?.stop()
             host.keepScreenAwake(true)
             // Connect while the mic starts up. Audio that arrives before the
             // session is ready waits in the socket's backlog.
@@ -297,6 +319,10 @@ class ConversationStore(
             stopListening()
             clear()
         }
+        // The Soniox key may have changed.
+        speaker?.stop()
+        speaker = null
+        speechSettingChanged()
         if (isListening) engineIsStale = true else releaseEngine()
         prefetchKey()
     }
@@ -313,6 +339,10 @@ class ConversationStore(
     }
 
     fun clear() {
+        speaker?.stop()
+        spoken.clear()
+        speechFlushes.values.forEach { it.cancel() }
+        speechFlushes.clear()
         translations.values.forEach { it.cancel() }
         debounces.values.forEach { it.cancel() }
         translations.clear()
@@ -334,6 +364,8 @@ class ConversationStore(
         if (index < 0) return
         translations.remove(utterance.id)?.cancel()
         debounces.remove(utterance.id)?.cancel()
+        speechFlushes.remove(utterance.id)?.cancel()
+        spoken[utterance.id] = Int.MAX_VALUE
         if (current === utterance) current = null
         utterances.removeAt(index)
         dropoutIndex?.let { if (index < it) dropoutIndex = it - 1 }
@@ -486,6 +518,7 @@ class ConversationStore(
             current = utterance
             armSilenceFallback()
         }
+        if (utterance.hasContent) speak(utterance, segment.stableTranslation, complete = false)
     }
 
     /**
@@ -515,6 +548,7 @@ class ConversationStore(
             utterances.remove(utterance)
             dropoutIndex = dropoutIndex?.let { maxOf(0, it - 1) }
         }
+        if (utterance.hasContent) speak(utterance, segment.stableTranslation, complete = false)
     }
 
     private fun show(segment: SpeechSegment, utterance: Utterance) {
@@ -554,7 +588,13 @@ class ConversationStore(
             utterances.remove(utterance)
             return
         }
-        if (utterance.needsTranslation) scheduleTranslation(utterance, delayMs = 0)
+        if (utterance.needsTranslation) {
+            scheduleTranslation(utterance, delayMs = 0)
+        } else if (translator != null && utterance.translationState == TranslationState.Current) {
+            // Translated while it was spoken. A translating engine's turns
+            // are read out as their segments arrive instead.
+            speak(utterance, utterance.translation, complete = true)
+        }
     }
 
     // endregion
@@ -613,6 +653,9 @@ class ConversationStore(
                     utterance.translationState =
                         if (utterance.needsTranslation) TranslationState.Working else TranslationState.Current
                     translations.remove(utterance.id)
+                    if (utterance.isFinal && utterance.translationState == TranslationState.Current) {
+                        speak(utterance, utterance.translation, complete = true)
+                    }
                     // The speaker kept talking while we translated; catch up.
                     if (utterance.needsTranslation) translate(utterance)
                     return@launch
@@ -631,6 +674,77 @@ class ConversationStore(
                     delay(400L * (1 shl attempt))
                 }
             }
+        }
+    }
+
+    // endregion
+
+    // region Speech-to-speech
+
+    /** Switches speech-to-speech mode, from the speaker button or Settings. */
+    fun setSpeaksTranslations(on: Boolean) {
+        settings.speaksTranslations = on
+        speechSettingChanged()
+    }
+
+    /** Speech-to-speech mode is on. */
+    val speaksTranslations: Boolean get() = settings.speaksTranslations
+
+    /** True when a Soniox key is available for speech, from Settings or the broker. */
+    val canSpeakTranslations: Boolean get() = SonioxSpeaker.credential(settings, keyProvider) != null
+
+    private fun speechSettingChanged() {
+        if (settings.speaksTranslations) {
+            if (speakingSince == null) speakingSince = System.currentTimeMillis()
+        } else {
+            speakingSince = null
+            speaker?.stop()
+            speechFlushes.values.forEach { it.cancel() }
+            speechFlushes.clear()
+        }
+    }
+
+    /**
+     * Reads a turn's translation aloud if it's into the second language,
+     * a sentence at a time. [stable] is the part of the translation that
+     * won't change; [complete] means nothing more is coming.
+     */
+    private fun speak(utterance: Utterance, stable: String, complete: Boolean) {
+        val since = speakingSince ?: return
+        if (!settings.speaksTranslations || utterance.createdAt < since || utterance.target != languages.second) return
+        val sent = spoken[utterance.id] ?: 0
+        if (stable.length <= sent) return
+        val fresh = stable.substring(sent)
+        val ready = if (complete) fresh else completeSentences(fresh)
+        if (ready.isNotEmpty()) {
+            val speaker = activeSpeaker() ?: return
+            speaker.speak(ready, utterance.target)
+        }
+        speechFlushes.remove(utterance.id)?.cancel()
+        if (complete) {
+            spoken[utterance.id] = Int.MAX_VALUE
+        } else {
+            spoken[utterance.id] = sent + ready.length
+            // A last sentence without closing punctuation is read once the
+            // turn has ended and its translation stops growing.
+            if (ready.length == fresh.length || !utterance.isFinal) return
+            speechFlushes[utterance.id] = scope.launch {
+                delay(1_500)
+                speechFlushes.remove(utterance.id)
+                speak(utterance, stable, complete = true)
+            }
+        }
+    }
+
+    private fun activeSpeaker(): SonioxSpeaker? {
+        speaker?.let { return it }
+        val credential = SonioxSpeaker.credential(settings, keyProvider) ?: return null
+        return SonioxSpeaker(credential, host.makeSpeechPlayer(), scope).also {
+            it.onError = { message ->
+                setSpeaksTranslations(false)
+                alert = message
+            }
+            speaker = it
         }
     }
 
@@ -668,6 +782,25 @@ class ConversationStore(
     // endregion
 
     companion object {
+        /**
+         * The text up to and including the last sentence end, or "" if none.
+         * A period after a digit may be a decimal point, so it doesn't count
+         * at the very end.
+         */
+        fun completeSentences(text: String): String {
+            val enders = setOf('.', '!', '?', '。', '！', '？', '…', ';', '；', '؟', '।')
+            var end = -1
+            for (i in text.indices) {
+                if (text[i] !in enders) continue
+                val atEnd = i == text.lastIndex
+                val followedBySpace = !atEnd && text[i + 1].isWhitespace()
+                val wide = text[i].code > 0x7F
+                val afterDigit = i > 0 && text[i - 1].isDigit()
+                if (wide || followedBySpace || (atEnd && !afterDigit)) end = i + 1
+            }
+            return if (end < 0) "" else text.substring(0, end)
+        }
+
         /**
          * How long a paused session stays open for a quick resume. Soniox bills
          * for the open stream, so this is kept short.
