@@ -205,7 +205,9 @@ struct ConversationScreen: View {
 
     @ViewBuilder
     private func trailingButtons(wide: Bool) -> some View {
-        SpeakAloudButton(store: store, settings: settings)
+        // Turned on from the menu in face-to-face or Settings; shown while
+        // on, so it can be stopped from here.
+        if settings.speaksTranslations { SpeakAloudButton(store: store, settings: settings) }
         if !wide {
             GlassIconButton(systemImage: "rectangle.split.1x2", label: "Face-to-face mode") {
                 withAnimation(.snappy) { phoneShowsTranscript = false }

@@ -189,6 +189,23 @@ struct GlassIconButton: View {
     }
 }
 
+/// The menu item that switches speech-to-speech mode. Hidden when there's
+/// no Soniox key to speak with.
+struct SpeakAloudToggle: View {
+    let store: ConversationStore
+    var settings: AppSettings = .shared
+
+    var body: some View {
+        if store.canSpeakTranslations {
+            Toggle(
+                "Speak Translations",
+                systemImage: "speaker.wave.2",
+                isOn: Binding(get: { settings.speaksTranslations }, set: { store.setSpeaksTranslations($0) })
+            )
+        }
+    }
+}
+
 /// Switches speech-to-speech mode: translations into the second language
 /// are read aloud. Hidden when there's no Soniox key to speak with.
 struct SpeakAloudButton: View {

@@ -193,7 +193,7 @@ struct SettingsView: View {
         }
         return "Translations into \(settings.languages.second.englishName) are read aloud through the speaker as they arrive. "
             + "Lively doesn't listen while it speaks, so it won't translate itself, unless you're using headphones. "
-            + "The speaker button on the conversation screen turns it on and off."
+            + "You can also turn it on and off from the ⋯ menu in face-to-face."
     }
 
     private var versionLine: String {

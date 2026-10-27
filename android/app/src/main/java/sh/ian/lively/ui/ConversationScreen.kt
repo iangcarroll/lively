@@ -211,7 +211,9 @@ private fun TranscriptLayout(
         ) {
             StatusPill(store.status, store.isListening)
             Spacer(Modifier.weight(1f))
-            SpeakAloudButton(store)
+            // Turned on from the menu in face-to-face or Settings; shown while
+            // on, so it can be stopped from here.
+            if (store.speaksTranslations) SpeakAloudButton(store)
             if (!wide) TonalIconButton(Icons.Rounded.Splitscreen, "Face-to-face mode", onFaceToFace)
             TonalIconButton(Icons.Rounded.Settings, "Settings", onShowSettings)
         }

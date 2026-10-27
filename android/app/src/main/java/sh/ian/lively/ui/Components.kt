@@ -40,7 +40,9 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Translate
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -365,6 +367,25 @@ fun TonalIconButton(
     ) {
         Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp)) }
     }
+}
+
+/**
+ * The menu item that switches speech-to-speech mode. Hidden when there's
+ * no Soniox key to speak with.
+ */
+@Composable
+fun SpeakAloudMenuItem(store: ConversationStore, onDone: () -> Unit) {
+    if (!store.canSpeakTranslations) return
+    val on = store.speaksTranslations
+    DropdownMenuItem(
+        text = { Text("Speak translations") },
+        leadingIcon = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, null) },
+        trailingIcon = { Checkbox(checked = on, onCheckedChange = null) },
+        onClick = {
+            onDone()
+            store.setSpeaksTranslations(!on)
+        },
+    )
 }
 
 /**

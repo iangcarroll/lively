@@ -165,9 +165,10 @@ private fun ControlStrip(
                     isHearing = store.isHearing, onHoldStart = store::startListening, onHoldEnd = store::stopListening,
                 )
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(if (narrow) 6.dp else 10.dp, Alignment.End)) {
-                    // Speech-to-speech is toggled mid-conversation, so it gets a
-                    // button; clearing, which happens less, is in the menu.
-                    SpeakAloudButton(store, size = buttonSize)
+                    TonalIconButton(
+                        Icons.Rounded.DeleteOutline, "Clear conversation", store::clear,
+                        enabled = store.utterances.isNotEmpty(), size = buttonSize,
+                    )
                     Box {
                         var menu by remember { mutableStateOf(false) }
                         TonalIconButton(Icons.Rounded.MoreVert, "More", size = buttonSize, onClick = { menu = true })
@@ -186,12 +187,7 @@ private fun ControlStrip(
                                     onSwap()
                                 },
                             )
-                            DropdownMenuItem(
-                                text = { Text("Clear conversation") },
-                                leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
-                                enabled = store.utterances.isNotEmpty(),
-                                onClick = { menu = false; store.clear() },
-                            )
+                            SpeakAloudMenuItem(store, onDone = { menu = false })
                             HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Settings") },

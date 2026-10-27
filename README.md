@@ -50,9 +50,9 @@ thresholds live in `Audio/NoiseGate.swift`.
 **Speech-to-speech** (off by default) reads translations into the second
 language aloud through the speaker with Soniox Text-to-Speech (`tts-rt-v2`),
 following [Soniox's speech-to-speech guide](https://soniox.com/docs/translation/sts-translation).
-Turn it on and off with the speaker button (top bar in the transcript, beside
-the mic in face-to-face, where Clear moves into the ••• menu) or in Settings ›
-Speech-to-Speech. Each sentence is spoken as soon as its translation is final,
+Turn it on and off from the ••• menu in face-to-face or in Settings ›
+Speech-to-Speech. While it's on, the transcript's top bar shows a speaker
+button that turns it off. Each sentence is spoken as soon as its translation is final,
 on its own stream over one WebSocket. While it speaks, the mic sends silence so
 Lively doesn't translate its own voice, unless audio goes to headphones; tapping
 or holding the mic cuts it off. It works with either engine whenever a Soniox
