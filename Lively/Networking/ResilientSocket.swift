@@ -46,6 +46,11 @@ protocol SocketDialect: AnyObject {
     func isMidUtterance(on stream: SocketStream) -> Bool
     /// A catch-up or handed-over stream has closed; no more messages will come.
     func sideStreamDidEnd(_ stream: SocketStream)
+    /// True when the server says how much audio it has finalized, so audio
+    /// past that point can be sent again after the session drops.
+    var reportsFinalizedAudio: Bool { get }
+    /// How much of the stream's audio the server has finalized so far.
+    func finalizedAudio(on stream: SocketStream) -> TimeInterval
 }
 
 extension SocketDialect {
@@ -58,6 +63,8 @@ extension SocketDialect {
     var supportsSideStreams: Bool { false }
     func isMidUtterance(on stream: SocketStream) -> Bool { false }
     func sideStreamDidEnd(_ stream: SocketStream) {}
+    var reportsFinalizedAudio: Bool { false }
+    func finalizedAudio(on stream: SocketStream) -> TimeInterval { 0 }
 }
 
 enum SocketSetupError: Error {
@@ -103,8 +110,11 @@ struct SocketStream: Hashable {
 ///   1.15× real time). Dialects without side streams replay at most 5 s.
 /// - When the network path changes, a second socket opens on the new path and
 ///   audio moves to it at the next utterance boundary (make-before-break).
+/// - Audio the server hasn't finalized is kept until it is. When a session
+///   drops, that audio goes back in the backlog and is sent again, so words
+///   that were in flight aren't lost.
 /// - While paused, a live session is kept open with keepalives, so resuming
-///   doesn't reconnect.
+///   doesn't reconnect. `prewarm()` opens one that way before listening starts.
 final class ResilientSocket {
     var onStatus: (SpeechEngineStatus) -> Void = { _ in }
 
@@ -116,8 +126,8 @@ final class ResilientSocket {
         }
     }
 
-    /// About 20 s of audio at 80 ms per chunk.
-    private static let maxBacklog = 250
+    /// About 60 s of audio at 80 ms per chunk.
+    private static let maxBacklog = 750
     /// Backlog speech beyond this goes to a catch-up session.
     private static let catchUpThreshold: TimeInterval = 3
     /// Without side streams, at most this much backlog speech is replayed.
@@ -189,12 +199,22 @@ final class ResilientSocket {
         #endif
     }
 
+    /// Opens a session before anyone speaks, held like a pause, so the first
+    /// `resume()` doesn't wait on the connect. Does nothing for a server that
+    /// can't idle.
+    func prewarm() {
+        guard !isRunning, dialect.keepaliveMessage != nil else { return }
+        start()
+        isPaused = true
+        debugLog("prewarming")
+    }
+
     func stop() {
         endPause()
         isRunning = false
         hedgeTask?.cancel()
         if let primary, primary.isReady, let end = dialect.endOfAudioMessage { primary.send(end) }
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio: false)
         dropStandby()
         side.forEach { closeSide($0) }
         backlog.removeAll()
@@ -207,9 +227,7 @@ final class ResilientSocket {
             enqueueAudio(chunk, on: primary)
         } else {
             backlog.append(chunk)
-            if backlog.count > Self.maxBacklog {
-                backlog.removeFirst(backlog.count - Self.maxBacklog)
-            }
+            trimBacklog()
         }
     }
 
@@ -248,11 +266,16 @@ final class ResilientSocket {
         primary.awaitingReplySince = nil
         if let message = dialect.pauseMessage { primary.send(message) }
         debugLog("paused stream \(primary.stream.id)")
+        startKeepalive(on: primary, message: keepalive)
+    }
+
+    private func startKeepalive(on primary: Connection, message: URLSessionWebSocketTask.Message) {
+        keepaliveTask?.cancel()
         keepaliveTask = Task { [weak primary] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.keepaliveInterval)
                 guard !Task.isCancelled, let primary, !primary.isClosed else { return }
-                primary.send(keepalive)
+                primary.send(message)
             }
         }
     }
@@ -261,10 +284,12 @@ final class ResilientSocket {
     func resume() {
         let wasPaused = isPaused
         endPause()
-        guard wasPaused, isRunning, let primary, primary.isReady else {
+        guard wasPaused, isRunning, let primary else {
             start()
             return
         }
+        // A prewarmed session still connecting: audio waits in the backlog.
+        guard primary.isReady else { return }
         debugLog("resumed stream \(primary.stream.id)")
         status = .live
     }
@@ -290,6 +315,15 @@ final class ResilientSocket {
         var awaitingReplySince: ContinuousClock.Instant?
         /// Audio to send once ready, then end the stream (catch-up only).
         var replay: [Data] = []
+        /// When a catch-up stream stops trying (catch-up only).
+        var deadline: ContinuousClock.Instant = .now
+        /// Earlier catch-up streams that failed with this replay.
+        var attempt = 0
+        /// Audio sent that the server hasn't finalized, oldest first, when
+        /// the dialect reports it.
+        var unconfirmed: [Data] = []
+        /// Where `unconfirmed` starts in the stream's audio, in seconds.
+        var unconfirmedStart: TimeInterval = 0
         let createdAt = ContinuousClock.now
 
         init(stream: SocketStream) {
@@ -320,7 +354,7 @@ final class ResilientSocket {
         guard isRunning else { return }
         reconnectTask?.cancel()
         reconnectTask = nil
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio: true)
         status = failures == 0 ? .connecting : .reconnecting
         let connection = makeConnection(isCatchUp: false)
         primary = connection
@@ -406,7 +440,9 @@ final class ResilientSocket {
                     if self.isBlackholed { continue }
                     #endif
                     connection.awaitingReplySince = nil
-                    self.connection(connection, received: self.dialect.receive(message, on: connection.stream))
+                    let signal = self.dialect.receive(message, on: connection.stream)
+                    self.confirmAudio(on: connection)
+                    self.connection(connection, received: signal)
                 } catch {
                     guard let self, let connection, !connection.isClosed else { return }
                     self.connection(connection, failed: .retry("Receive failed"))
@@ -503,14 +539,11 @@ final class ResilientSocket {
         case .ready:
             guard !primary.isReady else { return }
             primary.isReady = true
-            failures = 0
-            throttled = false
-            status = .live
             dialect.sessionDidOpen(primary.stream)
             // It won the race; a hedge still connecting isn't needed.
             hedgeTask?.cancel()
             dropStandby()
-            flushBacklog(to: primary)
+            primaryIsUp(primary)
         case .boundary:
             if standby?.isReady == true { handOver() }
         case .retry(_, let isThrottled):
@@ -521,8 +554,28 @@ final class ResilientSocket {
         }
     }
 
+    /// The primary can take audio: send what was held, or hold a prewarmed
+    /// session open until audio comes.
+    private func primaryIsUp(_ primary: Connection) {
+        failures = 0
+        throttled = false
+        status = .live
+        if isPaused, let keepalive = dialect.keepaliveMessage {
+            debugLog("stream \(primary.stream.id) is warm")
+            startKeepalive(on: primary, message: keepalive)
+        } else {
+            flushBacklog(to: primary)
+        }
+    }
+
     private func handleFailure() {
         guard isRunning else { return }
+        // A prewarm racing a slow attempt falls back to the other one.
+        // (A paused session has no standby.)
+        if isPaused, standby != nil {
+            promoteStandby()
+            return
+        }
         // Nobody is waiting on a paused session; reconnect when they come back.
         if isPaused {
             debugLog("paused session dropped")
@@ -545,7 +598,7 @@ final class ResilientSocket {
             return
         }
 
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio: true)
         failures += 1
         status = .reconnecting
         // 0.3 s, 0.6 s, 1.2 s… capped at 6 s, with jitter so clients don't
@@ -565,17 +618,25 @@ final class ResilientSocket {
     private func fail(_ message: String) {
         endPause()
         hedgeTask?.cancel()
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio: false)
         dropStandby()
         isRunning = false
         backlog.removeAll()
         status = .failed(message)
     }
 
-    private func tearDownPrimary() {
+    /// `keepingAudio` puts audio the server hadn't finalized back in the
+    /// backlog, ahead of what was held since, to send again on the next session.
+    private func tearDownPrimary(keepingAudio: Bool) {
         guard let primary else { return }
         self.primary = nil
         primary.close()
+        if keepingAudio, !primary.unconfirmed.isEmpty {
+            debugLog("stream \(primary.stream.id) dropped; keeping \(primary.unconfirmed.count) unfinalized chunks")
+            backlog = primary.unconfirmed + backlog
+            trimBacklog()
+        }
+        primary.unconfirmed.removeAll()
         if primary.isReady || primary.hasSentAudio { dialect.sessionDidReset(primary.stream) }
     }
 
@@ -604,14 +665,11 @@ final class ResilientSocket {
         self.standby = nil
         handoverTimer?.cancel()
         hedgeTask?.cancel()
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio: true)
         primary = standby
         if standby.isReady {
             debugLog("stream \(standby.stream.id) took over")
-            failures = 0
-            throttled = false
-            status = .live
-            flushBacklog(to: standby)
+            primaryIsUp(standby)
         } else {
             status = .reconnecting
         }
@@ -625,6 +683,8 @@ final class ResilientSocket {
         self.standby = nil
         primary = standby
         side.append(old)
+        // The old session finishes what it has; nothing is sent again from it.
+        old.unconfirmed.removeAll()
         debugLog("handed over from stream \(old.stream.id) to \(standby.stream.id)")
         if let end = dialect.endOfAudioMessage { old.send(end) }
         Task { [weak self, weak old] in
@@ -647,6 +707,40 @@ final class ResilientSocket {
         debugLog("closed side stream \(connection.stream.id)")
         connection.close()
         dialect.sideStreamDidEnd(connection.stream)
+        retryCatchUp(after: connection)
+    }
+
+    /// A catch-up stream that never got to send its audio, say because the
+    /// broker was rate-limiting keys after a burst of reconnects, tries again
+    /// with backoff until its deadline, so held speech isn't dropped.
+    private func retryCatchUp(after failed: Connection) {
+        guard failed.stream.isCatchUp, !failed.replay.isEmpty, isRunning else { return }
+        let delay = Duration.seconds(min(8, 1 << failed.attempt))
+        guard ContinuousClock.now + delay < failed.deadline else {
+            debugLog("catch-up stream \(failed.stream.id) gave up")
+            return
+        }
+        let replay = failed.replay, deadline = failed.deadline, attempt = failed.attempt + 1
+        Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard let self, self.isRunning else { return }
+            self.startCatchUp(replay, deadline: deadline, attempt: attempt)
+        }
+    }
+
+    private func startCatchUp(_ speech: [Data], deadline: ContinuousClock.Instant, attempt: Int) {
+        let catchUp = makeConnection(isCatchUp: true)
+        catchUp.replay = speech
+        catchUp.deadline = deadline
+        catchUp.attempt = attempt
+        debugLog("\(speech.count) chunks of speech → catch-up stream \(catchUp.stream.id)")
+        side.append(catchUp)
+        open(catchUp)
+        Task { [weak self, weak catchUp] in
+            try? await Task.sleep(until: deadline)
+            guard let self, let catchUp, !catchUp.isClosed else { return }
+            self.closeSide(catchUp)
+        }
     }
 
     // MARK: - Backlog
@@ -658,16 +752,8 @@ final class ResilientSocket {
         let seconds = Double(speech.count) * MicCapture.chunkDuration
 
         if seconds > Self.catchUpThreshold, dialect.supportsSideStreams {
-            let catchUp = makeConnection(isCatchUp: true)
-            catchUp.replay = speech
-            debugLog("held \(held) chunks, \(speech.count) of speech → catch-up stream \(catchUp.stream.id)")
-            side.append(catchUp)
-            open(catchUp)
-            Task { [weak self, weak catchUp] in
-                try? await Task.sleep(for: Self.catchUpDeadline)
-                guard let self, let catchUp, !catchUp.isClosed else { return }
-                self.closeSide(catchUp)
-            }
+            debugLog("held \(held) chunks")
+            startCatchUp(speech, deadline: .now + Self.catchUpDeadline, attempt: 0)
         } else {
             let limit = Int(Self.maxReplay / MicCapture.chunkDuration)
             if held > 0 { debugLog("held \(held) chunks, replaying \(min(speech.count, limit))") }
@@ -684,7 +770,41 @@ final class ResilientSocket {
     private func enqueueAudio(_ chunk: Data, on connection: Connection) {
         connection.hasSentAudio = true
         if connection.awaitingReplySince == nil { connection.awaitingReplySince = .now }
+        if dialect.reportsFinalizedAudio, !connection.stream.isCatchUp, connection === primary {
+            connection.unconfirmed.append(chunk)
+            if connection.unconfirmed.count > Self.maxBacklog {
+                let dropped = connection.unconfirmed.count - Self.maxBacklog
+                connection.unconfirmedStart += connection.unconfirmed.prefix(dropped).reduce(0) { $0 + Self.duration(of: $1) }
+                connection.unconfirmed.removeFirst(dropped)
+            }
+        }
         connection.send(dialect.audioMessage(chunk))
+    }
+
+    /// Lets go of audio the server has finalized.
+    private func confirmAudio(on connection: Connection) {
+        guard dialect.reportsFinalizedAudio, !connection.unconfirmed.isEmpty else { return }
+        let finalized = dialect.finalizedAudio(on: connection.stream)
+        var done = 0
+        for chunk in connection.unconfirmed {
+            let end = connection.unconfirmedStart + Self.duration(of: chunk)
+            // Half a millisecond of slack for rounding in the server's count.
+            guard end <= finalized + 0.0005 else { break }
+            connection.unconfirmedStart = end
+            done += 1
+        }
+        connection.unconfirmed.removeFirst(done)
+    }
+
+    private func trimBacklog() {
+        if backlog.count > Self.maxBacklog {
+            backlog.removeFirst(backlog.count - Self.maxBacklog)
+        }
+    }
+
+    /// Length of a 16 kHz mono PCM16 chunk.
+    private static func duration(of chunk: Data) -> TimeInterval {
+        Double(chunk.count / 2) / MicCapture.sampleRate
     }
 
     /// Cuts silence out of held audio with an energy gate. Speech keeps

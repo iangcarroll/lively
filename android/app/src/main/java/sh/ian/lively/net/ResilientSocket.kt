@@ -108,6 +108,13 @@ interface SocketDialect {
     fun isMidUtterance(stream: SocketStream): Boolean = false
     /** A catch-up or handed-over stream has closed; no more messages will come. */
     fun sideStreamDidEnd(stream: SocketStream) {}
+    /**
+     * True when the server says how much audio it has finalized, so audio
+     * past that point can be sent again after the session drops.
+     */
+    val reportsFinalizedAudio: Boolean get() = false
+    /** How much of the stream's audio the server has finalized so far, in seconds. */
+    fun finalizedAudio(stream: SocketStream): Double = 0.0
 }
 
 /** Permanent: stop and report. */
@@ -154,8 +161,11 @@ data class SocketStream(val id: Int, val isCatchUp: Boolean)
  *   1.15× real time). Dialects without side streams replay at most 5 s.
  * - When the network changes, a second socket opens on the new network and
  *   audio moves to it at the next utterance boundary (make-before-break).
+ * - Audio the server hasn't finalized is kept until it is. When a session
+ *   drops, that audio goes back in the backlog and is sent again, so words
+ *   that were in flight aren't lost.
  * - While paused, a live session is kept open with keepalives, so resuming
- *   doesn't reconnect.
+ *   doesn't reconnect. [prewarm] opens one that way before listening starts.
  */
 class ResilientSocket(
     private val dialect: SocketDialect,
@@ -220,12 +230,24 @@ class ResilientSocket(
         if (BuildConfig.DEBUG) scheduleSimulatedDropouts()
     }
 
+    /**
+     * Opens a session before anyone speaks, held like a pause, so the first
+     * [resume] doesn't wait on the connect. Does nothing for a server that
+     * can't idle.
+     */
+    fun prewarm() {
+        if (isRunning || dialect.keepaliveMessage == null) return
+        start()
+        isPaused = true
+        debugLog("prewarming")
+    }
+
     fun stop() {
         endPause()
         isRunning = false
         hedgeJob?.cancel()
         primary?.let { p -> if (p.isReady) dialect.endOfAudioMessage?.let(p::send) }
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio = false)
         dropStandby()
         side.toList().forEach(::closeSide)
         backlog.clear()
@@ -239,7 +261,7 @@ class ResilientSocket(
             enqueueAudio(chunk, primary)
         } else {
             backlog.addLast(chunk)
-            while (backlog.size > MAX_BACKLOG) backlog.removeFirst()
+            trimBacklog()
         }
     }
 
@@ -286,11 +308,16 @@ class ResilientSocket(
         primary.awaitingReplySince = null
         dialect.pauseMessage?.let(primary::send)
         debugLog("paused stream ${primary.stream.id}")
+        startKeepalive(primary, keepalive)
+    }
+
+    private fun startKeepalive(primary: Connection, message: WsMessage) {
+        keepaliveJob?.cancel()
         keepaliveJob = scope.launch {
             while (isActive) {
                 delay(KEEPALIVE_INTERVAL_MS)
                 if (primary.isClosed) return@launch
-                primary.send(keepalive)
+                primary.send(message)
             }
         }
     }
@@ -300,10 +327,12 @@ class ResilientSocket(
         val wasPaused = isPaused
         endPause()
         val primary = primary
-        if (!wasPaused || !isRunning || primary == null || !primary.isReady) {
+        if (!wasPaused || !isRunning || primary == null) {
             start()
             return
         }
+        // A prewarmed session still connecting: audio waits in the backlog.
+        if (!primary.isReady) return
         debugLog("resumed stream ${primary.stream.id}")
         status = SpeechEngineStatus.Live
     }
@@ -328,6 +357,17 @@ class ResilientSocket(
         var awaitingReplySince: Long? = null
         /** Audio to send once ready, then end the stream (catch-up only). */
         var replay: List<ByteArray> = emptyList()
+        /** When a catch-up stream stops trying, in [now] ms (catch-up only). */
+        var deadline = 0L
+        /** Earlier catch-up streams that failed with this replay. */
+        var attempt = 0
+        /**
+         * Audio sent that the server hasn't finalized, oldest first, when
+         * the dialect reports it.
+         */
+        val unconfirmed = ArrayDeque<ByteArray>()
+        /** Where [unconfirmed] starts in the stream's audio, in seconds. */
+        var unconfirmedStart = 0.0
         val createdAt = now()
 
         fun send(message: WsMessage) {
@@ -358,7 +398,7 @@ class ResilientSocket(
         if (!isRunning) return
         reconnectJob?.cancel()
         reconnectJob = null
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio = true)
         status = if (failures == 0) SpeechEngineStatus.Connecting else SpeechEngineStatus.Reconnecting
         val connection = makeConnection(isCatchUp = false)
         primary = connection
@@ -427,7 +467,9 @@ class ResilientSocket(
                 scope.launch {
                     if (connection.isClosed || isBlackholed) return@launch
                     connection.awaitingReplySince = null
-                    received(connection, dialect.receive(message, connection.stream))
+                    val signal = dialect.receive(message, connection.stream)
+                    confirmAudio(connection)
+                    received(connection, signal)
                 }
             }
 
@@ -519,14 +561,11 @@ class ResilientSocket(
             SocketSignal.Ready -> {
                 if (primary.isReady) return
                 primary.isReady = true
-                failures = 0
-                throttled = false
-                status = SpeechEngineStatus.Live
                 dialect.sessionDidOpen(primary.stream)
                 // It won the race; a hedge still connecting isn't needed.
                 hedgeJob?.cancel()
                 dropStandby()
-                flushBacklog(primary)
+                primaryIsUp(primary)
             }
             SocketSignal.Boundary -> if (standby?.isReady == true) handOver()
             is SocketSignal.Retry -> {
@@ -537,8 +576,31 @@ class ResilientSocket(
         }
     }
 
+    /**
+     * The primary can take audio: send what was held, or hold a prewarmed
+     * session open until audio comes.
+     */
+    private fun primaryIsUp(primary: Connection) {
+        failures = 0
+        throttled = false
+        status = SpeechEngineStatus.Live
+        val keepalive = dialect.keepaliveMessage
+        if (isPaused && keepalive != null) {
+            debugLog("stream ${primary.stream.id} is warm")
+            startKeepalive(primary, keepalive)
+        } else {
+            flushBacklog(primary)
+        }
+    }
+
     private fun handleFailure() {
         if (!isRunning) return
+        // A prewarm racing a slow attempt falls back to the other one.
+        // (A paused session has no standby.)
+        if (isPaused && standby != null) {
+            promoteStandby()
+            return
+        }
         // Nobody is waiting on a paused session; reconnect when they come back.
         if (isPaused) {
             debugLog("paused session dropped")
@@ -563,7 +625,7 @@ class ResilientSocket(
             return
         }
 
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio = true)
         failures += 1
         status = SpeechEngineStatus.Reconnecting
         // 0.3 s, 0.6 s, 1.2 s… capped at 6 s, with jitter so clients don't
@@ -580,17 +642,27 @@ class ResilientSocket(
     private fun fail(message: String) {
         endPause()
         hedgeJob?.cancel()
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio = false)
         dropStandby()
         isRunning = false
         backlog.clear()
         status = SpeechEngineStatus.Failed(message)
     }
 
-    private fun tearDownPrimary() {
+    /**
+     * [keepingAudio] puts audio the server hadn't finalized back in the
+     * backlog, ahead of what was held since, to send again on the next session.
+     */
+    private fun tearDownPrimary(keepingAudio: Boolean) {
         val primary = primary ?: return
         this.primary = null
         primary.close()
+        if (keepingAudio && primary.unconfirmed.isNotEmpty()) {
+            debugLog("stream ${primary.stream.id} dropped; keeping ${primary.unconfirmed.size} unfinalized chunks")
+            backlog.addAll(0, primary.unconfirmed)
+            trimBacklog()
+        }
+        primary.unconfirmed.clear()
         if (primary.isReady || primary.hasSentAudio) dialect.sessionDidReset(primary.stream)
     }
 
@@ -621,14 +693,11 @@ class ResilientSocket(
         this.standby = null
         handoverTimer?.cancel()
         hedgeJob?.cancel()
-        tearDownPrimary()
+        tearDownPrimary(keepingAudio = true)
         primary = standby
         if (standby.isReady) {
             debugLog("stream ${standby.stream.id} took over")
-            failures = 0
-            throttled = false
-            status = SpeechEngineStatus.Live
-            flushBacklog(standby)
+            primaryIsUp(standby)
         } else {
             status = SpeechEngineStatus.Reconnecting
         }
@@ -644,6 +713,8 @@ class ResilientSocket(
         this.standby = null
         primary = standby
         side += old
+        // The old session finishes what it has; nothing is sent again from it.
+        old.unconfirmed.clear()
         debugLog("handed over from stream ${old.stream.id} to ${standby.stream.id}")
         dialect.endOfAudioMessage?.let(old::send)
         scope.launch {
@@ -665,6 +736,42 @@ class ResilientSocket(
         debugLog("closed side stream ${connection.stream.id}")
         connection.close()
         dialect.sideStreamDidEnd(connection.stream)
+        retryCatchUp(connection)
+    }
+
+    /**
+     * A catch-up stream that never got to send its audio, say because the
+     * broker was rate-limiting keys after a burst of reconnects, tries again
+     * with backoff until its deadline, so held speech isn't dropped.
+     */
+    private fun retryCatchUp(failed: Connection) {
+        if (!failed.stream.isCatchUp || failed.replay.isEmpty() || !isRunning) return
+        val delayMs = min(8_000L, 1_000L shl failed.attempt)
+        if (now() + delayMs >= failed.deadline) {
+            debugLog("catch-up stream ${failed.stream.id} gave up")
+            return
+        }
+        val replay = failed.replay
+        val deadline = failed.deadline
+        val attempt = failed.attempt + 1
+        scope.launch {
+            delay(delayMs)
+            if (isRunning) startCatchUp(replay, deadline, attempt)
+        }
+    }
+
+    private fun startCatchUp(speech: List<ByteArray>, deadline: Long, attempt: Int) {
+        val catchUp = makeConnection(isCatchUp = true)
+        catchUp.replay = speech
+        catchUp.deadline = deadline
+        catchUp.attempt = attempt
+        debugLog("${speech.size} chunks of speech → catch-up stream ${catchUp.stream.id}")
+        side += catchUp
+        open(catchUp)
+        scope.launch {
+            delay(deadline - now())
+            if (!catchUp.isClosed) closeSide(catchUp)
+        }
     }
 
     // endregion
@@ -678,15 +785,8 @@ class ResilientSocket(
         val seconds = speech.size * MicCapture.CHUNK_DURATION
 
         if (seconds > CATCH_UP_THRESHOLD_S && dialect.supportsSideStreams) {
-            val catchUp = makeConnection(isCatchUp = true)
-            catchUp.replay = speech
-            debugLog("held $held chunks, ${speech.size} of speech → catch-up stream ${catchUp.stream.id}")
-            side += catchUp
-            open(catchUp)
-            scope.launch {
-                delay(CATCH_UP_DEADLINE_MS)
-                if (!catchUp.isClosed) closeSide(catchUp)
-            }
+            debugLog("held $held chunks")
+            startCatchUp(speech, now() + CATCH_UP_DEADLINE_MS, attempt = 0)
         } else {
             val limit = (MAX_REPLAY_S / MicCapture.CHUNK_DURATION).toInt()
             if (held > 0) debugLog("held $held chunks, replaying ${min(speech.size, limit)}")
@@ -703,7 +803,30 @@ class ResilientSocket(
     private fun enqueueAudio(chunk: ByteArray, connection: Connection) {
         connection.hasSentAudio = true
         if (connection.awaitingReplySince == null) connection.awaitingReplySince = now()
+        if (dialect.reportsFinalizedAudio && !connection.stream.isCatchUp && connection === primary) {
+            connection.unconfirmed.addLast(chunk)
+            while (connection.unconfirmed.size > MAX_BACKLOG) {
+                connection.unconfirmedStart += duration(connection.unconfirmed.removeFirst())
+            }
+        }
         connection.send(dialect.audioMessage(chunk))
+    }
+
+    /** Lets go of audio the server has finalized. */
+    private fun confirmAudio(connection: Connection) {
+        if (!dialect.reportsFinalizedAudio || connection.unconfirmed.isEmpty()) return
+        val finalized = dialect.finalizedAudio(connection.stream)
+        while (connection.unconfirmed.isNotEmpty()) {
+            val end = connection.unconfirmedStart + duration(connection.unconfirmed.first())
+            // Half a millisecond of slack for rounding in the server's count.
+            if (end > finalized + 0.0005) break
+            connection.unconfirmedStart = end
+            connection.unconfirmed.removeFirst()
+        }
+    }
+
+    private fun trimBacklog() {
+        while (backlog.size > MAX_BACKLOG) backlog.removeFirst()
     }
 
     // endregion
@@ -739,8 +862,11 @@ class ResilientSocket(
     }
 
     companion object {
-        /** About 20 s of audio at 80 ms per chunk. */
-        const val MAX_BACKLOG = 250
+        /** About 60 s of audio at 80 ms per chunk. */
+        const val MAX_BACKLOG = 750
+
+        /** Length of a 16 kHz mono PCM16 chunk, in seconds. */
+        fun duration(chunk: ByteArray): Double = (chunk.size / 2).toDouble() / MicCapture.SAMPLE_RATE
         /** Backlog speech beyond this goes to a catch-up session. */
         const val CATCH_UP_THRESHOLD_S = 3.0
         /** Without side streams, at most this much backlog speech is replayed. */

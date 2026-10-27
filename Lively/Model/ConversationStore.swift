@@ -126,6 +126,22 @@ final class ConversationStore {
         prefetchKey()
     }
 
+    /// Only the first screen to appear in a launch prewarms.
+    private static var didPrewarm = false
+
+    /// Opens a speech session as the app launches, so the first tap on the
+    /// mic is live at once instead of waiting on the connect. It's held like
+    /// a pause and closed after `warmPause` if nobody starts listening. Call
+    /// it once onboarding is done, which asks for the mic and may change the
+    /// languages. Not from `init`: SwiftUI makes and throws away stores while
+    /// it re-renders, and each would open a session.
+    func prewarm() {
+        guard !Self.didPrewarm, demo == nil, engine == nil, !isListening, settings.hasCredentials else { return }
+        Self.didPrewarm = true
+        makeEngine(settings.provider).prewarm()
+        scheduleIdleTeardown()
+    }
+
     /// Re-measures Soniox regions and gets a key ready when the app comes to
     /// the foreground, so tapping the mic doesn't wait on the key broker.
     func didBecomeActive() {
@@ -210,6 +226,10 @@ final class ConversationStore {
             refreshStatus()
             return
         }
+        makeEngine(provider).start()
+    }
+
+    private func makeEngine(_ provider: SpeechProvider) -> SpeechEngine {
         let pipeline = provider.makePipeline(settings)
         translator = pipeline.translator
         let engine = pipeline.engine
@@ -226,7 +246,7 @@ final class ConversationStore {
         }
         engine.networkAvailable = isOnline
         self.engine = engine
-        engine.start()
+        return engine
     }
 
     func stopListening() {
@@ -254,6 +274,10 @@ final class ConversationStore {
             return
         }
         engine.pause()
+        scheduleIdleTeardown()
+    }
+
+    private func scheduleIdleTeardown() {
         idleTeardown?.cancel()
         idleTeardown = Task { [weak self] in
             try? await Task.sleep(for: Self.warmPause)

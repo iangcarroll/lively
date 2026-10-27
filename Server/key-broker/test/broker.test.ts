@@ -53,8 +53,8 @@ describe("POST /v1/soniox/key", () => {
     const body = await response.json<{ api_key: string; expires_at: string; expires_in_seconds: number; max_session_seconds: number }>();
     expect(body.api_key).toMatch(/^temp:/);
     expect(body.expires_at).toBe("2026-10-20T12:01:30Z");
-    // Capped to the free day's 15 minutes.
-    expect(body.max_session_seconds).toBe(900);
+    // Capped to the free day's 60 minutes.
+    expect(body.max_session_seconds).toBe(3600);
     expect(body.expires_in_seconds).toBe(300);
 
     expect(soniox).toHaveBeenCalledOnce();
@@ -65,7 +65,7 @@ describe("POST /v1/soniox/key", () => {
       usage_type: "transcribe_websocket",
       expires_in_seconds: 300,
       single_use: true,
-      max_session_duration_seconds: 900,
+      max_session_duration_seconds: 3600,
       client_reference_id: await hash(`install:${installID}`),
     });
   });

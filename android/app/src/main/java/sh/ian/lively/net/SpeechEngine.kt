@@ -25,6 +25,12 @@ interface SpeechEngine {
     val textLagMs: Long get() = 0
 
     fun start()
+    /**
+     * Opens a server session ahead of listening, held like [pause], so the
+     * first [resume] is instant. Engines that can't hold one idle do
+     * nothing, and [resume] connects as usual.
+     */
+    fun prewarm() {}
     fun stop()
     /**
      * Stops taking audio but may keep the server session open for a while,

@@ -29,7 +29,7 @@ Designed for face-to-face conversations:
 - Lively Pro: up to 10 hours of translation a day
 - No advertising or cross-app tracking
 
-Lively is free to try, with 15 minutes of translation a day, or 30 when you sign in. Lively Pro is an auto-renewing subscription with up to 10 hours a day. Payment is charged to your Apple Account, and the subscription renews unless cancelled at least 24 hours before the end of the period. Manage it in your Apple Account's Subscriptions.
+Lively is free to try, with an hour of translation a day, or two when you sign in. Lively Pro is an auto-renewing subscription with up to 10 hours a day. Payment is charged to your Apple Account, and the subscription renews unless cancelled at least 24 hours before the end of the period. Manage it in your Apple Account's Subscriptions.
 
 Microphone audio is processed by the selected speech provider to provide live transcription and translation. See Lively's privacy policy for details.
 
@@ -39,7 +39,7 @@ Privacy Policy: https://lively.ian.sh/privacy
 ## Review information
 
 - Sign-in required: No
-- Notes: `Lively does not require an account. To exercise the primary flow, skip the optional email sign-in, allow microphone access, tap the microphone, and speak English or Chinese. The default Soniox engine obtains a temporary key automatically. Free use is 15 minutes a day (30 when signed in with a one-time email code). Lively Pro, an auto-renewing subscription in Settings › Lively Pro, raises it to 10 hours a day; Restore Purchases is on the same screen. Accounts can be deleted in Settings › Account › Delete Account. Settings also offers an optional Voxtral + Mistral engine for users who provide their own Mistral API key.`
+- Notes: `Lively does not require an account. To exercise the primary flow, skip the optional email sign-in, allow microphone access, tap the microphone, and speak English or Chinese. The default Soniox engine obtains a temporary key automatically. Free use is an hour a day (two hours when signed in with a one-time email code). Lively Pro, an auto-renewing subscription in Settings › Lively Pro, raises it to 10 hours a day; Restore Purchases is on the same screen. Accounts can be deleted in Settings › Account › Delete Account. Settings also offers an optional Voxtral + Mistral engine for users who provide their own Mistral API key.`
 - Release: Manual release after approval
 
 ## In-app purchases

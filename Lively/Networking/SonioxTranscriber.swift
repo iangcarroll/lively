@@ -74,6 +74,8 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     /// The region of each connection attempt, until it opens or fails.
     /// Attempts overlap when a slow one is raced.
     private var connectingRegions: [Int: String] = [:]
+    /// Audio each stream's server has finalized, from `final_audio_proc_ms`.
+    private var finalized: [Int: TimeInterval] = [:]
 
     init(_ configuration: Configuration) {
         config = configuration
@@ -84,6 +86,13 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         connectingRegions.removeAll()
         if case .broker(let provider) = config.credential { provider.startRefreshing() }
         socket.start()
+    }
+
+    func prewarm() {
+        rejectedTemporaryKeys = 0
+        connectingRegions.removeAll()
+        if case .broker(let provider) = config.credential { provider.startRefreshing() }
+        socket.prewarm()
     }
 
     /// Finalizes what was heard and keeps the session open with keepalives.
@@ -100,6 +109,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         for id in streams.keys { closeOpenSegment(in: id) }
         streams.removeAll()
         connectingRegions.removeAll()
+        finalized.removeAll()
     }
 
     func endTurn() {
@@ -171,6 +181,13 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
     /// Finalizes pending tokens, so the last words before a pause show up now.
     var pauseMessage: URLSessionWebSocketTask.Message? { .json(["type": "finalize"]) }
     var supportsSideStreams: Bool { true }
+    /// Every response carries `final_audio_proc_ms`, so audio Soniox hadn't
+    /// finalized when a session drops is sent again on the next one.
+    var reportsFinalizedAudio: Bool { true }
+
+    func finalizedAudio(on stream: SocketStream) -> TimeInterval {
+        finalized[stream.id] ?? 0
+    }
 
     func isMidUtterance(on stream: SocketStream) -> Bool {
         streams[stream.id]?.open != nil
@@ -191,12 +208,14 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
         // A new session starts a new segment; late tokens from the old one won't come.
         closeOpenSegment(in: stream.id)
         streams[stream.id] = nil
+        finalized[stream.id] = nil
         onEvent(.sessionReset)
     }
 
     func sideStreamDidEnd(_ stream: SocketStream) {
         closeOpenSegment(in: stream.id)
         streams[stream.id] = nil
+        finalized[stream.id] = nil
     }
 
     func receive(_ message: URLSessionWebSocketTask.Message, on stream: SocketStream) -> SocketSignal {
@@ -217,6 +236,9 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
 
         // The key worked.
         rejectedTemporaryKeys = 0
+        if let ms = (json["final_audio_proc_ms"] as? NSNumber)?.doubleValue {
+            finalized[stream.id] = ms / 1000
+        }
 
         var endedUtterance = false
         if let tokens = json["tokens"] as? [[String: Any]], !tokens.isEmpty {

@@ -159,6 +159,20 @@ class ConversationStore(
     }
 
     /**
+     * Opens a speech session as the app launches, so the first tap on the
+     * mic is live at once instead of waiting on the connect. It's held like
+     * a pause and closed after [WARM_PAUSE_MS] if nobody starts listening. Call
+     * it once onboarding is done, which asks for the mic and may change the
+     * languages. Only the first call in a launch prewarms.
+     */
+    fun prewarm() {
+        if (didPrewarm || demo != null || engine != null || isListening || !settings.hasCredentials) return
+        didPrewarm = true
+        makeEngine(settings.provider).prewarm()
+        scheduleIdleTeardown()
+    }
+
+    /**
      * Re-measures Soniox regions and gets a key ready when the app comes to
      * the foreground, so tapping the mic doesn't wait on the key broker.
      */
@@ -258,6 +272,10 @@ class ConversationStore(
             refreshStatus()
             return
         }
+        makeEngine(provider).start()
+    }
+
+    private fun makeEngine(provider: SpeechProvider): SpeechEngine {
         val pipeline = makePipeline(provider)
         translator = pipeline.translator
         val engine = pipeline.engine
@@ -273,7 +291,7 @@ class ConversationStore(
         }
         engine.networkAvailable = isOnline
         this.engine = engine
-        engine.start()
+        return engine
     }
 
     fun stopListening() {
@@ -300,6 +318,10 @@ class ConversationStore(
             return
         }
         engine.pause()
+        scheduleIdleTeardown()
+    }
+
+    private fun scheduleIdleTeardown() {
         idleTeardown?.cancel()
         idleTeardown = scope.launch {
             delay(WARM_PAUSE_MS)
@@ -782,6 +804,9 @@ class ConversationStore(
     // endregion
 
     companion object {
+        /** Only the first store in a launch prewarms. */
+        private var didPrewarm = false
+
         /**
          * The text up to and including the last sentence end, or "" if none.
          * A period after a digit may be a decimal point, so it doesn't count

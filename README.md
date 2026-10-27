@@ -197,8 +197,14 @@ To keep latency low:
 
 On a bad network (all engines, via `ResilientSocket`):
 
-- Audio keeps recording while the socket is down, with up to 20 s held in a
+- Audio keeps recording while the socket is down, with up to 60 s held in a
   backlog that is replayed on reconnect.
+- Soniox reports how much audio it has finalized, so audio sent but not yet
+  finalized when a session drops goes back in the backlog and is sent again:
+  words in flight at the moment of a dropout aren't lost.
+- Once onboarding is done, a session opens as the app launches and is held
+  with keepalives, so the first tap on the mic is live at once. It closes
+  after 60 s if nobody starts listening.
 - Reconnects use jittered backoff, and a ping every 4 s detects dead sockets.
 - `NWPathMonitor` triggers an immediate retry when the network comes back.
 - Mistral translations wait for the network, then retry with backoff.

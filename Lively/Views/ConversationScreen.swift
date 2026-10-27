@@ -144,6 +144,8 @@ struct ConversationScreen: View {
                 showOnboarding = true
             } else if !settings.hasCredentials {
                 showSettings = true
+            } else {
+                store.prewarm()
             }
         }
     }

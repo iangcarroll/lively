@@ -212,7 +212,7 @@ private fun ProHeader(title: String = "Lively Pro", subtitle: String = "Translat
             Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Benefit(Icons.Rounded.Timer, Color(0xFFFF9500), "10 hours a day", "Free gives you 15 minutes a day, or 30 when you're signed in.")
+            Benefit(Icons.Rounded.Timer, Color(0xFFFF9500), "10 hours a day", "Free gives you an hour a day, or two when you're signed in.")
             Benefit(Icons.Rounded.Devices, Color(0xFF007AFF), "On all your devices", "Pro comes with your Google account. No sign-in needed.")
             Benefit(Icons.AutoMirrored.Rounded.Undo, Color(0xFF34C759), "Cancel anytime", "Manage it in Google Play's Payments & subscriptions.")
         }

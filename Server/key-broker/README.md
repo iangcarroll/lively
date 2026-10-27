@@ -74,11 +74,11 @@ limits cap what that costs:
 | Variable | Default | Limit |
 |---|---|---|
 | `PER_INSTALL_KEYS_PER_MINUTE` | 6 | keys per install per minute |
-| `PER_INSTALL_MINUTES_PER_DAY` | 15 | listening minutes per install per UTC day |
+| `PER_INSTALL_MINUTES_PER_DAY` | 60 | listening minutes per install per UTC day |
 | `PER_IP_KEYS_PER_MINUTE` | 30 | keys per IP per minute (IPv6 by /64) |
 | `PER_IP_MINUTES_PER_DAY` | 1440 | listening minutes per IP per UTC day (anonymous only) |
 | `PER_USER_KEYS_PER_MINUTE` | 10 | keys per account per minute |
-| `PER_USER_MINUTES_PER_DAY` | 30 | listening minutes per account per UTC day |
+| `PER_USER_MINUTES_PER_DAY` | 120 | listening minutes per account per UTC day |
 | `PRO_KEYS_PER_MINUTE` | 10 | keys per Pro subscription or account per minute |
 | `PRO_MINUTES_PER_DAY` | 600 | listening minutes per Pro subscription or account per UTC day |
 | `GLOBAL_KEYS_PER_DAY` | 100000 | keys for everyone per UTC day |

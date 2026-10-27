@@ -138,12 +138,17 @@ class AndroidConversationHost : ConversationHost {
 
 class ConversationViewModel(graph: LivelyApp.Graph) : ViewModel() {
     val host = AndroidConversationHost()
-    val store = ConversationStore(graph.settings, graph.scope, host, graph.keyProvider, graph.brokerTranslator, demo = DebugFlags.demo)
+    val store = ConversationStore(
+        graph.settings, graph.scope, host, graph.keyProvider, graph.brokerTranslator,
+        demo = DebugFlags.demo,
+    )
     private val networkListener: (Boolean, Boolean) -> Unit = { online, changed -> store.setNetwork(online, changed) }
     private val network = graph.network
 
     init {
         network.listen(networkListener)
+        // Like the Swift screen's onAppear: once onboarding is done, open a session for the first tap.
+        if (graph.prefs.bool("onboardingDone") && !DebugFlags.forceOnboarding) store.prewarm()
     }
 
     override fun onCleared() {

@@ -113,7 +113,7 @@ private struct ProHeader: View {
                 }
             }
             VStack(alignment: .leading, spacing: 16) {
-                row("timer", .orange, "10 hours a day", "Free gives you 15 minutes a day, or 30 when you're signed in.")
+                row("timer", .orange, "10 hours a day", "Free gives you an hour a day, or two when you're signed in.")
                 row("iphone.gen3", .blue, "On all your devices", "Pro comes with your Apple Account. No sign-in needed.")
                 row("arrow.uturn.backward", .green, "Cancel anytime", "Manage it in your Apple Account's Subscriptions.")
             }

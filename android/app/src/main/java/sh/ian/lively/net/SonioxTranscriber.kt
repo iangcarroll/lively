@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -92,12 +93,21 @@ class SonioxTranscriber(
      * Attempts overlap when a slow one is raced.
      */
     private val connectingRegions = mutableMapOf<Int, String>()
+    /** Audio each stream's server has finalized, in seconds, from `final_audio_proc_ms`. */
+    private val finalized = mutableMapOf<Int, Double>()
 
     override fun start() {
         rejectedTemporaryKeys = 0
         connectingRegions.clear()
         (config.credential as? Credential.Broker)?.provider?.startRefreshing()
         socket.start()
+    }
+
+    override fun prewarm() {
+        rejectedTemporaryKeys = 0
+        connectingRegions.clear()
+        (config.credential as? Credential.Broker)?.provider?.startRefreshing()
+        socket.prewarm()
     }
 
     /**
@@ -116,6 +126,7 @@ class SonioxTranscriber(
         for (id in streams.keys.toList()) closeOpenSegment(id)
         streams.clear()
         connectingRegions.clear()
+        finalized.clear()
     }
 
     override fun endTurn() {
@@ -195,6 +206,14 @@ class SonioxTranscriber(
 
     override val supportsSideStreams = true
 
+    /**
+     * Every response carries `final_audio_proc_ms`, so audio Soniox hadn't
+     * finalized when a session drops is sent again on the next one.
+     */
+    override val reportsFinalizedAudio = true
+
+    override fun finalizedAudio(stream: SocketStream) = finalized[stream.id] ?: 0.0
+
     override fun isMidUtterance(stream: SocketStream) = streams[stream.id]?.open != null
 
     /**
@@ -214,12 +233,14 @@ class SonioxTranscriber(
         // A new session starts a new segment; late tokens from the old one won't come.
         closeOpenSegment(stream.id)
         streams.remove(stream.id)
+        finalized.remove(stream.id)
         onEvent(SpeechEvent.SessionReset)
     }
 
     override fun sideStreamDidEnd(stream: SocketStream) {
         closeOpenSegment(stream.id)
         streams.remove(stream.id)
+        finalized.remove(stream.id)
     }
 
     override fun receive(message: WsMessage, stream: SocketStream): SocketSignal {
@@ -240,6 +261,7 @@ class SonioxTranscriber(
 
         // The key worked.
         rejectedTemporaryKeys = 0
+        json.double("final_audio_proc_ms")?.let { finalized[stream.id] = it / 1000 }
 
         var endedUtterance = false
         val tokens = (json["tokens"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
@@ -381,5 +403,6 @@ class SonioxTranscriber(
 
 internal fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
 internal fun JsonObject.int(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
+internal fun JsonObject.double(key: String): Double? = (this[key] as? JsonPrimitive)?.doubleOrNull
 internal fun JsonObject.bool(key: String): Boolean? = (this[key] as? JsonPrimitive)?.booleanOrNull
 internal fun JsonObject.obj(key: String): JsonObject? = runCatching { this[key]?.jsonObject }.getOrNull()

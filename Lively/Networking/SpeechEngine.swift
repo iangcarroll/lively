@@ -15,6 +15,10 @@ protocol SpeechEngine: AnyObject {
     var textLag: Duration { get }
 
     func start()
+    /// Opens a server session ahead of listening, held like `pause()`, so
+    /// the first `resume()` is instant. Engines that can't hold one idle do
+    /// nothing, and `resume()` connects as usual.
+    func prewarm()
     func stop()
     /// Stops taking audio but may keep the server session open for a while,
     /// so `resume()` doesn't have to reconnect. Call `stop()` to let it go.
@@ -32,6 +36,7 @@ protocol SpeechEngine: AnyObject {
 
 extension SpeechEngine {
     var textLag: Duration { .zero }
+    func prewarm() {}
     func pause() { stop() }
     func resume() { start() }
     func endTurn() {}
