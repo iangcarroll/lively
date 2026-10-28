@@ -98,6 +98,13 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.billing)
     implementation(libs.mlkit.translate)
+    // Text recognition for photos, bundled so it works offline and without
+    // Play services, like Vision on iOS. One model per script.
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.text.recognition.chinese)
+    implementation(libs.mlkit.text.recognition.japanese)
+    implementation(libs.mlkit.text.recognition.korean)
+    implementation(libs.mlkit.text.recognition.devanagari)
     // Play Billing brings an old Fragment; ActivityResult needs 1.3 or later.
     implementation(libs.androidx.fragment)
     debugImplementation(libs.compose.ui.tooling)

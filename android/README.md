@@ -23,6 +23,11 @@ broker, account and Pro allowance:
 - Typing instead of speaking from the keyboard button, translated by
   DeepSeek through the key broker, falling back to ML Kit on the device
   (Apple's Translation framework on iOS).
+- Translating a photo from the camera button in the text field: take one
+  or choose one, and ML Kit reads its text on the device (Vision on iOS)
+  and adds it as a typed turn. The Latin, Chinese, Japanese, Korean and
+  Devanagari models are bundled, so it works offline and without Play
+  services.
 - Swipe a turn in the transcript, or long-press it, to delete it. Long-press
   also offers Edit, which fixes a misheard transcript and translates it
   again; in face-to-face, long-press one of your own lines.
@@ -119,5 +124,6 @@ draws the same bubbles as the iOS icon.
 | `Model/Account.swift`, `Pro.swift` | `model/Account.kt`, `model/Pro.kt` (Play Billing) |
 | `Support/Keychain.swift` | `support/Stores.kt` (Keystore-sealed preferences, kept out of backups) |
 | `NLLanguageRecognizer` | `model/LanguageDetector.kt` (script counting, then `TextClassifier`) |
+| Vision text recognition (`Support/TextRecognizer.swift`) | `support/TextRecognizer.kt` (ML Kit, a model per script) |
 | `StringTransform("Hans-Hant")` | ICU `Transliterator("Hans-Hant")` |
 | `Views/*` | `ui/*` |

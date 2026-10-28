@@ -28,7 +28,8 @@ own Mistral translator for them.
 
 The camera button at the start of the text field translates a photo, such as
 a sign or a menu. Take one (iPhone and iPad) or choose one from Photos. Its
-text is read on the device with Vision (`Support/TextRecognizer.swift`), one
+text is read on the device with Vision (`Support/TextRecognizer.swift`; ML Kit
+text recognition on Android), one
 line per line of text, and added as a typed turn, so it's translated the same
 way and can be corrected with Edit.
 

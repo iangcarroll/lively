@@ -97,7 +97,8 @@ class ConversationStore(
     val visibleUtterances: List<Utterance> by derivedStateOf { utterances.filter { it.hasContent } }
 
     /** The languages of the turns in [utterances]. */
-    private var languages = settings.languages
+    var languages = settings.languages
+        private set
     private var engine: SpeechEngine? = null
     private var translator: TranslationService? = null
 

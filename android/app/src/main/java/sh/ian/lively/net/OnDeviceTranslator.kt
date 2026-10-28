@@ -57,7 +57,8 @@ class OnDeviceTranslator : TranslationService {
 
 class OnDeviceTranslationException(language: Language) : Exception("${language.englishName} isn't available on this device")
 
-private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { continuation ->
+/** Waits for a Play services task, such as an ML Kit result. */
+internal suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { continuation ->
     addOnSuccessListener { continuation.resume(it) }
     addOnFailureListener { continuation.resumeWithException(it) }
     addOnCanceledListener { continuation.cancel() }
