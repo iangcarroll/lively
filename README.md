@@ -26,6 +26,12 @@ lines go to DeepSeek through the key broker, falling back to on-device
 translation (Apple's Translation framework; ML Kit on Android). Voxtral uses its
 own Mistral translator for them.
 
+The camera button at the start of the text field translates a photo, such as
+a sign or a menu. Take one (iPhone and iPad) or choose one from Photos. Its
+text is read on the device with Vision (`Support/TextRecognizer.swift`), one
+line per line of text, and added as a typed turn, so it's translated the same
+way and can be corrected with Edit.
+
 Swipe a turn in the transcript to delete it, or long-press it (right-click on Mac)
 for Edit and Delete. Edit fixes a misheard transcript, such as a name, and
 translates the corrected text again the same way as typed lines. In face-to-face,
@@ -100,6 +106,7 @@ when the conversation screen appears.
 | Voxtral: WebSocket to `voxtral-mini-transcribe-realtime-3`, language auto-detected, turn detection on | `Networking/RealtimeTranscriber.swift` |
 | Voxtral: streaming translation over Mistral chat completions | `Networking/Translator.swift` |
 | Typed lines: DeepSeek through the broker, falling back to on-device translation | `Networking/Translator.swift` |
+| Photos: text read on the device with Vision, then translated as a typed line | `Support/TextRecognizer.swift` |
 | Soniox: WebSocket to `stt-rt-v5` with two-way translation and endpoint detection | `Networking/SonioxTranscriber.swift` |
 | Soniox: temporary keys from the broker, with one spare kept ready | `Networking/SonioxKeyProvider.swift` |
 | Soniox: picks the region (US or Japan) with the shortest round trip | `Networking/RegionProber.swift` |

@@ -74,7 +74,7 @@ struct Language: Hashable, Identifiable, RawRepresentable, Sendable {
         return languages.all.first { $0.recognizerLanguages.contains(dominant) }
     }
 
-    private var usesLatinScript: Bool { Self.latinScript.contains(rawValue) }
+    var usesLatinScript: Bool { Self.latinScript.contains(rawValue) }
 
     private static let latinScript: Set<String> = [
         "af", "sq", "az", "eu", "bs", "ca", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de",

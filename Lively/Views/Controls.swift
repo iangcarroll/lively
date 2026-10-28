@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 import Translation
 
@@ -229,7 +230,8 @@ struct SpeakAloudButton: View {
 
 /// An optional text field for typing a line to translate, for when speaking
 /// isn't practical. Opening it offers to download on-device languages, which
-/// typed text uses when no translation key is set.
+/// typed text uses when no translation key is set. Its photo button reads the
+/// text in a photo, such as a sign or a menu, and translates it the same way.
 struct TypeToTranslateBar: View {
     let store: ConversationStore
     let languages: LanguagePair
@@ -257,6 +259,10 @@ struct TypeToTranslateBar: View {
 
     @State private var text = ""
     @State private var download: TranslationSession.Configuration?
+    @State private var photo: PhotosPickerItem?
+    @State private var choosesPhoto = false
+    @State private var takesPhoto = false
+    @State private var readsPhoto = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -266,6 +272,8 @@ struct TypeToTranslateBar: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 14)
                     .accessibilityHidden(true)
+            } else {
+                photoButton
             }
             TextField(editing == nil ? "Type to translate" : "Fix what was heard", text: $text)
                 // Corrections are often names, which autocorrect would undo.
@@ -273,7 +281,6 @@ struct TypeToTranslateBar: View {
                 .focused(focused)
                 .submitLabel(.send)
                 .onSubmit(send)
-                .padding(.leading, editing == nil ? 16 : 0)
                 .padding(.vertical, 10)
             Button(action: send) {
                 Image(systemName: editing == nil ? "arrow.up" : "checkmark")
@@ -318,6 +325,71 @@ struct TypeToTranslateBar: View {
             nonisolated(unsafe) let session = session
             try? await session.prepareTranslation()
         }
+        .photosPicker(isPresented: $choosesPhoto, selection: $photo, matching: .images)
+        .onChange(of: photo) { _, item in
+            guard let item else { return }
+            photo = nil
+            Task { await translatePhoto { try await item.loadTransferable(type: Data.self) } }
+        }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $takesPhoto) {
+            CameraPicker { image in
+                takesPhoto = false
+                guard let image = image?.jpegData(compressionQuality: 0.9) else { return }
+                Task { await translatePhoto { image } }
+            }
+            .ignoresSafeArea()
+        }
+        #endif
+    }
+
+    /// Takes or chooses a photo to translate. Without a camera, as on the
+    /// Mac, it goes straight to the photo picker.
+    private var photoButton: some View {
+        Group {
+            if readsPhoto {
+                ProgressView().controlSize(.small)
+            } else if CameraPicker.isAvailable {
+                Menu {
+                    Button("Take Photo", systemImage: "camera") { takesPhoto = true }
+                    Button("Choose Photo", systemImage: "photo.on.rectangle") { choosesPhoto = true }
+                } label: {
+                    photoIcon
+                }
+                .menuIndicator(.hidden)
+            } else {
+                Button { choosesPhoto = true } label: { photoIcon }
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(width: 32, height: 32)
+        .padding(.leading, 6)
+        .accessibilityLabel(readsPhoto ? "Reading photo" : "Translate a photo")
+    }
+
+    private var photoIcon: some View {
+        Image(systemName: "camera")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 32, height: 32)
+            .contentShape(.circle)
+    }
+
+    /// Reads the photo's text on the device and adds it as a typed turn.
+    private func translatePhoto(_ load: () async throws -> Data?) async {
+        readsPhoto = true
+        defer { readsPhoto = false }
+        do {
+            guard let image = try await load() else { return }
+            let text = try await TextRecognizer.text(in: image, languages: languages)
+            guard !text.isEmpty else {
+                store.alert = "Lively couldn't find any text in that photo."
+                return
+            }
+            withAnimation(.snappy) { store.submitTyped(text, language: language) }
+        } catch {
+            store.alert = "Lively couldn't read that photo."
+        }
     }
 
     private var isEmpty: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -341,3 +413,41 @@ struct TypeToTranslateBar: View {
         text = ""
     }
 }
+
+#if os(iOS)
+/// The system camera, for photographing text to translate.
+struct CameraPicker: UIViewControllerRepresentable {
+    static var isAvailable: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
+
+    /// Called with the photo, or nil when the camera is cancelled.
+    let onCapture: (UIImage?) -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ picker: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture) }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let onCapture: (UIImage?) -> Void
+
+        init(onCapture: @escaping (UIImage?) -> Void) { self.onCapture = onCapture }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            onCapture(info[.originalImage] as? UIImage)
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { onCapture(nil) }
+    }
+}
+#else
+/// The Mac has no camera to take photos with here; it chooses photos instead.
+enum CameraPicker {
+    static let isAvailable = false
+}
+#endif
