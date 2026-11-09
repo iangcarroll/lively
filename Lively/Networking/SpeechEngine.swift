@@ -46,6 +46,9 @@ extension SpeechEngine {
 enum SpeechEvent {
     /// More transcript text for the current turn.
     case text(String)
+    /// The whole transcript of the current turn so far, for engines whose
+    /// recognizer revises provisional words instead of appending deltas.
+    case replaceText(String, Language?)
     case turnStarted
     case turnEagerEnded
     case turnResumed

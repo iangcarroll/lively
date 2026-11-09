@@ -50,7 +50,7 @@ struct FaceToFaceScreen: View {
         HStack(spacing: narrow ? 8 : 12) {
             HStack(spacing: narrow ? 6 : 10) {
                 // Never truncated: on narrow screens it keeps its width over the spacing.
-                StatusPill(status: store.status, isListening: store.isListening, compact: true)
+                StatusPill(status: store.status, isListening: store.isListening, compact: true, onDevice: store.isUsingOnDevice)
                     .fixedSize()
                 GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
                     onSetTextInput(!showsTextInput)

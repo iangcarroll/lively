@@ -79,7 +79,36 @@ nonisolated final class MicCapture: @unchecked Sendable {
 
     private func configureSession() throws {
         try AudioSessionUsers.begin(.mic)
+        #if os(iOS) && DEBUG
+        logInputTopology()
+        #endif
     }
+
+    #if os(iOS) && DEBUG
+    /// Prints what iOS actually exposes for the built-in mics. Run on the
+    /// device to see whether the top and bottom mics are separate data
+    /// sources, and whether two-channel capture is allowed.
+    private func logInputTopology() {
+        let session = AVAudioSession.sharedInstance()
+        print("MIC availableInputs:")
+        for port in session.availableInputs ?? [] {
+            print("  port type=\(port.portType.rawValue) name=\(port.portName) uid=\(port.uid)")
+            for source in port.dataSources ?? [] {
+                print("    source name=\(source.dataSourceName) id=\(source.dataSourceID) orientation=\(source.orientation?.rawValue ?? "unknown")")
+            }
+            for channel in port.channels ?? [] {
+                print("    channel name=\(channel.channelName) label=\(channel.channelLabel) number=\(channel.channelNumber)")
+            }
+        }
+        print("MIC selected source=\(session.inputDataSource?.dataSourceName ?? "nil") channels=\(session.inputNumberOfChannels)")
+        do {
+            try session.setPreferredInputNumberOfChannels(2)
+            print("MIC requested 2 channels: ok, now \(session.inputNumberOfChannels)")
+        } catch {
+            print("MIC requested 2 channels: failed \(error.localizedDescription)")
+        }
+    }
+    #endif
 
     private func startEngine() throws {
         let input = engine.inputNode
@@ -88,6 +117,9 @@ nonisolated final class MicCapture: @unchecked Sendable {
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
             throw CaptureError.noInput
         }
+        #if os(iOS) && DEBUG
+        print("MIC engine input: \(inputFormat.channelCount) ch at \(inputFormat.sampleRate) Hz, \(inputFormat.commonFormat.rawValue)")
+        #endif
         let converter = AVAudioConverter(from: inputFormat, to: outputFormat)
         state.withLock {
             $0.converter = converter

@@ -134,9 +134,18 @@ extension SpeechProvider {
         languages: Language.voxtral,
         makePipeline: { settings in
             let key = settings.credential(.mistral)
+            let cloud = RealtimeTranscriber(.init(apiKey: key, streamingDelayMs: settings.latency.milliseconds))
+            let translator = MistralTranslator(apiKey: key, model: settings.translationModel)
+            guard SpeechProvider.onDevice.supports(settings.languages) else {
+                return SpeechPipeline(engine: cloud, translator: translator)
+            }
             return SpeechPipeline(
-                engine: RealtimeTranscriber(.init(apiKey: key, streamingDelayMs: settings.latency.milliseconds)),
-                translator: MistralTranslator(apiKey: key, model: settings.translationModel)
+                engine: HybridSpeechEngine(
+                    local: OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript),
+                    cloud: cloud
+                ),
+                translator: translator,
+                fallbackTranslator: AppleTranslator()
             )
         }
     )

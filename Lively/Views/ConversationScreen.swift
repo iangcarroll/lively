@@ -1,4 +1,5 @@
 import SwiftUI
+import Translation
 
 struct ConversationScreen: View {
     @State var store: ConversationStore
@@ -128,6 +129,12 @@ struct ConversationScreen: View {
             #endif
         }
         .onOpenURL(perform: open)
+        .translationTask(store.offlineDownload) { session in
+            // Offers the download when the on-device fallback needs a
+            // language direction that isn't installed yet.
+            nonisolated(unsafe) let session = session
+            try? await session.prepareTranslation()
+        }
         .onAppear {
             if forcesOnboarding {
                 showOnboarding = true
@@ -194,7 +201,7 @@ struct ConversationScreen: View {
 
     private func topBar(wide: Bool, column: StatusColumn?) -> some View {
         HStack(spacing: 10) {
-            StatusPill(status: store.status, isListening: store.isListening)
+            StatusPill(status: store.status, isListening: store.isListening, onDevice: store.isUsingOnDevice)
             Spacer()
             if column == nil { trailingButtons(wide: wide) }
         }

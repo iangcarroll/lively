@@ -37,6 +37,10 @@ final class Utterance: Identifiable {
     /// translated as text.
     var isTyped = false
 
+    /// Transcribed by the on-device stopgap while a server session connects.
+    /// The server re-transcribes the matching audio and replaces these turns.
+    var isProvisional = false
+
     /// The transcript the current `translation` was produced from.
     var translatedSource: String?
 
