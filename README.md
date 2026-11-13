@@ -280,6 +280,8 @@ audio probe also ran two players simultaneously for four rounds; listening
 confirmed separate headphone and speaker output, and both claims released.
 Normal conversation playback still queues translated sentences in order.
 
-Normal conversation startup was exercised on the device. Home Screen return,
-phone-call interruption, and a long-session soak have not yet been verified.
+Normal conversation startup and a Home Screen round trip were also verified.
+Backgrounding stopped capture and released all session claims; one tap after
+returning restarted the real microphone. No crash occurred during these checks.
+Phone-call interruption and a long-session soak have not yet been verified.
 These audio checks did not cover widget sharing in the separate development app.
