@@ -1,0 +1,44 @@
+Adapted from soniqo/speech-swift, Apache-2.0.
+https://github.com/soniqo/speech-swift
+Upstream revision: 31d676c6a7f1a3f9e3004c06914de54e61f0f987
+
+Modified for a local-only runtime: removed AudioCommon, remote downloads,
+logging, protocol and memory extensions; added a local model loader.
+Fixed Japanese phonemizer gap slicing to use UTF-16 NSRange consistently.
+
+Base Kokoro model: hexgrad/Kokoro-82M, Apache-2.0.
+https://huggingface.co/hexgrad/Kokoro-82M
+CoreML conversion: aufklarer/Kokoro-82M-CoreML-INT8, Apache-2.0.
+Model revision: 4ef656f55554ceb242ed11febbdbbffd60dd5938
+
+Retain the third-party attribution comments in the adapted source files.
+This package does not redistribute model weights. Additional changes: actor-owned
+model access, typed asset and inference errors, cancellation between predictions,
+canonical Japanese text normalization, and bounded text requests.
+
+Pronunciation resources and embedded dictionaries
+-----------------------------------------------
+Sources/NeuralVoices/Resources/dict_fr.json, dict_pt.json, and dict_hi.json,
+and the Spanish/Italian literals in PronunciationDicts.swift, were retained
+from the pinned speech-swift source. Its source attribution names
+open-dict-data/ipa-dict (MIT) and standard phonetic references.
+https://github.com/open-dict-data/ipa-dict
+Reference license revision: 972cd67dd5f96bc5660e28070cde26e3928abcd7
+Copyright (c) 2016 dohliam. Full text: ThirdPartyNotices/ipa-dict-MIT.txt.
+Third-party datasets in ipa-dict retain their own licenses; this package
+does not bundle ipa-dict's Japanese, Mandarin, German, Korean, Finnish,
+British English, or other separate datasets. The English dictionaries and
+G2P models are not bundled here; the app's verified model manifest owns them.
+
+Chinese pinyin-to-IPA mapping
+----------------------------
+ChinesePhonemizer.swift attributes its adapted mapping to
+stefantaubert/pinyin-to-ipa (MIT).
+https://github.com/stefantaubert/pinyin-to-ipa
+Reference license revision: 8dfee4d37d18618ce44fbb6452f630b375beec19
+Copyright (c) 2026 Stefan Taubert.
+Full text: ThirdPartyNotices/pinyin-to-ipa-MIT.txt.
+
+The upstream ThirdPartyNotices directory was inspected; its notices cover
+other model families not copied into this package. No espeak-ng, Python
+runtime, or third-party tokenizer dataset is included.
