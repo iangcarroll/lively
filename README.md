@@ -417,10 +417,12 @@ and produced a 3.375 s finite sample (peak 0.376). Warm Japanese Alpha and Kumo
 reached audio in 0.42 s and 0.44 s, respectively. These measure preview
 preparation and generation, not a full translation conversation. The active
 route was the iPhone speaker (`Speaker:2`), without an active AirPods route.
-The user reported hearing neither preview during this run. A separate standard
-playback check reported speaker volume at 5%; listening confirmation is still
-pending. Generated samples and playback callbacks alone do not establish audible
-output or voice quality. These neural-voice checks did not include airplane mode.
+The user initially reported hearing neither preview. A separate standard
+playback check reported speaker volume at 5%. After raising it to 55%, the
+listener confirmed that Japanese Alpha and English Heart sounded good. That
+check used pre-rendered clips with AVAudioPlayer; it confirms the samples are
+audible, rather than the full on-phone synthesis and directional playback path.
+These neural-voice checks did not include airplane mode.
 
 These tests do not replace an iPhone check with AirPods: verify both languages,
 unplug/reconnect during playback, and confirm that incoming speech stays in the
