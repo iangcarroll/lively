@@ -237,7 +237,7 @@ struct ConversationScreen: View {
     }
 
     private func controls(column: StatusColumn?) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 8) {
             if showsTextInput {
                 TypeToTranslateBar(
                     store: store, languages: settings.languages, language: settings.languages.first,
@@ -247,6 +247,15 @@ struct ConversationScreen: View {
                 .padding(column?.edges ?? [], column?.width ?? 0)
                 .transition(.opacity)
             }
+            if !store.visibleUtterances.isEmpty {
+                TranscriptListeningStatus(
+                    status: store.status,
+                    isListening: store.isListening,
+                    languages: settings.languages
+                )
+                .padding(.horizontal, 16)
+                .padding(column?.edges ?? [], column?.width ?? 0)
+            }
             // The status column is free this far down, so the keyboard button
             // sits in it, under the status icons, with the column's other
             // buttons stacked above it.
@@ -255,7 +264,7 @@ struct ConversationScreen: View {
     }
 
     private func controlRow(column: StatusColumn?) -> some View {
-        ZStack {
+        ZStack(alignment: .top) {
             HStack {
                 GlassIconButton(systemImage: "trash", label: "Clear conversation") {
                     withAnimation(.snappy) { store.clear() }
@@ -268,16 +277,24 @@ struct ConversationScreen: View {
                 }
                 .anchorPreference(key: KeyboardButtonBounds.self, value: .bounds) { $0 }
             }
+            .frame(height: 76)
             .padding(.horizontal, 24)
             .padding(column?.edges ?? [], (column?.inset(centering: GlassIconButton.size) ?? 24) - 24)
             // The mic centers on the transcript above it, beside the column.
-            MicButton(isListening: store.isListening, level: store.level, isHearing: store.isHearing) {
-                store.toggleListening()
-            } onHoldStart: {
-                store.startListening()
-            } onHoldEnd: {
-                store.stopListening()
+            VStack(spacing: 4) {
+                MicButton(isListening: store.isListening, level: store.level, isHearing: store.isHearing) {
+                    store.toggleListening()
+                } onHoldStart: {
+                    store.startListening()
+                } onHoldEnd: {
+                    store.stopListening()
+                }
+                Text(store.isListening ? "Stop" : "Start")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
+            .frame(width: 112)
             .padding(column?.edges ?? [], column?.width ?? 0)
         }
         .padding(.top, 8)

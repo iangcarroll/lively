@@ -21,6 +21,12 @@ Soniox is the default because it won the [benchmark](Tools/probe/RESULTS.md).
 Tap the mic to start and stop listening, or hold it to listen only while it's
 pressed, like a walkie-talkie: letting go ends the turn and stops the mic.
 
+In the iOS and macOS transcript, the listening prompt stays above the mic
+after the conversation starts, in both languages. It tells the next person
+they can speak without pressing anything. The mic is labeled **Stop** while
+active and **Start** while off; connecting and offline states show their own
+messages instead of claiming to be listening.
+
 When speaking isn't practical, the keyboard button opens a text field. Typed
 lines go to DeepSeek through the key broker, falling back to on-device
 translation (Apple's Translation framework; ML Kit on Android). Voxtral uses its

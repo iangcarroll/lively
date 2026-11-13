@@ -164,6 +164,59 @@ struct StatusPill: View {
     }
 }
 
+/// Stays beside the transcript controls after the empty-state guidance is gone.
+/// Both readers can see that they can speak without touching the microphone.
+struct TranscriptListeningStatus: View {
+    let status: ConversationStore.ConnectionStatus
+    let isListening: Bool
+    let languages: LanguagePair
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(tint)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(prompt(in: languages.first))
+                    .foregroundStyle(.primary)
+                Text(prompt(in: languages.second))
+                    .foregroundStyle(languages.second.ink)
+            }
+            .font(.headline)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(tint.opacity(isListening ? 0.1 : 0.04), in: .rect(cornerRadius: 16))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func prompt(in language: Language) -> String {
+        guard isListening else { return language.phrases.tapToStart }
+        switch status {
+        case .live: return language.phrases.listening
+        case .offline: return language.phrases.waitingForConnection
+        default: return language.phrases.connecting
+        }
+    }
+
+    private var symbol: String {
+        guard isListening else { return "mic.slash" }
+        switch status {
+        case .live: return "waveform"
+        case .offline: return "wifi.slash"
+        default: return "antenna.radiowaves.left.and.right"
+        }
+    }
+
+    private var tint: Color {
+        guard isListening else { return .secondary }
+        return status == .offline ? .orange : .accentColor
+    }
+}
+
 struct GlassIconButton: View {
     let systemImage: String
     let label: String
