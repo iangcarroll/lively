@@ -203,9 +203,8 @@ struct FallbackTranslator: TranslationService {
     }
 }
 
-/// Translates on device with Apple's Translation framework, for typed text
-/// when no translation API key is set. The languages must be downloaded;
-/// `TypeToTranslateBar` offers the download when it opens.
+/// Translates with installed Apple models. Settings > Offline Languages
+/// prepares the assets; inference never asks to download them or uses cloud TTS.
 struct AppleTranslator: TranslationService {
     func translate(
         _ text: String, from source: Language, to target: Language, context: [Utterance], script: ChineseScript
@@ -213,15 +212,31 @@ struct AppleTranslator: TranslationService {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let session: TranslationSession
-                    if #available(iOS 26.4, macOS 26.4, *) {
-                        session = TranslationSession(installedSource: Self.language(source, script: script), target: Self.language(target, script: script), preferredStrategy: .lowLatency)
-                    } else {
-                        session = TranslationSession(installedSource: Self.language(source, script: script), target: Self.language(target, script: script))
+                    var retry = 0
+                    while true {
+                        try Task.checkCancellation()
+                        do {
+                            // A fresh local session lets the system recover
+                            // from an engine startup failure. This initializer
+                            // cannot request downloads or use a cloud service.
+                            let session: TranslationSession
+                            if #available(iOS 26.4, macOS 26.4, *) {
+                                session = TranslationSession(installedSource: Self.language(source, script: script), target: Self.language(target, script: script), preferredStrategy: .lowLatency)
+                            } else {
+                                session = TranslationSession(installedSource: Self.language(source, script: script), target: Self.language(target, script: script))
+                            }
+                            let response = try await session.translate(text)
+                            try Task.checkCancellation()
+                            continuation.yield(response.targetText)
+                            continuation.finish()
+                            return
+                        } catch {
+                            try Task.checkCancellation()
+                            guard retry < 2, Self.canRetryLocally(error) else { throw error }
+                            retry += 1
+                            try await Task.sleep(for: .milliseconds(250 * retry))
+                        }
                     }
-                    let response = try await session.translate(text)
-                    continuation.yield(response.targetText)
-                    continuation.finish()
                 } catch is CancellationError {
                     continuation.finish(throwing: CancellationError())
                 } catch {
@@ -229,6 +244,19 @@ struct AppleTranslator: TranslationService {
                 }
             }
             continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private static func canRetryLocally(_ error: Error) -> Bool {
+        switch error {
+        case Translation.TranslationError.internalError:
+            return true
+        case Translation.TranslationError.notInstalled:
+            // Shared models may still be settling after installation. Bound
+            // that wait; missing assets still produce the download guidance.
+            return true
+        default:
+            return false
         }
     }
 

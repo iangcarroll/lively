@@ -62,12 +62,16 @@ Missing models produce download guidance instead of starting a download while
 listening. When a cloud conversation loses its connection, downloaded local
 models take over immediately; the cloud provider reconnects when online again.
 
-Spoken translations use installed Apple voices while on-device or offline, or
-when no Soniox key is available. Missing voices must be downloaded in system
-Accessibility settings; the download screen checks voices separately. Local
-speech uses the same headphone/speaker routing and microphone echo gating as
-online speech. The app does not include cloud providers' models or promise that
-every supported online language is available offline.
+The original Soniox voice stays the default, including when recognition and
+text translation use on-device models. That voice needs internet and sends the
+translated text to Soniox; offline translations stay visible without silently
+switching voices. For fully offline speech, explicitly choose **Settings ›
+Speech-to-Speech › Voice › Device voice**. Installed Apple voices can sound
+different from the original voice. Missing voices must be downloaded in system
+Accessibility settings; the download screen checks voices separately. Device
+speech keeps the same headphone/speaker routing and microphone echo gating.
+The app does not include cloud providers' models or promise that every supported
+online language is available offline.
 
 Apple shares and manages these assets, and may remove unused models. Reopen the
 download screen before travel, then verify a fresh launch in airplane mode with
@@ -76,12 +80,27 @@ not immediately delete shared system files. Manage translation downloads in
 Apple's Translate settings. Android's existing ML Kit typed/photo fallback is
 unchanged; this offline spoken-conversation setup is for iOS/macOS.
 
-Device preflight on 2026-11-13 confirmed both English/Chinese speech models,
-both translation directions, and both local voices installed on an iPhone 17 Pro
-running iOS 27.0.1. Real English and Chinese system synthesis also completed on
-macOS. A fresh airplane-mode conversation, both spoken directions, and local
-voice routing on the iPhone remain separate acceptance checks; model readiness
-and the automated suites alone do not establish those results.
+Device checks on 2026-11-13 used an iPhone 17 Pro running iOS 27.0.1. Fixed
+English and Chinese recordings passed through the real microphone file-input
+path, Speech framework, and installed translation models. Both spoken and typed
+directions produced final translations with the expected meaning. The app's
+network policy was held offline, URLSession requests were blocked, and no app
+network attempts occurred during those cases. No live microphone audio was
+recorded or retained.
+
+The device exposed a cold-start inconsistency: one language-availability check
+reported not installed, and the first translation raised `notInstalled`, before
+succeeding on the bounded local retry. The app still reports actual system
+readiness and never converts a failed check into a saved ready flag. Missing
+models still fail with download guidance.
+
+Separate local speech checks produced audio, received playback completion
+callbacks, and applied the headphone/speaker channel maps successfully. The
+original Soniox Chinese voice was also replayed and confirmed by listening.
+Actual network radios stayed connected during automated checks, so a fresh
+airplane-mode launch and a live two-person offline conversation remain
+unverified. These fixture checks establish the on-device pipeline; they don't
+measure recognition accuracy across real speakers, accents, or noisy rooms.
 
 The camera button at the start of the text field translates a photo, such as
 a sign or a menu. Take one (iPhone and iPad) or choose one from Photos. Its

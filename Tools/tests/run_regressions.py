@@ -25,6 +25,7 @@ def main():
         ("offline_speech_regression.py", ["--negative-controls"]),
         ("offline_packs_regression.py", ["--negative-controls"]),
         ("offline_store_regression.py", ["--negative-controls"]),
+        ("apple_translator_regression.py", ["--negative-controls"]),
         ("offline_speaker_regression.py", ["--negative-controls"] + (["--thread-sanitizer"] if args.thread_sanitizer else [])),
     ]
     for name, options in suites:
