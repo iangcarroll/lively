@@ -40,7 +40,7 @@ struct OfflineLanguagesView: View {
                 Button("Use on-device translation") { settings.providerID = SpeechProvider.onDevice.id }
                     .disabled(!packs.ready || packs.isDownloading)
             } footer: {
-                Text("On-device mode keeps speech and text on this device, even with a connection. Tap the speaker's language before speaking. Automatic cloud fallback also uses these downloads when the connection drops. System downloads already started may finish after you stop preparing or leave this screen.")
+                Text("On-device recognition and text translation run locally. The original voice still needs internet; choose Device voice in Speech-to-Speech for fully offline spoken output. Tap the speaker's language before speaking. System downloads already started may finish after you stop preparing or leave this screen.")
             }
 
             Section {

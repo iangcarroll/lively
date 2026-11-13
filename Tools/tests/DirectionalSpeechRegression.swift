@@ -151,6 +151,17 @@ final class ConversationStore {
         // Persistence is tested against the full production AppSettings source.
         TestDefaults.standard.values = [:]
         let settings = AppSettings()
+        check(settings.speechVoice == .original, "default voice changed without opting in")
+        settings.speechVoice = .onDevice
+        check(TestDefaults.standard.string(forKey: "speechVoice") == "onDevice", "device voice was not persisted")
+        check(AppSettings().speechVoice == .onDevice, "device voice did not survive reload")
+        settings.speechVoice = .original
+        check(TestDefaults.standard.string(forKey: "speechVoice") == "original"
+                && AppSettings().speechVoice == .original, "original voice did not survive reload")
+        TestDefaults.standard.set("unrecognized-voice", forKey: "speechVoice")
+        check(AppSettings().speechVoice == .original, "invalid saved voice did not fall back to the original voice")
+        TestDefaults.standard.set(nil, forKey: "speechVoice")
+        check(AppSettings().speechVoice == .original, "existing install without a voice preference changed voice")
         check(settings.offlineSpokenLanguage == .english, "default offline speaker is not first language")
         settings.offlineSpokenLanguage = .chinese
         check(AppSettings().offlineSpokenLanguage == .chinese, "offline speaker did not survive reload")
@@ -288,6 +299,6 @@ final class ConversationStore {
               "cancelled broker denial cleared a new queue")
         staleDenial.stop()
 
-        print("PASS: listener persistence/fallback, both directional targets, old pair, legacy routing, per-line queue, unavailable output, cancelled drain/broker denial")
+        print("PASS: voice/listener persistence and fallback, both directional targets, old pair, legacy routing, per-line queue, unavailable output, cancelled drain/broker denial")
     }
 }

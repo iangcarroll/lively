@@ -65,6 +65,10 @@ final class AppSettings {
         didSet { defaults.set(speaksTranslations, forKey: "speaksTranslations") }
     }
 
+    var speechVoice: SpeechVoice {
+        didSet { defaults.set(speechVoice.rawValue, forKey: "speechVoice") }
+    }
+
     private var speechListenerLanguageCode: String {
         didSet { defaults.set(speechListenerLanguageCode, forKey: "speechListenerLanguage") }
     }
@@ -129,6 +133,7 @@ final class AppSettings {
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel
         speaksTranslations = defaults.bool(forKey: "speaksTranslations")
+        speechVoice = SpeechVoice(rawValue: defaults.string(forKey: "speechVoice") ?? "") ?? .original
         speechListenerLanguageCode = defaults.string(forKey: "speechListenerLanguage") ?? stored.first.rawValue
         offlineSpokenLanguageCode = defaults.string(forKey: "offlineSpokenLanguage") ?? stored.first.rawValue
         for credential in SpeechProvider.allCredentials {
@@ -138,5 +143,16 @@ final class AppSettings {
         // didSet doesn't run here; the widgets may not have this pair yet.
         WidgetLanguages.publish(languages)
         #endif
+    }
+}
+
+enum SpeechVoice: String, CaseIterable, Identifiable, Sendable {
+    case original, onDevice
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .original: "Original voice · internet"
+        case .onDevice: "Device voice · offline"
+        }
     }
 }

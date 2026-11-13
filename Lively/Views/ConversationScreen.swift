@@ -95,6 +95,10 @@ struct ConversationScreen: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    if !store.isOnline, settings.speaksTranslations, settings.speechVoice == .original {
+                        Text("Original voice needs internet; translations stay visible.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -116,6 +120,9 @@ struct ConversationScreen: View {
             store.speechRoutingDidChange()
         }
         .onChange(of: settings.speechListenerLanguage) { _, _ in
+            store.speechRoutingDidChange()
+        }
+        .onChange(of: settings.speechVoice) { _, _ in
             store.speechRoutingDidChange()
         }
         .onChange(of: settings.offlineSpokenLanguage) { _, _ in

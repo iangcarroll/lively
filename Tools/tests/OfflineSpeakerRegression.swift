@@ -160,10 +160,41 @@ final class Renderer: OfflineSpeechRendering {
                 "routing failure synthesized speech or hid the error")
         routeSpeaker.stop()
 
+        voiceSelection()
         try await conversion()
         require(!OfflineSpeaker.hasVoice(for: Language(rawValue: "not-a-language")),
                 "missing language used a default voice")
-        print("PASS: offline speech queue, direction, drain, cancellation, stale callbacks, errors, native PCM conversion (\(assertions) assertions)")
+        print("PASS: offline speech queue, direction, drain, cancellation, stale callbacks, errors, voice ranking, native PCM conversion (\(assertions) assertions)")
+    }
+
+    static func voiceSelection() {
+        typealias Voice = OfflineVoiceSelection.Candidate
+        let legacy = Voice(identifier: "com.apple.eloquence.zh-CN.Reed", language: "zh-CN", quality: 1)
+        let compact = Voice(identifier: "com.apple.voice.compact.zh-CN.Tingting", language: "zh-CN", quality: 1)
+        let bundled = Voice(identifier: "com.apple.ttsbundle.Ting-Ting-compact", language: "zh-CN", quality: 1)
+        let enhanced = Voice(identifier: "com.apple.voice.enhanced.zh-CN.Tingting", language: "zh-CN", quality: 2)
+        let premiumOtherRegion = Voice(identifier: "com.apple.voice.premium.zh-TW.Meijia", language: "zh-TW", quality: 3)
+        func chosen(_ candidates: [Voice], preferred: String? = nil) -> String? {
+            OfflineVoiceSelection.best(in: candidates, preferredLanguage: "zh-CN", preferredIdentifier: preferred)
+        }
+        require(chosen([legacy, compact]) == compact.identifier,
+                "lexically earlier legacy voice won over modern speech")
+        require(chosen([compact, legacy], preferred: legacy.identifier) == compact.identifier,
+                "legacy system choice displaced an available modern voice")
+        require(chosen([legacy, bundled]) == bundled.identifier,
+                "available bundled modern voice lost to legacy speech")
+        require(chosen([compact, bundled], preferred: bundled.identifier) == bundled.identifier,
+                "same-quality modern voices ignored the system's language choice")
+        require(chosen([compact, enhanced], preferred: compact.identifier) == enhanced.identifier,
+                "system preference displaced higher-quality installed speech")
+        require(chosen([premiumOtherRegion, compact]) == compact.identifier,
+                "voice selection changed the requested Mandarin region")
+        require(chosen([legacy]) == legacy.identifier, "legacy-only device lost its available voice")
+        require(chosen([]) == nil, "empty installed voice list produced a voice")
+        require(chosen([compact], preferred: enhanced.identifier) == compact.identifier,
+                "unavailable preferred voice displaced an installed voice")
+        require(chosen([legacy, compact, enhanced]) == chosen([enhanced, compact, legacy]),
+                "voice selection depended on the system's enumeration order")
     }
 
     static func conversion() async throws {

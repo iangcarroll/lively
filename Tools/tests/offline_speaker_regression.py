@@ -51,6 +51,9 @@ def main():
                 "wrong-sample-rate": (
                     "sampleRate: 24_000,",
                     "sampleRate: 16_000,"),
+                "legacy-voice-order": (
+                    "            if first.isModern != second.isModern { return first.isModern }",
+                    "            // Deliberate regression: identifier sorting chooses legacy voices."),
             }
             for name, (before, after) in mutations.items():
                 if actual.count(before) != 1:

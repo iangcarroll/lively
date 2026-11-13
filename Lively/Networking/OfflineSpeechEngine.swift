@@ -478,7 +478,7 @@ extension SpeechProvider {
     static let onDevice = SpeechProvider(
         id: "on-device",
         name: "On-device",
-        summary: "Apple's speech recognition and translation run on this device. No key, and no audio leaves it.",
+        summary: "Apple's speech recognition and text translation run on this device. The original spoken voice still needs internet; choose Device voice for offline speech.",
         credentials: [],
         options: [],
         languages: Language.appleOnDevice,

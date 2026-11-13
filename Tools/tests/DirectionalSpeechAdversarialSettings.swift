@@ -23,6 +23,7 @@ final class ConversationStore {
     var speaker: (any TranslationSpeaker)?
     var speakerUsesOnDevice = false
     var usesOnDeviceServices = false
+    var isOnline = true
     var speakingSince: Date? = .distantPast
     var spoken: [UUID: Int] = [:]
     var speechFlushes: [UUID: Task<Void, Never>] = [:]
@@ -104,6 +105,36 @@ final class ConversationStore {
         await drainActor()
         check(store.speaker == nil && URLSession.shared.sent.count == 4,
               "old pair stays ineligible even when its completion arrives after the cutoff")
+
+        let voiceTurn = Utterance(target: .english, languages: settings.languages)
+        let originalVoice = store.testSpeaker()
+        originalVoice.player.suspendPreparation = true
+        store.accept(voiceTurn, text: "Queued original voice.", complete: true)
+        await until { originalVoice.player.pending.count == 1 }
+        let voiceTail = Utterance(target: Language("fr"), languages: settings.languages)
+        store.accept(voiceTail, text: "deferred original voice", complete: false)
+        let oldFlush = store.speechFlushes.values.first
+        settings.speechVoice = .onDevice
+        store.speechRoutingDidChange()
+        check(originalVoice.player.stopCount == 1 && store.speaker == nil,
+              "voice preference change immediately stops queued original speech")
+        check(oldFlush?.isCancelled == true && store.speechFlushes.isEmpty && store.spoken.isEmpty,
+              "voice preference change cancels deferred original speech")
+        originalVoice.player.pending.removeFirst().resume(returning: true)
+        await drainActor()
+        store.accept(voiceTurn, text: "Queued original voice. Late completion.", complete: true)
+        await drainActor()
+        check(URLSession.shared.sent.count == 4 && store.speaker == nil,
+              "old original-voice callbacks cannot synthesize after opting into device speech")
+        store.accept(Utterance(target: .english, languages: settings.languages),
+                     text: "Fresh device voice.", complete: true)
+        let deviceVoice = store.speaker as? OfflineSpeaker
+        check(deviceVoice != nil && URLSession.shared.sent.count == 4,
+              "fresh speech uses the explicitly selected device voice")
+        settings.speechVoice = .original
+        store.speechRoutingDidChange()
+        check(deviceVoice?.player.stopCount == 1 && store.speaker == nil,
+              "returning to original voice immediately stops the device producer")
 
         settings.speaksTranslations = false
         store.speechRoutingDidChange()

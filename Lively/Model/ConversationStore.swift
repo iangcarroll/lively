@@ -827,8 +827,7 @@ final class ConversationStore {
         speechSettingChanged()
     }
 
-    /// Local voices also work without a Soniox credential.
-    var canSpeakTranslations: Bool { true }
+    var canSpeakTranslations: Bool { settings.speechVoice == .onDevice || SonioxSpeaker.credential(settings) != nil }
 
     /// A language change applies immediately, including while Settings is open.
     /// Old turns must not be spoken for a newly selected listener.
@@ -892,7 +891,12 @@ final class ConversationStore {
     }
 
     private func activeSpeaker() -> (any TranslationSpeaker)? {
-        let local = usesOnDeviceServices || SonioxSpeaker.credential(settings) == nil
+        let local = settings.speechVoice == .onDevice
+        if !local, !isOnline {
+            speaker?.stop()
+            speaker = nil
+            return nil
+        }
         if let speaker, speakerUsesOnDevice == local { return speaker }
         speaker?.stop()
         let speaker: any TranslationSpeaker

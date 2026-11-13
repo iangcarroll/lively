@@ -43,13 +43,12 @@ final class OfflineSpeaker {
             // The app's Chinese language is Mandarin, not Cantonese.
             return language != .chinese || locale.region?.identifier != "HK"
         }
-        return voices.sorted { first, second in
-            let firstMatches = first.language == preferred
-            let secondMatches = second.language == preferred
-            if firstMatches != secondMatches { return firstMatches }
-            if first.quality != second.quality { return first.quality.rawValue > second.quality.rawValue }
-            return first.identifier < second.identifier
-        }.first
+        let identifier = OfflineVoiceSelection.best(
+            in: voices.map { .init(identifier: $0.identifier, language: $0.language, quality: $0.quality.rawValue) },
+            preferredLanguage: preferred,
+            preferredIdentifier: AVSpeechSynthesisVoice(language: preferred)?.identifier
+        )
+        return voices.first { $0.identifier == identifier }
     }
 
     func speak(_ text: String, in language: Language, output: SpeechPlayer.Output = .automatic) {
@@ -96,6 +95,36 @@ final class OfflineSpeaker {
                 return
             }
         }
+    }
+}
+
+/// Voice identifiers include both modern voices and older assistive speech
+/// families. At the same locale and quality, prefer modern speech and the
+/// system's language choice before using an identifier to break a tie.
+nonisolated enum OfflineVoiceSelection {
+    struct Candidate: Sendable {
+        let identifier: String
+        let language: String
+        let quality: Int
+
+        var isModern: Bool {
+            identifier.hasPrefix("com.apple.voice.") || identifier.hasPrefix("com.apple.ttsbundle.")
+        }
+    }
+
+    static func best(in candidates: [Candidate], preferredLanguage: String,
+                     preferredIdentifier: String?) -> String? {
+        candidates.sorted { first, second in
+            let firstMatches = first.language == preferredLanguage
+            let secondMatches = second.language == preferredLanguage
+            if firstMatches != secondMatches { return firstMatches }
+            if first.quality != second.quality { return first.quality > second.quality }
+            if first.isModern != second.isModern { return first.isModern }
+            let firstPreferred = first.identifier == preferredIdentifier
+            let secondPreferred = second.identifier == preferredIdentifier
+            if firstPreferred != secondPreferred { return firstPreferred }
+            return first.identifier < second.identifier
+        }.first?.identifier
     }
 }
 

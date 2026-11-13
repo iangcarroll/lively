@@ -30,6 +30,7 @@ def main():
     methods = "\n".join(block(store, declaration) for declaration in [
         r"private var textTranslator:", r"private var usesOnDeviceServices:",
         r"var translatesTypedTextOnDevice:",
+        r"var canSpeakTranslations:", r"func speechRoutingDidChange\(",
         r"func submitTyped\(", r"private func translate\(", r"private func activeSpeaker\(",
         r"private func setPath\(",
     ])
@@ -45,7 +46,9 @@ def main():
         mutations = [
             ("typed-local-selection-removed", "if usesOnDeviceServices { return AppleTranslator() }", ""),
             ("spoken-local-selection-removed", "self?.demo == nil && self?.usesOnDeviceServices == true ? AppleTranslator() : translator", "translator"),
-            ("cloud-voice-forced", "let local = usesOnDeviceServices || SonioxSpeaker.credential(settings) == nil", "let local = false"),
+            ("voice-preference-ignored", "let local = settings.speechVoice == .onDevice", "let local = usesOnDeviceServices || SonioxSpeaker.credential(settings) == nil"),
+            ("offline-original-network-guard-removed", "if !local, !isOnline {", "if false {"),
+            ("voice-switch-not-cancelled", "func speechRoutingDidChange() {\n        speaker?.stop()", "func speechRoutingDidChange() {"),
             ("cloud-voice-not-cancelled", "speaker?.stop()\n        speaker = nil\n        engine?.networkAvailable = online", "speaker = nil\n        engine?.networkAvailable = online"),
         ]
         for name, old, new in mutations:

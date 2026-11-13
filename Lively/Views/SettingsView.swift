@@ -82,6 +82,10 @@ struct SettingsView: View {
                     Toggle(isOn: $settings.speaksTranslations) {
                         Label { Text("Speak translations aloud") } icon: { SettingsIcon(systemImage: "speaker.wave.2.fill", color: .blue) }
                     }
+                    .disabled(settings.speechVoice == .original && SonioxSpeaker.credential(settings) == nil)
+                    Picker("Voice", selection: $settings.speechVoice) {
+                        ForEach(SpeechVoice.allCases) { Text($0.label).tag($0) }
+                    }
                     if SpeechPlayer.supportsDirectionalOutput {
                         Picker("Your language", selection: $settings.speechListenerLanguage) {
                             ForEach(settings.languages.all) { language in
@@ -205,14 +209,17 @@ struct SettingsView: View {
     }
 
     private var speechFooter: String {
+        let voice = settings.speechVoice == .original
+            ? "The original Soniox voice needs internet and sends translated text to Soniox. Offline translations stay visible without changing to a device voice. "
+            : "Installed device voices work offline and can sound different from the original voice. "
         if SpeechPlayer.supportsDirectionalOutput {
             let incoming = settings.speechListenerLanguage.englishName
             let outgoing = settings.languages.other(than: settings.speechListenerLanguage).englishName
-            return "On-device mode uses installed system voices; online speech uses Soniox when a key is available. Incoming \(incoming) translations play through your headphones. Outgoing \(outgoing) translations play through the device speaker. "
+            return voice + "Incoming \(incoming) translations play through your headphones. Outgoing \(outgoing) translations play through the device speaker. "
                 + "Connect headphones with a microphone; incoming audio stays silent when no compatible headset is connected. "
                 + "Lively pauses microphone audio while the speaker is playing so it won't translate itself."
         }
-        return "Translations into \(settings.languages.second.englishName) are read aloud through the speaker as they arrive. "
+        return voice + "Translations into \(settings.languages.second.englishName) are read aloud through the speaker as they arrive. "
             + "Lively doesn't listen while it speaks, so it won't translate itself, unless you're using headphones. "
             + "You can also turn it on and off from the ⋯ menu in face-to-face."
     }
