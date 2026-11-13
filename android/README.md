@@ -20,6 +20,8 @@ broker, account and Pro allowance:
 - Speech-to-speech, off by default: the ⋮ menu in face-to-face (or Settings) reads
   translations into the second language aloud with Soniox Text-to-Speech,
   muting the mic while it speaks unless headphones are connected.
+  Separate incoming-headphone / outgoing-speaker playback is currently an
+  iOS 26.2+ feature; Android uses its normal audio output.
 - Typing instead of speaking from the keyboard button, translated by
   DeepSeek through the key broker, falling back to ML Kit on the device
   (Apple's Translation framework on iOS).
