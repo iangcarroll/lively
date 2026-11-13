@@ -103,6 +103,8 @@ struct StatusPill: View {
     let isListening: Bool
     /// Dot only, for tight spaces; the label is still read by VoiceOver.
     var compact = false
+    /// The on-device engine is standing in for the chosen provider.
+    var onDevice = false
 
     var body: some View {
         HStack(spacing: 7) {
@@ -138,7 +140,7 @@ struct StatusPill: View {
         switch status {
         case .idle: "Ready"
         case .connecting: "Connecting…"
-        case .live: "Listening"
+        case .live: onDevice ? "On-device" : "Listening"
         case .reconnecting: "Reconnecting…"
         case .offline: isListening ? "Offline · holding audio" : "Offline"
         case .failed: "Needs attention"

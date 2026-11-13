@@ -22,7 +22,7 @@ struct SpeechProvider: Identifiable {
         pair.all.allSatisfy(languages.contains)
     }
 
-    static let all: [SpeechProvider] = [.soniox, .voxtralMistral]
+    static let all: [SpeechProvider] = [.soniox, .voxtralMistral, .onDevice]
     /// Soniox won the 2026-10-20 benchmark (Tools/probe/RESULTS.md): every
     /// turn translated, no leaks, lowest cost.
     static let fallback = SpeechProvider.soniox
@@ -60,4 +60,7 @@ struct SpeechPipeline {
     var engine: SpeechEngine
     /// Nil when the engine translates by itself.
     var translator: TranslationService?
+    /// Translates while the on-device stopgap is active, before a hybrid
+    /// engine's server session is live.
+    var fallbackTranslator: TranslationService?
 }

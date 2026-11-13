@@ -95,6 +95,15 @@ struct Language: Hashable, Identifiable, RawRepresentable, Sendable {
     static let voxtral: [Language] = [
         "en", "zh", "hi", "es", "ar", "fr", "pt", "ru", "de", "ja", "ko", "it", "nl",
     ].map { Language($0) }
+
+    /// Languages Apple's on-device speech recognizer can listen for. The
+    /// offline engine checks the exact list for this device at runtime with
+    /// `SpeechTranscriber.supportedLocale(equivalentTo:)`.
+    static let appleOnDevice: [Language] = [
+        "en", "zh", "es", "fr", "de", "it", "ja", "ko", "pt", "ru", "ar", "hi", "nl", "tr", "pl",
+        "th", "vi", "uk", "id", "sv", "da", "no", "fi", "ms", "cs", "hu", "ro", "sk", "hr", "ca",
+        "el", "he",
+    ].map { Language($0) }
 }
 
 /// The two languages of a conversation. Lively listens for both and

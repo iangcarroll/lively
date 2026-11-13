@@ -15,8 +15,20 @@ Settings are stored in the Keychain.
 |---|---|---|
 | **Soniox** (default) | `stt-rt-v5` transcribes and translates both ways (`two_way`, en ⇄ zh) in one stream, so there's no second request per turn | from the [key broker](#soniox-keys), or your own from console.soniox.com |
 | **Voxtral + Mistral** | `voxtral-mini-transcribe-realtime-3` transcribes and detects turns, then a Mistral chat model translates each turn | console.mistral.ai |
+| **On-device** (iOS/macOS) | Apple's Speech and Translation frameworks run on this device. No key, and no audio leaves the device | none |
 
 Soniox is the default because it won the [benchmark](Tools/probe/RESULTS.md).
+
+Soniox and Voxtral listen through **HybridSpeechEngine**: tapping the mic starts
+the on-device recognizer immediately, so hearing and translating work while the
+server session connects. The audio heard during that wait is kept in a short
+buffer and replayed to the server when it comes online, then the provisional
+on-device turns are replaced by the server's more accurate transcript. If the
+server never arrives — or drops mid-conversation — the on-device recognizer
+carries the conversation. The first time it does, Lively offers to download the
+Apple translation languages, both directions. On-device listening is iOS/macOS
+only; Android keeps ML Kit for typed text (see
+[android/README.md](android/README.md)).
 
 Tap the mic to start and stop listening, or hold it to listen only while it's
 pressed, like a walkie-talkie: letting go ends the turn and stops the mic.
@@ -121,6 +133,8 @@ when the conversation screen appears.
 | Pickup range: quiet chunks sent as silence | `Audio/NoiseGate.swift` |
 | Engine registry: names, keys, which settings apply, how to build each pipeline | `Model/SpeechProvider.swift` |
 | Engine interface and events | `Networking/SpeechEngine.swift` |
+| On-device ASR for the stopgap and fallback (Speech framework) | `Networking/OfflineSpeechEngine.swift` |
+| Local stopgap, audio buffer, replay and handoff to the server | `Networking/HybridSpeechEngine.swift` |
 | Reconnects, pings, audio backlog, shared by every engine | `Networking/ResilientSocket.swift` |
 | Voxtral: WebSocket to `voxtral-mini-transcribe-realtime-3`, language auto-detected, turn detection on | `Networking/RealtimeTranscriber.swift` |
 | Voxtral: streaming translation over Mistral chat completions | `Networking/Translator.swift` |

@@ -394,7 +394,19 @@ extension SpeechProvider {
             } else {
                 .apiKey(key)
             }
-            return SpeechPipeline(engine: SonioxTranscriber(.init(credential: credential, languages: settings.languages)), translator: nil)
+            let cloud = SonioxTranscriber(.init(credential: credential, languages: settings.languages))
+            guard SpeechProvider.onDevice.supports(settings.languages) else {
+                return SpeechPipeline(engine: cloud, translator: nil)
+            }
+            // The on-device model covers the wait for the server session.
+            return SpeechPipeline(
+                engine: HybridSpeechEngine(
+                    local: OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript),
+                    cloud: cloud
+                ),
+                translator: nil,
+                fallbackTranslator: AppleTranslator()
+            )
         }
     )
 }

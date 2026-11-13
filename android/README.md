@@ -33,6 +33,11 @@ broker, account and Pro allowance:
   and adds it as a typed turn. The Latin, Chinese, Japanese, Korean and
   Devanagari models are bundled, so it works offline and without Play
   services.
+- The live on-device stopgap and fallback are iOS/macOS only: Apple's Speech
+  and Translation frameworks have no Android equivalent for streaming
+  on-device ASR plus translation. Android keeps the ML Kit fallback for typed
+  text and uses Soniox or Voxtral for speech. This is the app's one intentional
+  platform difference; see [../README.md](../README.md#engines).
 - Swipe a turn in the transcript, or long-press it, to delete it. Long-press
   also offers Edit, which fixes a misheard transcript and translates it
   again; in face-to-face, long-press one of your own lines.

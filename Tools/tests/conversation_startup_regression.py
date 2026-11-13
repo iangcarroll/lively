@@ -35,12 +35,18 @@ def method(source, name):
 def build_source(source):
     names = ["isListening", "level", "isHearing", "alert", "settings", "mic",
              "demo", "gate", "speaker", "transcriberStatus", "listeningStart",
-             "listeningGeneration"]
+             "listeningGeneration", "utterances", "pendingDiscard"]
     fields = []
     for name in names:
         match = re.search(r"^    (?:private(?:\(set\))? )?(?:let|var) " + name + r"(?:[ : =].*)?$", source, re.M)
         if match:
             fields.append(match.group())
+        # Older baselines predate stopgap turns; keep their methods buildable
+        # so the original startup failure is still detected at runtime.
+        elif name == "utterances":
+            fields.append("    private(set) var utterances: [Utterance] = []")
+        elif name == "pendingDiscard":
+            fields.append("    private var pendingDiscard: TimeInterval?")
     methods = [method(source, name) for name in ["toggleListening", "startListening", "stopListening", "didEnterBackground"]]
     return PRELUDE + "\n@MainActor final class ConversationStore {\n" + "\n".join(fields) + SUPPORT + "\n".join(methods) + "\n}\n" + TESTS
 
@@ -53,13 +59,25 @@ enum Failure: LocalizedError {
     var errorDescription: String? { "injected startup failure" }
 }
 enum SpeechEngineStatus { case idle, live }
-struct Credential { let name: String }
-struct SpeechProvider { let credentials = [Credential(name: "test")] }
+struct Credential: Sendable { let name: String }
+struct SpeechProvider: Sendable {
+    let id: String
+    let credentials: [Credential]
+    init(id: String = "cloud", credentials: [Credential] = [Credential(name: "test")]) {
+        self.id = id
+        self.credentials = credentials
+    }
+    static let onDevice = SpeechProvider(id: "on-device", credentials: [])
+}
 @MainActor final class AppSettings {
     var provider = SpeechProvider()
     var hasCredentials = true
 }
 struct NoiseGate { mutating func reset() {} }
+@MainActor final class Utterance {
+    var isProvisional: Bool
+    init(isProvisional: Bool) { self.isProvisional = isProvisional }
+}
 @MainActor final class DemoConversation {
     func play(into: ConversationStore) {}
     func stop() {}
@@ -106,10 +124,25 @@ SUPPORT = r'''
     var engineStarts = 0
     var engineReleases = 0
     var enginePauses = 0
+    var stopDuringEngineStart = false
     init() { settings = AppSettings() }
     var testMic: MicCapture { mic }
+    var testSettings: AppSettings { settings }
+    var testPendingDiscard: TimeInterval? { pendingDiscard }
     func injectSpeaker(_ value: SonioxSpeaker) { speaker = value }
-    func startEngine(_ provider: SpeechProvider) { engineStarts += 1 }
+    func seedProvisionalTurn() -> Utterance {
+        let utterance = Utterance(isProvisional: true)
+        utterances.append(utterance)
+        pendingDiscard = 5
+        return utterance
+    }
+    func startEngine(_ provider: SpeechProvider) {
+        engineStarts += 1
+        if stopDuringEngineStart {
+            stopListening()
+            releaseEngine()
+        }
+    }
     func releaseEngine() { engineReleases += 1 }
     func pauseEngine() { enginePauses += 1 }
     func finalizeCurrent() {}
@@ -245,7 +278,61 @@ TESTS = r'''
         await drain()
         interruptedSpeech.stopListening()
 
-        print("PASS: permission release, background, toggle cancellation, stale permission, stale success/failure, startup failure, synthesis interruption")
+        // A local or hybrid engine can fail synchronously before mic startup.
+        // That failure must cancel startup without taking an audio session.
+        let engineFailed = ConversationStore()
+        engineFailed.stopDuringEngineStart = true
+        engineFailed.startListening()
+        await until { !MicCapture.permissions.isEmpty }
+        permission(true)
+        await drain()
+        require(!engineFailed.isListening && engineFailed.engineStarts == 1
+                && engineFailed.engineReleases == 1 && engineFailed.enginePauses == 1,
+                "synchronous engine failure did not stop the current request")
+        require(engineFailed.testMic.starts.isEmpty
+                && engineFailed.testMic.originalStartCount() == 0,
+                "synchronous engine failure reached microphone startup")
+        engineFailed.stopDuringEngineStart = false
+        engineFailed.startListening()
+        await until { !MicCapture.permissions.isEmpty }
+        permission(true)
+        await until { engineFailed.testMic.starts.count == 1 }
+        engineFailed.testMic.starts.removeFirst().resume()
+        await drain()
+        require(engineFailed.isListening, "engine failure blocked the next start")
+        engineFailed.stopListening()
+
+        // On-device recognition doesn't need cloud credentials. A cloud
+        // provider without credentials must still stop before permission.
+        let local = ConversationStore()
+        local.testSettings.provider = .onDevice
+        local.testSettings.hasCredentials = false
+        local.startListening()
+        await until { !MicCapture.permissions.isEmpty }
+        permission(true)
+        await until { local.testMic.starts.count == 1 }
+        local.testMic.starts.removeFirst().resume()
+        await drain()
+        require(local.isListening && local.engineStarts == 1 && local.alert == nil,
+                "on-device startup required cloud credentials")
+
+        // A stop keeps stopgap text and clears the pending cloud replacement.
+        let provisional = local.seedProvisionalTurn()
+        local.stopListening()
+        require(!provisional.isProvisional && local.testPendingDiscard == nil,
+                "stopping left provisional text pending replacement")
+        require(!local.isListening && local.testMic.stopCount == 1,
+                "stopping on-device capture did not stop the microphone")
+
+        let noCredentials = ConversationStore()
+        noCredentials.testSettings.hasCredentials = false
+        noCredentials.startListening()
+        await drain()
+        require(noCredentials.engineStarts == 0 && MicCapture.permissions.isEmpty
+                && noCredentials.testMic.starts.isEmpty && noCredentials.alert != nil,
+                "cloud startup without credentials reached permission or capture")
+
+        print("PASS: permission release, background, toggle cancellation, stale permission, stale success/failure, startup failure, synthesis interruption, synchronous engine failure, on-device credentials, provisional stop cleanup")
     }
 }
 '''

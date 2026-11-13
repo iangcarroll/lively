@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import Observation
+import Translation
 #if os(iOS)
 import UIKit
 #endif
@@ -39,8 +40,25 @@ final class ConversationStore {
     private var languages: LanguagePair
     private let mic = MicCapture()
     private var engine: SpeechEngine?
+    /// The provider `engine` was built from, so a different one isn't resumed.
+    private var engineProviderID: String?
     private let pathMonitor = NWPathMonitor()
     private var translator: TranslationService?
+    /// The chosen provider's translator, and the one used while the local
+    /// stopgap is in charge.
+    private var primaryTranslator: TranslationService?
+    private var fallbackTranslator: TranslationService?
+    /// The local engine is transcribing while the server session connects.
+    private var usingStopgap = false
+    /// Provisional turns stay visible until the server produces its first
+    /// real transcript, so the handoff doesn't blank the conversation.
+    private var pendingDiscard: TimeInterval?
+    /// True while the on-device engine is standing in for the chosen provider.
+    private(set) var isUsingOnDevice = false
+    /// A cloud engine failed and the on-device engine took over this session.
+    private var didFallBackToOnDevice = false
+    /// Drives the system download sheet for the on-device translation models.
+    var offlineDownload: TranslationSession.Configuration?
 
     /// The turn currently receiving transcript text.
     private var current: Utterance?
@@ -190,7 +208,7 @@ final class ConversationStore {
             return
         }
         let provider = settings.provider
-        guard settings.hasCredentials else {
+        guard provider.id == SpeechProvider.onDevice.id || settings.hasCredentials else {
             let names = provider.credentials.map(\.name).formatted(.list(type: .and))
             alert = "Add your \(names) in Settings to start."
             return
@@ -233,7 +251,7 @@ final class ConversationStore {
     }
 
     private func startEngine(_ provider: SpeechProvider) {
-        if let engine {
+        if let engine, engineProviderID == provider.id, !(engine is HybridSpeechEngine) {
             // Still warm from the last pause.
             idleTeardown?.cancel()
             idleTeardown = nil
@@ -241,16 +259,60 @@ final class ConversationStore {
             refreshStatus()
             return
         }
+        // A session built for another provider can't be reused, and a hybrid
+        // one restarts from the local stopgap on every listen.
+        if let engine {
+            engine.stop()
+            self.engine = nil
+            engineProviderID = nil
+        }
         makeEngine(provider).start()
+    }
+
+    /// Offers the system download for on-device translation, both ways, when
+    /// the fallback starts and a direction isn't installed yet.
+    private func requestOfflineLanguagesIfNeeded() {
+        guard isUsingOnDevice else { return }
+        let first = AppleTranslator.language(languages.first, script: settings.chineseScript)
+        let second = AppleTranslator.language(languages.second, script: settings.chineseScript)
+        Task { [weak self] in
+            let availability = LanguageAvailability()
+            if await availability.status(from: first, to: second) != .installed {
+                self?.offlineDownload = TranslationSession.Configuration(source: first, target: second)
+            } else if await availability.status(from: second, to: first) != .installed {
+                self?.offlineDownload = TranslationSession.Configuration(source: second, target: first)
+            }
+        }
     }
 
     private func makeEngine(_ provider: SpeechProvider) -> SpeechEngine {
         let pipeline = provider.makePipeline(settings)
-        translator = pipeline.translator
+        primaryTranslator = pipeline.translator
+        fallbackTranslator = pipeline.fallbackTranslator
         let engine = pipeline.engine
+        if let hybrid = engine as? HybridSpeechEngine {
+            // The on-device model is the stopgap until the server connects,
+            // and translates its provisional turns itself.
+            translator = pipeline.fallbackTranslator
+            isUsingOnDevice = true
+            usingStopgap = true
+            hybrid.onSourceChange = { [weak self] source, replayed in
+                self?.sourceChanged(source, replayed: replayed)
+            }
+            requestOfflineLanguagesIfNeeded()
+        } else {
+            translator = pipeline.translator
+            isUsingOnDevice = provider.id == SpeechProvider.onDevice.id
+            usingStopgap = false
+            if isUsingOnDevice { requestOfflineLanguagesIfNeeded() }
+        }
         engine.onEvent = { [weak self] in self?.handle($0) }
         engine.onStatus = { [weak self] status in
             guard let self else { return }
+            if case .failed(let message) = status, self.canFallBackToOnDevice {
+                self.fallBackToOnDevice(reason: message)
+                return
+            }
             self.transcriberStatus = status
             if self.isListening {
                 self.refreshStatus()
@@ -261,7 +323,79 @@ final class ConversationStore {
         }
         engine.networkAvailable = isOnline
         self.engine = engine
+        engineProviderID = provider.id
         return engine
+    }
+
+    /// The hybrid engine moved between the local stopgap and the server.
+    private func sourceChanged(_ source: HybridSpeechEngine.Source, replayed: TimeInterval) {
+        switch source {
+        case .local:
+            translator = fallbackTranslator
+            isUsingOnDevice = true
+            usingStopgap = true
+            pendingDiscard = nil
+            requestOfflineLanguagesIfNeeded()
+        case .cloud:
+            translator = primaryTranslator
+            isUsingOnDevice = false
+            usingStopgap = false
+            // Keep the local turns until the server says something; the
+            // first substantial server result replaces the matching ones.
+            pendingDiscard = replayed
+        }
+        refreshStatus()
+    }
+
+    /// Removes the on-device turns whose audio the server just re-transcribed.
+    /// Turns older than the replayed window stay; they weren't sent again.
+    private func discardProvisionalTurns(replayed: TimeInterval) {        let cutoff = Date().addingTimeInterval(-replayed)
+        let doomed = utterances.filter {
+            $0.isProvisional && ($0.createdAt >= cutoff || $0 === current)
+        }
+        guard !doomed.isEmpty else { return }
+        let identifiers = Set(doomed.map { ObjectIdentifier($0) })
+        for utterance in doomed {
+            translations.removeValue(forKey: utterance.id)?.cancel()
+            debounces.removeValue(forKey: utterance.id)?.cancel()
+            speechFlushes.removeValue(forKey: utterance.id)?.cancel()
+            spoken[utterance.id] = Int.max
+            if current === utterance { current = nil }
+        }
+        utterances.removeAll { identifiers.contains(ObjectIdentifier($0)) }
+        segmentUtterances = segmentUtterances.filter { !identifiers.contains(ObjectIdentifier($0.value)) }
+        catchUpUtterances = catchUpUtterances.filter { !identifiers.contains(ObjectIdentifier($0.value)) }
+    }
+
+    /// Waits for a substantial server result before replacing the stopgap
+    /// turns, so the transcript doesn't go blank during the handoff.
+    private func discardPendingIfReady(length: Int) {
+        guard let replayed = pendingDiscard, length >= 10 else { return }
+        pendingDiscard = nil
+        discardProvisionalTurns(replayed: replayed)
+    }
+
+    /// A cloud engine failed before the fallback was already in use.
+    private var canFallBackToOnDevice: Bool {
+        isListening && !isUsingOnDevice && !didFallBackToOnDevice
+            && SpeechProvider.onDevice.supports(languages)
+    }
+
+    /// Replaces a failed cloud session with the on-device one, keeping the
+    /// microphone and the rest of the conversation running.
+    private func fallBackToOnDevice(reason: String) {
+        guard canFallBackToOnDevice else { return }
+        didFallBackToOnDevice = true
+        isUsingOnDevice = true
+        // The failed session's turn can't continue on the new engine.
+        handle(.sessionReset)
+        engine?.stop()
+        engine = nil
+        engineProviderID = nil
+        transcriberStatus = .connecting
+        requestOfflineLanguagesIfNeeded()
+        makeEngine(.onDevice).start()
+        refreshStatus()
     }
 
     func stopListening() {
@@ -276,6 +410,12 @@ final class ConversationStore {
         level = 0
         isHearing = false
         Self.keepScreenAwake(false)
+        // Turns heard while the server was still connecting stay in the
+        // transcript if listening ends before it does.
+        for utterance in utterances where utterance.isProvisional {
+            utterance.isProvisional = false
+        }
+        pendingDiscard = nil
         finalizeCurrent()
         refreshStatus()
     }
@@ -329,6 +469,14 @@ final class ConversationStore {
         idleTeardown = nil
         engine?.stop()
         engine = nil
+        engineProviderID = nil
+        isUsingOnDevice = false
+        didFallBackToOnDevice = false
+        usingStopgap = false
+        pendingDiscard = nil
+        primaryTranslator = nil
+        fallbackTranslator = nil
+        offlineDownload = nil
         transcriberStatus = .idle
     }
 
@@ -345,6 +493,7 @@ final class ConversationStore {
         segmentUtterances.removeAll()
         catchUpUtterances.removeAll()
         dropoutIndex = nil
+        pendingDiscard = nil
         utterances.removeAll()
     }
 
@@ -420,15 +569,34 @@ final class ConversationStore {
     func handle(_ event: SpeechEvent) {
         switch event {
         case .text(let delta):
+            discardPendingIfReady(length: delta.count)
             let utterance: Utterance
             if let current {
                 utterance = current
             } else {
                 utterance = Utterance(languages: languages)
+                utterance.isProvisional = usingStopgap
                 utterances.append(utterance)
                 current = utterance
             }
             utterance.append(utterance.source.isEmpty ? delta.trimmingLeadingWhitespace() : delta)
+            scheduleTranslation(utterance, after: .milliseconds(280))
+            armSilenceFallback()
+
+        case .replaceText(let text, let language):
+            discardPendingIfReady(length: text.count)
+            // The on-device recognizer revises provisional words, so its
+            // results replace the turn's transcript instead of appending.
+            let utterance: Utterance
+            if let current {
+                utterance = current
+            } else {
+                utterance = Utterance(languages: languages)
+                utterance.isProvisional = usingStopgap
+                utterances.append(utterance)
+                current = utterance
+            }
+            utterance.setSource(text, language: language)
             scheduleTranslation(utterance, after: .milliseconds(280))
             armSilenceFallback()
 
@@ -455,6 +623,7 @@ final class ConversationStore {
             }
 
         case .segment(let segment):
+            discardPendingIfReady(length: segment.source.count)
             apply(segment)
 
         case .sessionReset:
