@@ -6,6 +6,7 @@ struct SpeechProvider {
     static let onDevice = Self(id: "on-device")
 }
 enum ProviderCredential { case mistral }
+enum SpeechSource { case original, downloaded }
 final class AppSettings {
     var provider = SpeechProvider(id: "cloud")
     var languages = LanguagePair(first: .english, second: Language("fr"))
@@ -13,6 +14,7 @@ final class AppSettings {
     var translationModel = "test"
     var speaksTranslations = true
     var hasSpeechCredential = true
+    var speechSource = SpeechSource.original
     func credential(_ credential: ProviderCredential) -> String { "test" }
 }
 protocol TranslationService {
@@ -32,9 +34,12 @@ enum Calls {
     static var pending: [AsyncThrowingStream<String, Error>.Continuation] = []
     static var cloudCancellations = 0
     static var cloudSpeakers = 0
+    static var neuralSpeakers = 0
     static func reset() {
         local = []; cloud = 0; holdCloud = false; missingPack = false
-        pending = []; cloudCancellations = 0; cloudSpeakers = 0
+        pending = []; cloudCancellations = 0; cloudSpeakers = 0; neuralSpeakers = 0
+        NeuralVoicePacks.shared.isReady = false
+        NeuralVoicePacks.shared.status = .notInstalled
     }
 }
 struct AppleTranslator: TranslationService {
@@ -87,6 +92,20 @@ final class SonioxSpeaker {
     func speak(_ text: String, in language: Language, output: SpeechPlayer.Output) {}
     func stop() { stops += 1 }
 }
+final class NeuralVoicePacks {
+    enum Status { case checking, notInstalled, ready, failed }
+    static let shared = NeuralVoicePacks()
+    var isReady = false
+    var status = Status.notInstalled
+}
+final class NeuralSpeaker: TranslationSpeaker {
+    let player = SpeechPlayer()
+    var onError: (String) -> Void = { _ in }
+    var stops = 0
+    init() { Calls.neuralSpeakers += 1 }
+    func speak(_ text: String, in language: Language, output: SpeechPlayer.Output) {}
+    func stop() { stops += 1 }
+}
 enum NWInterface { enum InterfaceType { case wifi, cellular } }
 final class FakeEngine {
     var networkAvailable = true
@@ -107,6 +126,7 @@ final class ConversationStore {
     var translator: (any TranslationService)?
     var translations: [UUID: Task<Void, Never>] = [:]
     var speaker: (any TranslationSpeaker)?
+    var speakerSource: SpeechSource?
     var speakingSince: Date? = .distantPast
     var spoken: [UUID: Int] = [:]
     var speechFlushes: [UUID: Task<Void, Never>] = [:]
@@ -217,6 +237,77 @@ final class ConversationStore {
         check(!missingVoiceKey.canSpeakTranslations && missingVoiceKey.chooseSpeaker() == nil
                 && Calls.cloudSpeakers == 0,
               "missing original voice credentials do not silently enable a different voice")
+
+        Calls.reset()
+        let downloaded = ConversationStore()
+        downloaded.settings.speechSource = .downloaded
+        downloaded.settings.hasSpeechCredential = false
+        downloaded.changeNetwork(false)
+        NeuralVoicePacks.shared.isReady = true
+        NeuralVoicePacks.shared.status = .ready
+        let localSpeech = downloaded.chooseSpeaker() as? NeuralSpeaker
+        check(downloaded.canSpeakTranslations && localSpeech != nil,
+              "explicit downloaded speech works offline without cloud credentials")
+        check((downloaded.chooseSpeaker() as? NeuralSpeaker) === localSpeech
+                && Calls.neuralSpeakers == 1 && Calls.cloudSpeakers == 0,
+              "downloaded speech reuses its producer and never creates cloud speech")
+        downloaded.changeNetwork(true)
+        downloaded.changeNetwork(false)
+        check((downloaded.chooseSpeaker() as? NeuralSpeaker) === localSpeech
+                && localSpeech?.stops == 0 && Calls.neuralSpeakers == 1 && Calls.cloudSpeakers == 0,
+              "network loss and reconnection preserve in-flight downloaded speech")
+        downloaded.settings.speechSource = .original
+        downloaded.speechRoutingDidChange()
+        check(downloaded.chooseSpeaker() == nil && localSpeech?.stops == 1
+                && Calls.neuralSpeakers == 1 && Calls.cloudSpeakers == 0,
+              "original speech remains silent offline even when a verified downloaded pack exists")
+
+        Calls.reset()
+        let unverified = ConversationStore()
+        unverified.settings.speechSource = .downloaded
+        for status in [NeuralVoicePacks.Status.notInstalled, .failed] {
+            NeuralVoicePacks.shared.status = status
+            check(unverified.chooseSpeaker() == nil && Calls.cloudSpeakers == 0 && Calls.neuralSpeakers == 0,
+                  "missing or failed downloaded pack has no cloud fallback even online")
+        }
+        NeuralVoicePacks.shared.status = .checking
+        unverified.changeNetwork(false)
+        check(unverified.chooseSpeaker() is NeuralSpeaker && Calls.cloudSpeakers == 0,
+              "cold local verification can retain the first offline sentence without cloud fallback")
+        unverified.speechRoutingDidChange()
+        NeuralVoicePacks.shared.status = .failed
+        check(unverified.chooseSpeaker() == nil && Calls.cloudSpeakers == 0,
+              "failed verification invalidation cannot restart a downloaded producer")
+
+        Calls.reset()
+        let switching = ConversationStore()
+        let previousOriginal = switching.chooseSpeaker() as? SonioxSpeaker
+        switching.settings.speechSource = .downloaded
+        NeuralVoicePacks.shared.isReady = true
+        NeuralVoicePacks.shared.status = .ready
+        let selectedDownloaded = switching.chooseSpeaker() as? NeuralSpeaker
+        check(previousOriginal?.stops == 1 && selectedDownloaded != nil,
+              "source mismatch cancels original synthesis before creating downloaded speech")
+        switching.settings.speechSource = .original
+        let selectedOriginal = switching.chooseSpeaker() as? SonioxSpeaker
+        check(selectedDownloaded?.stops == 1 && selectedOriginal != nil
+                && selectedOriginal !== previousOriginal,
+              "source mismatch cancels downloaded synthesis before creating original speech")
+        switching.settings.speechSource = .downloaded
+        let deferredOriginal = Task<Void, Never> { try? await Task.sleep(for: .seconds(60)) }
+        switching.speechFlushes[UUID()] = deferredOriginal
+        switching.spoken[UUID()] = 5
+        switching.speechRoutingDidChange()
+        check(selectedOriginal?.stops == 1 && deferredOriginal.isCancelled
+                && switching.speechFlushes.isEmpty && switching.spoken.isEmpty,
+              "source-change hook cancels both the current producer and deferred old-source text")
+        let downloadedBeforeDeletion = switching.chooseSpeaker() as? NeuralSpeaker
+        NeuralVoicePacks.shared.isReady = false
+        NeuralVoicePacks.shared.status = .notInstalled
+        switching.speechRoutingDidChange()
+        check(downloadedBeforeDeletion?.stops == 1 && switching.chooseSpeaker() == nil
+                && Calls.cloudSpeakers == 2,
+              "pack removal hook stops downloaded synthesis without replacing it with cloud speech")
 
         Calls.reset()
         Calls.holdCloud = true

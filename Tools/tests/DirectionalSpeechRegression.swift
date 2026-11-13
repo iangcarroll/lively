@@ -96,6 +96,30 @@ final class URLSessionWebSocketTask {
     func receive() async throws -> Message { .object(["stream_id": stream, "terminated": true]) }
 }
 
+// Store integration fakes: synthesis and voice-ID selection are covered by the
+// adapter suite. These record the target language and destination from Store.
+final class NeuralVoicePacks {
+    enum Status { case checking, notInstalled, ready, failed }
+    static let shared = NeuralVoicePacks()
+    var isReady = false
+    var status = Status.notInstalled
+}
+final class NeuralSpeaker: TranslationSpeaker {
+    struct Line {
+        let text: String
+        let language: Language
+        let output: SpeechPlayer.Output
+    }
+    let player = SpeechPlayer()
+    var onError: (String) -> Void = { _ in }
+    var lines: [Line] = []
+    var stops = 0
+    func speak(_ text: String, in language: Language, output: SpeechPlayer.Output) {
+        lines.append(Line(text: text, language: language, output: output))
+    }
+    func stop() { stops += 1; player.stop() }
+}
+
 // INSERT_ACTUAL_LANGUAGE
 // INSERT_ACTUAL_SETTINGS
 // INSERT_ACTUAL_SPEAKER
@@ -143,6 +167,16 @@ final class ConversationStore {
         // Persistence is tested against the full production AppSettings source.
         TestDefaults.standard.values = [:]
         let settings = AppSettings()
+        check(settings.speechSource == .original, "original speech source is not the default")
+        settings.speechSource = .downloaded
+        check(TestDefaults.standard.string(forKey: "speechSource") == "downloaded",
+              "downloaded speech source was not saved")
+        check(AppSettings().speechSource == .downloaded, "downloaded speech source did not survive reload")
+        settings.speechSource = .original
+        check(AppSettings().speechSource == .original, "original speech source did not survive reload")
+        TestDefaults.standard.set("unknown-future-source", forKey: "speechSource")
+        check(AppSettings().speechSource == .original, "invalid speech source did not return to original")
+        TestDefaults.standard.set(nil, forKey: "speechSource")
         TestDefaults.standard.set("onDevice", forKey: "speechVoice")
         _ = AppSettings()
         check(TestDefaults.standard.string(forKey: "speechVoice") == nil,
@@ -288,6 +322,6 @@ final class ConversationStore {
               "cancelled broker denial cleared a new queue")
         staleDenial.stop()
 
-        print("PASS: removed voice preference migration, listener persistence and fallback, both directional targets, old pair, legacy routing, per-line queue, unavailable output, cancelled drain/broker denial")
+        print("PASS: source default/persistence/fallback, removed voice preference migration, listener persistence and fallback, both directional targets, old pair, legacy routing, per-line queue, unavailable output, cancelled drain/broker denial")
     }
 }

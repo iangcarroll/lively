@@ -11,13 +11,13 @@ import tempfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--thread-sanitizer", action="store_true",
-                        help="also check microphone lifecycle for data races")
+                        help="check microphone lifecycle, neural voice packs/speech, and package tests for data races")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
 
     suites = [
-        ("conversation_startup_regression.py", []),
-        ("directional_speech_regression.py", []),
+        ("conversation_startup_regression.py", ["--negative-controls"]),
+        ("directional_speech_regression.py", ["--negative-controls"]),
         ("test_speech_player.py", []),
         ("directional_speech_adversarial.py", ["--negative-controls"]),
         ("audio_session_regression.py", ["--negative-controls"]),
@@ -26,8 +26,13 @@ def main():
         ("offline_packs_regression.py", ["--negative-controls"]),
         ("offline_store_regression.py", ["--negative-controls"]),
         ("apple_translator_regression.py", ["--negative-controls"]),
+        ("neural_voice_packs_regression.py", ["--negative-controls"]),
+        ("neural_speaker_regression.py", ["--negative-controls"]),
+        ("voice_preview_lifecycle_regression.py", ["--negative-controls"]),
     ]
     for name, options in suites:
+        if args.thread_sanitizer and name in {"neural_voice_packs_regression.py", "neural_speaker_regression.py", "voice_preview_lifecycle_regression.py"}:
+            options = [*options, "--thread-sanitizer"]
         print(f"Running {name}", flush=True)
         subprocess.run([sys.executable, str(root / "Tools/tests" / name), *options],
                        cwd=root, check=True, timeout=180)
@@ -45,6 +50,11 @@ def main():
             str(root / "Tools/tests/AudioLifecycleRegression.swift"), "-o", str(binary),
         ], cwd=root, check=True, timeout=120)
         subprocess.run([str(binary)], cwd=root, check=True, timeout=30)
+    print("Running NeuralVoices package tests", flush=True)
+    package_flags = ["--sanitize=thread"] if args.thread_sanitizer else []
+    subprocess.run([
+        "xcrun", "swift", "test", "--package-path", str(root / "Packages/NeuralVoices"), *package_flags,
+    ], cwd=root, check=True, timeout=180)
     print("All regression suites passed.")
 
 

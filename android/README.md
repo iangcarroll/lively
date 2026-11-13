@@ -1,7 +1,7 @@
 # Lively for Android
 
 A native Android version of Lively, in Kotlin and Jetpack Compose with
-Material 3. It does everything the iOS app does, with the same engines, key
+Material 3. It shares Lively's main conversation flows, cloud engines, key
 broker, account and Pro allowance:
 
 - Face-to-face layout on phones (the far half upside down), a chat transcript
@@ -36,13 +36,19 @@ broker, account and Pro allowance:
 - The live on-device stopgap and fallback are iOS/macOS only: Apple's Speech
   and Translation frameworks have no Android equivalent for streaming
   on-device ASR plus translation. Android keeps the ML Kit fallback for typed
-  text and uses Soniox or Voxtral for speech. This is the app's one intentional
-  platform difference; see [../README.md](../README.md#engines).
+  text and uses Soniox or Voxtral for speech; see
+  [../README.md](../README.md#engines).
 - iOS/macOS now has an Offline Languages screen to prepare full speech and
   bidirectional translation models and an explicit speaker-language selector.
-  Spoken output uses Soniox and pauses offline; Apple system voices are not
-  offered. This Apple-framework
-  implementation does not change Android's existing ML Kit typed/photo fallback.
+  It also has an Offline Voice Library with 54 Kokoro presets in 8 languages,
+  including 5 Japanese voices, from one 92,022,138-byte shared download. Voice
+  selections are saved per language, separately from the conversation pair.
+  Original Soniox remains the default online voice; downloaded voices run locally
+  without a cloud or Apple system-voice fallback. Recognition and text translation
+  still require separate language downloads. These Swift-app features don't
+  change Android: spoken output still uses Soniox and needs internet, and the
+  ML Kit typed/photo fallback remains as before. See the
+  [offline setup and testing limits](../README.md#offline-conversations-ios--macos).
 - Swipe a turn in the transcript, or long-press it, to delete it. Long-press
   also offers Edit, which fixes a misheard transcript and translates it
   again; in face-to-face, long-press one of your own lines.

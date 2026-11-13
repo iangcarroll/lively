@@ -46,9 +46,16 @@ def main():
         mutations = [
             ("typed-local-selection-removed", "if usesOnDeviceServices { return AppleTranslator() }", ""),
             ("spoken-local-selection-removed", "self?.demo == nil && self?.usesOnDeviceServices == true ? AppleTranslator() : translator", "translator"),
-            ("offline-original-network-guard-removed", "guard isOnline else {", "guard true else {"),
+            ("offline-original-network-guard-removed", "guard settings.speechSource == .downloaded || isOnline else {", "guard true else {"),
+            ("downloaded-offline-disabled", "guard settings.speechSource == .downloaded || isOnline else {", "guard isOnline else {"),
+            ("downloaded-needs-cloud-credentials", "settings.speechSource == .downloaded || SonioxSpeaker.credential(settings) != nil", "SonioxSpeaker.credential(settings) != nil"),
+            ("source-mismatch-reuses-old-producer", "if let speaker, speakerSource == settings.speechSource { return speaker }", "if let speaker { return speaker }"),
+            ("missing-pack-accepted", "guard NeuralVoicePacks.shared.isReady || NeuralVoicePacks.shared.status == .checking else { return nil }", "// Missing packs deliberately accepted."),
+            ("checking-pack-first-sentence-dropped", "NeuralVoicePacks.shared.isReady || NeuralVoicePacks.shared.status == .checking", "NeuralVoicePacks.shared.isReady"),
+            ("missing-pack-cloud-fallback", "guard NeuralVoicePacks.shared.isReady || NeuralVoicePacks.shared.status == .checking else { return nil }", "guard NeuralVoicePacks.shared.isReady || NeuralVoicePacks.shared.status == .checking else { return SonioxSpeaker.credential(settings).map { SonioxSpeaker(credential: $0) } }"),
             ("routing-switch-not-cancelled", "func speechRoutingDidChange() {\n        speaker?.stop()", "func speechRoutingDidChange() {"),
-            ("cloud-voice-not-cancelled", "speaker?.stop()\n        speaker = nil\n        engine?.networkAvailable = online", "speaker = nil\n        engine?.networkAvailable = online"),
+            ("cloud-voice-not-cancelled", "if speakerSource != .downloaded {\n            speaker?.stop()", "if speakerSource != .downloaded {"),
+            ("offline-voice-stopped-by-network", "if speakerSource != .downloaded {", "if true {"),
         ]
         for name, old, new in mutations:
             if methods.count(old) != 1:

@@ -65,6 +65,10 @@ final class AppSettings {
         didSet { defaults.set(speaksTranslations, forKey: "speaksTranslations") }
     }
 
+    var speechSource: SpeechSource {
+        didSet { defaults.set(speechSource.rawValue, forKey: "speechSource") }
+    }
+
     private var speechListenerLanguageCode: String {
         didSet { defaults.set(speechListenerLanguageCode, forKey: "speechListenerLanguage") }
     }
@@ -129,6 +133,7 @@ final class AppSettings {
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel
         speaksTranslations = defaults.bool(forKey: "speaksTranslations")
+        speechSource = SpeechSource(rawValue: defaults.string(forKey: "speechSource") ?? "") ?? .original
         // The device voice option was removed. Don't retain an old selection.
         defaults.set(nil, forKey: "speechVoice")
         speechListenerLanguageCode = defaults.string(forKey: "speechListenerLanguage") ?? stored.first.rawValue
@@ -140,5 +145,16 @@ final class AppSettings {
         // didSet doesn't run here; the widgets may not have this pair yet.
         WidgetLanguages.publish(languages)
         #endif
+    }
+}
+
+enum SpeechSource: String, CaseIterable, Identifiable, Sendable {
+    case original, downloaded
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .original: "Original voice · online"
+        case .downloaded: "Downloaded voices · offline"
+        }
     }
 }

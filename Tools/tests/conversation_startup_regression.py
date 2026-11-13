@@ -86,12 +86,17 @@ struct NoiseGate { mutating func reset() {} }
     var stopCount = 0
     func stop() { stopCount += 1 }
 }
-@MainActor protocol TranslationSpeaker: AnyObject { func stop() }
-@MainActor final class SonioxSpeaker: TranslationSpeaker {
+@MainActor protocol TranslationSpeaker: AnyObject {
+    var player: Player { get }
+    func stop()
+}
+@MainActor class TestSpeechProducer: TranslationSpeaker {
     let player = Player()
     var stopCount = 0
     func stop() { stopCount += 1; player.stop() }
 }
+@MainActor final class SonioxSpeaker: TestSpeechProducer {}
+@MainActor final class NeuralSpeaker: TestSpeechProducer {}
 
 nonisolated final class MicCapture: @unchecked Sendable {
     @MainActor static var permissions: [CheckedContinuation<Bool, Never>] = []
@@ -130,7 +135,7 @@ SUPPORT = r'''
     var testMic: MicCapture { mic }
     var testSettings: AppSettings { settings }
     var testPendingDiscard: TimeInterval? { pendingDiscard }
-    func injectSpeaker(_ value: SonioxSpeaker) { speaker = value }
+    func injectSpeaker(_ value: any TranslationSpeaker) { speaker = value }
     func seedProvisionalTurn() -> Utterance {
         let utterance = Utterance(isProvisional: true)
         utterances.append(utterance)
@@ -266,18 +271,19 @@ TESTS = r'''
 
         // Starting the mic cancels the entire speech producer. Stopping only
         // its player would allow an in-flight synthesis stream to refill it.
-        let interruptedSpeech = ConversationStore()
-        let producer = SonioxSpeaker()
-        interruptedSpeech.injectSpeaker(producer)
-        interruptedSpeech.startListening()
-        await until { !MicCapture.permissions.isEmpty }
-        permission(true)
-        await until { interruptedSpeech.testMic.starts.count == 1 }
-        require(producer.stopCount == 1 && producer.player.stopCount == 1,
-                "microphone start stopped playback without cancelling synthesis")
-        interruptedSpeech.testMic.starts.removeFirst().resume()
-        await drain()
-        interruptedSpeech.stopListening()
+        for producer in [SonioxSpeaker(), NeuralSpeaker()] {
+            let interruptedSpeech = ConversationStore()
+            interruptedSpeech.injectSpeaker(producer)
+            interruptedSpeech.startListening()
+            await until { !MicCapture.permissions.isEmpty }
+            permission(true)
+            await until { interruptedSpeech.testMic.starts.count == 1 }
+            require(producer.stopCount == 1 && producer.player.stopCount == 1,
+                    "microphone start stopped playback without cancelling the selected synthesis producer")
+            interruptedSpeech.testMic.starts.removeFirst().resume()
+            await drain()
+            interruptedSpeech.stopListening()
+        }
 
         // A local or hybrid engine can fail synchronously before mic startup.
         // That failure must cancel startup without taking an audio session.
@@ -333,7 +339,7 @@ TESTS = r'''
                 && noCredentials.testMic.starts.isEmpty && noCredentials.alert != nil,
                 "cloud startup without credentials reached permission or capture")
 
-        print("PASS: permission release, background, toggle cancellation, stale permission, stale success/failure, startup failure, synthesis interruption, synchronous engine failure, on-device credentials, provisional stop cleanup")
+        print("PASS: permission release, background, toggle cancellation, stale permission, stale success/failure, startup failure, original/downloaded synthesis interruption, synchronous engine failure, on-device credentials, provisional stop cleanup")
     }
 }
 '''
@@ -342,17 +348,37 @@ TESTS = r'''
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", metavar="REV", help="compile source from a git revision (expected to fail)")
+    parser.add_argument("--negative-controls", action="store_true")
     args = parser.parse_args()
     source = (subprocess.check_output(["git", "show", f"{args.baseline}:{SOURCE}"], cwd=ROOT, text=True)
               if args.baseline else (ROOT / SOURCE).read_text())
+    variants = [("regression", source, True)]
+    if args.negative_controls:
+        startup = method(source, "startListening")
+        anchor = "speaker?.stop()"
+        if startup.count(anchor) != 1:
+            raise RuntimeError("Update startup synthesis-cancellation mutation anchor")
+        for name, replacement in [
+            ("player-only-interruption", "speaker?.player.stop()"),
+            ("downloaded-producer-left-running", "if !(speaker is NeuralSpeaker) { speaker?.stop() }"),
+        ]:
+            variants.append((name, source.replace(startup, startup.replace(anchor, replacement)), False))
     with tempfile.TemporaryDirectory(prefix="lively-startup-regression-") as directory:
         directory = pathlib.Path(directory)
-        swift = directory / "ConversationStartupRegression.swift"
-        swift.write_text(build_source(source))
-        executable = directory / "regression"
-        subprocess.run(["swiftc", "-swift-version", "6", "-parse-as-library", "-module-cache-path", str(directory / "module-cache"), str(swift), "-o", str(executable)], check=True, cwd=ROOT)
-        result = subprocess.run([str(executable)], cwd=ROOT, timeout=30)
-    raise SystemExit(result.returncode)
+        for name, actual, should_pass in variants:
+            swift = directory / (name + ".swift")
+            swift.write_text(build_source(actual))
+            executable = directory / name
+            subprocess.run(["swiftc", "-swift-version", "6", "-parse-as-library", "-module-cache-path", str(directory / "module-cache"), str(swift), "-o", str(executable)], check=True, cwd=ROOT, timeout=90)
+            result = subprocess.run([str(executable)], cwd=ROOT, capture_output=True, text=True, timeout=30)
+            if should_pass:
+                print(result.stdout, end="")
+                if result.returncode:
+                    raise RuntimeError(result.stderr or "Conversation startup regression failed")
+            elif result.returncode == 0 or "FAIL:" not in result.stderr:
+                raise RuntimeError("Negative control was not detected: " + name)
+            else:
+                print("PASS: " + name + " detected deliberate corruption")
 
 
 if __name__ == "__main__":

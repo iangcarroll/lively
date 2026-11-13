@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B20000000000000000000001 /* NeuralVoices in Frameworks */ = {isa = PBXBuildFile; productRef = B20000000000000000000002 /* NeuralVoices */; };
 		A10000000000000000000025 /* LivelyWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* LivelyWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -76,6 +77,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B20000000000000000000001 /* NeuralVoices in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,6 +133,7 @@
 			);
 			name = Lively;
 			packageProductDependencies = (
+				B20000000000000000000002 /* NeuralVoices */,
 			);
 			productName = Lively;
 			productReference = A10000000000000000000001 /* Lively.app */;
@@ -187,6 +190,9 @@
 			);
 			mainGroup = A10000000000000000000004;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B20000000000000000000003 /* XCLocalSwiftPackageReference "Packages/NeuralVoices" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000005 /* Products */;
 			projectDirPath = "";
@@ -484,6 +490,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		B20000000000000000000003 /* XCLocalSwiftPackageReference "Packages/NeuralVoices" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NeuralVoices;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B20000000000000000000002 /* NeuralVoices */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B20000000000000000000003 /* XCLocalSwiftPackageReference "Packages/NeuralVoices" */;
+			productName = NeuralVoices;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A10000000000000000000009 /* Project object */;
 }

@@ -24,7 +24,7 @@ struct ConversationScreen: View {
     /// Unfolded iPhone Duo, landscape phones, iPad and Mac get side-by-side columns.
     private static let wideBreakpoint: CGFloat = 640
 
-    var body: some View {
+    private var conversationCanvas: some View {
         GeometryReader { geometry in
             let wide = geometry.size.width >= Self.wideBreakpoint
             let column = StatusColumn(size: geometry.size, insets: geometry.safeAreaInsets)
@@ -95,8 +95,14 @@ struct ConversationScreen: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    if !store.isOnline, settings.speaksTranslations {
+                    if !store.isOnline, settings.speaksTranslations, settings.speechSource == .original {
                         Text("Original voice needs internet; translations stay visible.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if settings.speaksTranslations, settings.speechSource == .downloaded, !NeuralVoicePacks.shared.isReady {
+                        Text(NeuralVoicePacks.shared.status == .checking
+                             ? "Checking downloaded voices…"
+                             : "Download voices in Settings → Offline Voice Library.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -105,6 +111,10 @@ struct ConversationScreen: View {
                 .background(Color(.canvas))
             }
         }
+    }
+
+    private var observedConversation: some View {
+        conversationCanvas
         .onChange(of: editing == nil) { _, done in
             guard done, textInputOpenedForEdit else { return }
             textInputOpenedForEdit = false
@@ -122,6 +132,15 @@ struct ConversationScreen: View {
         .onChange(of: settings.speechListenerLanguage) { _, _ in
             store.speechRoutingDidChange()
         }
+        .onChange(of: settings.speechSource) { _, _ in store.speechRoutingDidChange() }
+        .onChange(of: NeuralVoicePacks.shared.selectionRevision) { _, _ in store.speechRoutingDidChange() }
+        .onChange(of: NeuralVoicePacks.shared.installedDirectory) { previous, current in
+            // First verification can publish files that a new speaker is
+            // already waiting for. Only replacing or removing an existing
+            // installation invalidates that speaker.
+            if previous != nil { store.speechRoutingDidChange() }
+            if current == nil { Task { await NeuralSpeaker.releaseCachedModel() } }
+        }
         .onChange(of: settings.offlineSpokenLanguage) { _, _ in
             if store.isUsingOnDevice || settings.provider.id == SpeechProvider.onDevice.id { store.offlineSpeakerDidChange() }
         }
@@ -134,8 +153,16 @@ struct ConversationScreen: View {
         .onChange(of: settings.speaksTranslations) { _, enabled in
             store.setSpeaksTranslations(enabled)
         }
+    }
+
+    var body: some View {
+        observedConversation
         .sheet(isPresented: $showSettings) {
-            SettingsView(settings: settings, onClear: { store.clear() }, onShowWelcome: { showOnboarding = true })
+            SettingsView(settings: settings, onClear: { store.clear() }, onShowWelcome: { showOnboarding = true },
+                         onPauseForVoicePreview: {
+                             store.stopListening()
+                             store.speechRoutingDidChange()
+                         })
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $showOnboarding) { onboarding }
@@ -164,10 +191,12 @@ struct ConversationScreen: View {
             #if os(iOS)
             // iOS takes the mic away in the background anyway; stop cleanly.
             if phase == .background { store.didEnterBackground() }
+            if phase == .background { Task { await NeuralSpeaker.releaseCachedModel() } }
             #endif
         }
         .onOpenURL(perform: open)
         .onAppear {
+            Task { await NeuralVoicePacks.shared.refresh() }
             if forcesOnboarding {
                 showOnboarding = true
                 return

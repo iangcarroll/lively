@@ -89,6 +89,7 @@ final class ConversationStore {
     /// Speech-to-speech: reads translations into the second language aloud.
     /// Made when first needed.
     private var speaker: (any TranslationSpeaker)?
+    private var speakerSource: SpeechSource?
     /// Characters of each turn's translation already sent to the speaker;
     /// `Int.max` once the whole turn has been.
     private var spoken: [UUID: Int] = [:]
@@ -826,7 +827,9 @@ final class ConversationStore {
         speechSettingChanged()
     }
 
-    var canSpeakTranslations: Bool { SonioxSpeaker.credential(settings) != nil }
+    var canSpeakTranslations: Bool {
+        settings.speechSource == .downloaded || SonioxSpeaker.credential(settings) != nil
+    }
 
     /// A language change applies immediately, including while Settings is open.
     /// Old turns must not be spoken for a newly selected listener.
@@ -890,19 +893,29 @@ final class ConversationStore {
     }
 
     private func activeSpeaker() -> (any TranslationSpeaker)? {
-        guard isOnline else {
+        guard settings.speechSource == .downloaded || isOnline else {
             speaker?.stop()
             speaker = nil
             return nil
         }
-        if let speaker { return speaker }
-        guard let credential = SonioxSpeaker.credential(settings) else { return nil }
-        let speaker = SonioxSpeaker(credential: credential)
+        if let speaker, speakerSource == settings.speechSource { return speaker }
+        speaker?.stop()
+        let speaker: any TranslationSpeaker
+        if settings.speechSource == .downloaded {
+            // An existing installation may still be undergoing its local
+            // startup verification; the speaker awaits that shared check.
+            guard NeuralVoicePacks.shared.isReady || NeuralVoicePacks.shared.status == .checking else { return nil }
+            speaker = NeuralSpeaker()
+        } else {
+            guard let credential = SonioxSpeaker.credential(settings) else { return nil }
+            speaker = SonioxSpeaker(credential: credential)
+        }
         speaker.onError = { [weak self] message in
             self?.setSpeaksTranslations(false)
             self?.alert = message
         }
         self.speaker = speaker
+        speakerSource = settings.speechSource
         return speaker
     }
 
@@ -935,10 +948,12 @@ final class ConversationStore {
         if handoff { engine?.networkPathChanged() }
         guard online != isOnline else { return }
         isOnline = online
-        // Invalidate an in-flight cloud TTS stream as soon as connectivity
-        // changes. Subsequent sentences choose the matching local/cloud voice.
-        speaker?.stop()
-        speaker = nil
+        // Cloud speech cannot continue across connectivity changes. Downloaded
+        // speech already has its audio and model locally, so keep it playing.
+        if speakerSource != .downloaded {
+            speaker?.stop()
+            speaker = nil
+        }
         engine?.networkAvailable = online
         if !online {
             // A cloud request may still be waiting on its socket. Restart it
