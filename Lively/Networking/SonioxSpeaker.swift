@@ -35,6 +35,7 @@ final class SonioxSpeaker {
     private struct Line {
         var text: String
         var language: Language
+        var output: SpeechPlayer.Output
     }
 
     private enum SpeakError: Error {
@@ -63,10 +64,10 @@ final class SonioxSpeaker {
     }
 
     /// Queues a sentence to speak in `language`.
-    func speak(_ text: String, in language: Language) {
+    func speak(_ text: String, in language: Language, output: SpeechPlayer.Output = .automatic) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        queue.append(Line(text: text, language: language))
+        queue.append(Line(text: text, language: language, output: output))
         idleTimer?.cancel()
         if worker == nil { worker = Task { await run() } }
     }
@@ -89,6 +90,7 @@ final class SonioxSpeaker {
                     try await generate(line)
                     break
                 } catch SpeakError.fatal(let message) {
+                    guard !Task.isCancelled else { return }
                     queue.removeAll()
                     closeSocket()
                     onError(message)
@@ -112,6 +114,16 @@ final class SonioxSpeaker {
 
     /// Generates one sentence on its own stream and queues its audio.
     private func generate(_ line: Line) async throws {
+        // Finish the previous destination before changing the channel map.
+        // A missing headset skips private playback instead of using the speaker.
+        do {
+            guard try await player.prepare(output: line.output) else { return }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw SpeakError.fatal(error.localizedDescription)
+        }
+        try Task.checkCancellation()
         let socket = try await connectedSocket()
         let id = "lively-\(nextStreamID)"
         nextStreamID += 1

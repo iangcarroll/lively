@@ -17,9 +17,14 @@ broker, account and Pro allowance:
   Swift code, file by file (see the table below).
 - Tap the mic to start and stop, or hold it to listen only while it's
   pressed, as on iOS.
+  iOS and macOS also keep a bilingual listening prompt above the transcript
+  controls and label the mic Start/Stop; Android currently uses its existing
+  status indicator.
 - Speech-to-speech, off by default: the ⋮ menu in face-to-face (or Settings) reads
   translations into the second language aloud with Soniox Text-to-Speech,
   muting the mic while it speaks unless headphones are connected.
+  Separate incoming-headphone / outgoing-speaker playback is currently an
+  iOS 26.2+ feature; Android uses its normal audio output.
 - Typing instead of speaking from the keyboard button, translated by
   DeepSeek through the key broker, falling back to ML Kit on the device
   (Apple's Translation framework on iOS).

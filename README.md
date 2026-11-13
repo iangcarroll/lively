@@ -33,6 +33,12 @@ only; Android keeps ML Kit for typed text (see
 Tap the mic to start and stop listening, or hold it to listen only while it's
 pressed, like a walkie-talkie: letting go ends the turn and stops the mic.
 
+In the iOS and macOS transcript, the listening prompt stays above the mic
+after the conversation starts, in both languages. It tells the next person
+they can speak without pressing anything. The mic is labeled **Stop** while
+active and **Start** while off; connecting and offline states show their own
+messages instead of claiming to be listening.
+
 When speaking isn't practical, the keyboard button opens a text field. Typed
 lines go to DeepSeek through the key broker, falling back to on-device
 translation (Apple's Translation framework; ML Kit on Android). Voxtral uses its
@@ -66,8 +72,8 @@ phone, and **Whole room** everything. **Auto** tracks the room's background
 level and only hears speech well above it, never laxer than Nearby. The
 thresholds live in `Audio/NoiseGate.swift`.
 
-**Speech-to-speech** (off by default) reads translations into the second
-language aloud through the speaker with Soniox Text-to-Speech (`tts-rt-v2`),
+**Speech-to-speech** (off by default) reads translations aloud with
+Soniox Text-to-Speech (`tts-rt-v2`),
 following [Soniox's speech-to-speech guide](https://soniox.com/docs/translation/sts-translation).
 Turn it on and off from the ••• menu in face-to-face or in Settings ›
 Speech-to-Speech. While it's on, the transcript's top bar shows a speaker
@@ -76,6 +82,18 @@ on its own stream over one WebSocket. While it speaks, the mic sends silence so
 Lively doesn't translate its own voice, unless audio goes to headphones; tapping
 or holding the mic cuts it off. It works with either engine whenever a Soniox
 key is available (the broker's `/v1/soniox/tts-key`, or a key in Settings).
+
+On **iOS 26.2 or later**, choose **Your language** in Settings › Speech-to-Speech.
+Incoming translations into that language play only through connected headphones;
+outgoing translations into the other language play through the built-in speaker.
+The headset must support both input and output (for example, AirPods or wired
+headphones with a microphone). Without a compatible headset, incoming translations
+remain visible but are not spoken. Playback waits before switching destinations,
+keeping each sentence on its selected output. This uses
+Apple's `multiRoute` / `dualRoute` audio session and maps output channels to the
+appropriate device. On earlier iOS versions, macOS, and Android,
+speech-to-speech continues to speak only translations into the second language
+through the normal audio output.
 
 Soniox only outputs Simplified Chinese. When Settings › Chinese is 繁體, Lively
 converts its output on the device.
@@ -247,3 +265,43 @@ On a bad network (all engines, via `ResilientSocket`):
 
 English is always indigo and Chinese always vermilion, in both light and dark
 mode.
+
+## Audio regression tests
+
+On a Mac with Xcode installed, run:
+
+```sh
+python3 Tools/tests/run_regressions.py --thread-sanitizer
+```
+
+The suites compile production source with controlled audio, network, and
+permission dependencies. They cover startup cancellation, speech direction,
+channel ordering, disconnect/reconnect bursts, settings changes, session
+ownership, and error cleanup. Negative controls deliberately break routing and
+settings behavior in temporary source copies and check that the tests detect it.
+The microphone lifecycle suite also exercises real AVFoundation conversion with
+a generated audio file; Thread Sanitizer checks its concurrent lifecycle work.
+
+These tests do not replace an iPhone check with AirPods: verify both languages,
+unplug/reconnect during playback, and confirm that incoming speech stays in the
+headset while outgoing speech uses the phone speaker. The simulator has no
+Bluetooth audio hardware to validate that routing.
+
+Device checks on 2026-11-13 used an iPhone 17 Pro running iOS 27.0.1 with
+AirPods and a separately signed development copy of this branch. The real
+Soniox demo played English translations in AirPods and Chinese translations
+from the phone, confirmed by listening. The active dual-route session exposed
+two headset channels and two speaker channels; both channel maps were accepted.
+
+Ten real microphone start/stop cycles produced audio chunks and released every
+session claim. Disconnecting and reconnecting AirPods stopped private playback
+without moving it to the speaker, then restored headphone playback. A local
+audio probe also ran two players simultaneously for four rounds; listening
+confirmed separate headphone and speaker output, and both claims released.
+Normal conversation playback still queues translated sentences in order.
+
+Normal conversation startup and a Home Screen round trip were also verified.
+Backgrounding stopped capture and released all session claims; one tap after
+returning restarted the real microphone. No crash occurred during these checks.
+Phone-call interruption and a long-session soak have not yet been verified.
+These audio checks did not cover widget sharing in the separate development app.
