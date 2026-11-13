@@ -266,3 +266,20 @@ These tests do not replace an iPhone check with AirPods: verify both languages,
 unplug/reconnect during playback, and confirm that incoming speech stays in the
 headset while outgoing speech uses the phone speaker. The simulator has no
 Bluetooth audio hardware to validate that routing.
+
+Device checks on 2026-11-13 used an iPhone 17 Pro running iOS 27.0.1 with
+AirPods and a separately signed development copy of this branch. The real
+Soniox demo played English translations in AirPods and Chinese translations
+from the phone, confirmed by listening. The active dual-route session exposed
+two headset channels and two speaker channels; both channel maps were accepted.
+
+Ten real microphone start/stop cycles produced audio chunks and released every
+session claim. Disconnecting and reconnecting AirPods stopped private playback
+without moving it to the speaker, then restored headphone playback. A local
+audio probe also ran two players simultaneously for four rounds; listening
+confirmed separate headphone and speaker output, and both claims released.
+Normal conversation playback still queues translated sentences in order.
+
+Normal conversation startup was exercised on the device. Home Screen return,
+phone-call interruption, and a long-session soak have not yet been verified.
+These audio checks did not cover widget sharing in the separate development app.
