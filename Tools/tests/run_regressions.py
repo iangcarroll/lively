@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the audio regression suites on macOS with Xcode installed."""
+"""Run audio, offline language, and translation regressions with Xcode on macOS."""
 
 import argparse
 from pathlib import Path
@@ -11,7 +11,7 @@ import tempfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--thread-sanitizer", action="store_true",
-                        help="also check microphone lifecycle tests for data races")
+                        help="also check microphone lifecycle and local synthesis for data races")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
 
@@ -21,6 +21,11 @@ def main():
         ("test_speech_player.py", []),
         ("directional_speech_adversarial.py", ["--negative-controls"]),
         ("audio_session_regression.py", ["--negative-controls"]),
+        ("hybrid_offline_regression.py", ["--negative-controls"]),
+        ("offline_speech_regression.py", ["--negative-controls"]),
+        ("offline_packs_regression.py", ["--negative-controls"]),
+        ("offline_store_regression.py", ["--negative-controls"]),
+        ("offline_speaker_regression.py", ["--negative-controls"] + (["--thread-sanitizer"] if args.thread_sanitizer else [])),
     ]
     for name, options in suites:
         print(f"Running {name}", flush=True)

@@ -85,6 +85,22 @@ struct ConversationScreen: View {
                 }
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if store.isUsingOnDevice || settings.provider.id == SpeechProvider.onDevice.id {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("On-device · Who's speaking?").font(.caption.weight(.semibold))
+                    Picker("Who's speaking?", selection: $settings.offlineSpokenLanguage) {
+                        ForEach(settings.languages.all) { language in
+                            Text(language.nativeName).tag(language)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color(.canvas))
+            }
+        }
         .onChange(of: editing == nil) { _, done in
             guard done, textInputOpenedForEdit else { return }
             textInputOpenedForEdit = false
@@ -101,6 +117,15 @@ struct ConversationScreen: View {
         }
         .onChange(of: settings.speechListenerLanguage) { _, _ in
             store.speechRoutingDidChange()
+        }
+        .onChange(of: settings.offlineSpokenLanguage) { _, _ in
+            if store.isUsingOnDevice || settings.provider.id == SpeechProvider.onDevice.id { store.offlineSpeakerDidChange() }
+        }
+        .onChange(of: settings.providerID) { _, _ in
+            store.offlineSpeakerDidChange()
+        }
+        .onChange(of: settings.chineseScript) { _, _ in
+            store.offlineSpeakerDidChange()
         }
         .onChange(of: settings.speaksTranslations) { _, enabled in
             store.setSpeaksTranslations(enabled)
@@ -138,12 +163,6 @@ struct ConversationScreen: View {
             #endif
         }
         .onOpenURL(perform: open)
-        .translationTask(store.offlineDownload) { session in
-            // Offers the download when the on-device fallback needs a
-            // language direction that isn't installed yet.
-            nonisolated(unsafe) let session = session
-            try? await session.prepareTranslation()
-        }
         .onAppear {
             if forcesOnboarding {
                 showOnboarding = true

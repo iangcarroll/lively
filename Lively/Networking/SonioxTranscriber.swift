@@ -401,7 +401,7 @@ extension SpeechProvider {
             // The on-device model covers the wait for the server session.
             return SpeechPipeline(
                 engine: HybridSpeechEngine(
-                    local: OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript),
+                    local: OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript, spokenLanguage: settings.offlineSpokenLanguage),
                     cloud: cloud
                 ),
                 translator: nil,

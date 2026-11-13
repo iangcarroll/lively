@@ -57,8 +57,6 @@ final class ConversationStore {
     private(set) var isUsingOnDevice = false
     /// A cloud engine failed and the on-device engine took over this session.
     private var didFallBackToOnDevice = false
-    /// Drives the system download sheet for the on-device translation models.
-    var offlineDownload: TranslationSession.Configuration?
 
     /// The turn currently receiving transcript text.
     private var current: Utterance?
@@ -90,7 +88,8 @@ final class ConversationStore {
     private var engineIsStale = false
     /// Speech-to-speech: reads translations into the second language aloud.
     /// Made when first needed.
-    private var speaker: SonioxSpeaker?
+    private var speaker: (any TranslationSpeaker)?
+    private var speakerUsesOnDevice = false
     /// Characters of each turn's translation already sent to the speaker;
     /// `Int.max` once the whole turn has been.
     private var spoken: [UUID: Int] = [:]
@@ -269,22 +268,6 @@ final class ConversationStore {
         makeEngine(provider).start()
     }
 
-    /// Offers the system download for on-device translation, both ways, when
-    /// the fallback starts and a direction isn't installed yet.
-    private func requestOfflineLanguagesIfNeeded() {
-        guard isUsingOnDevice else { return }
-        let first = AppleTranslator.language(languages.first, script: settings.chineseScript)
-        let second = AppleTranslator.language(languages.second, script: settings.chineseScript)
-        Task { [weak self] in
-            let availability = LanguageAvailability()
-            if await availability.status(from: first, to: second) != .installed {
-                self?.offlineDownload = TranslationSession.Configuration(source: first, target: second)
-            } else if await availability.status(from: second, to: first) != .installed {
-                self?.offlineDownload = TranslationSession.Configuration(source: second, target: first)
-            }
-        }
-    }
-
     private func makeEngine(_ provider: SpeechProvider) -> SpeechEngine {
         let pipeline = provider.makePipeline(settings)
         primaryTranslator = pipeline.translator
@@ -299,12 +282,10 @@ final class ConversationStore {
             hybrid.onSourceChange = { [weak self] source, replayed in
                 self?.sourceChanged(source, replayed: replayed)
             }
-            requestOfflineLanguagesIfNeeded()
         } else {
             translator = pipeline.translator
             isUsingOnDevice = provider.id == SpeechProvider.onDevice.id
             usingStopgap = false
-            if isUsingOnDevice { requestOfflineLanguagesIfNeeded() }
         }
         engine.onEvent = { [weak self] in self?.handle($0) }
         engine.onStatus = { [weak self] status in
@@ -335,7 +316,6 @@ final class ConversationStore {
             isUsingOnDevice = true
             usingStopgap = true
             pendingDiscard = nil
-            requestOfflineLanguagesIfNeeded()
         case .cloud:
             translator = primaryTranslator
             isUsingOnDevice = false
@@ -393,7 +373,6 @@ final class ConversationStore {
         engine = nil
         engineProviderID = nil
         transcriberStatus = .connecting
-        requestOfflineLanguagesIfNeeded()
         makeEngine(.onDevice).start()
         refreshStatus()
     }
@@ -476,7 +455,7 @@ final class ConversationStore {
         pendingDiscard = nil
         primaryTranslator = nil
         fallbackTranslator = nil
-        offlineDownload = nil
+        translator = nil
         transcriberStatus = .idle
     }
 
@@ -545,6 +524,7 @@ final class ConversationStore {
     /// don't translate text, so this uses the broker's DeepSeek, falling back
     /// to on-device translation; then a Mistral key if there is one.
     private var textTranslator: TranslationService {
+        if usesOnDeviceServices { return AppleTranslator() }
         if let translator { return translator }
         if let broker = BrokerTranslator.shared { return FallbackTranslator(primary: broker, fallback: AppleTranslator()) }
         let key = settings.credential(.mistral)
@@ -554,6 +534,26 @@ final class ConversationStore {
 
     /// True when typed text needs on-device languages.
     var translatesTypedTextOnDevice: Bool { textTranslator is AppleTranslator }
+
+    private var usesOnDeviceServices: Bool {
+        settings.provider.id == SpeechProvider.onDevice.id || isUsingOnDevice || !isOnline
+    }
+
+    /// The selected offline recognizer must change with the visible selector.
+    func offlineSpeakerDidChange() {
+        let resume = isListening
+        stopListening()
+        releaseEngine()
+        if languages != settings.languages {
+            languages = settings.languages
+            clear()
+        }
+        speechRoutingDidChange()
+        translations.values.forEach { $0.cancel() }
+        translations.removeAll()
+        if resume { startListening() }
+        for utterance in utterances where utterance.needsTranslation { translate(utterance) }
+    }
 
     func retryTranslation(_ utterance: Utterance) {
         utterance.translatedSource = nil
@@ -777,19 +777,16 @@ final class ConversationStore {
         translations[utterance.id] = Task { [weak self] in
             var attempt = 0
             while !Task.isCancelled {
-                // Hold the request until we're back online.
-                if let self, !self.isOnline {
-                    utterance.translationState = .waitingForNetwork
-                    while !self.isOnline, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(250)) }
-                    utterance.translationState = .working
-                }
+                // Re-evaluate after a failed cloud attempt so a connection
+                // loss never leaves local translation waiting for the network.
+                let service: TranslationService = self?.demo == nil && self?.usesOnDeviceServices == true ? AppleTranslator() : translator
                 do {
                     var output = ""
                     // Show tokens as they stream for a first translation. When
                     // revising an existing one, swap in the new text only when
                     // it's complete so the line doesn't flicker.
                     let streamLive = utterance.translation.isEmpty
-                    for try await token in translator.translate(text, from: language, to: target, context: context, script: script) {
+                    for try await token in service.translate(text, from: language, to: target, context: context, script: script) {
                         if Task.isCancelled { return }
                         output += token
                         if streamLive { utterance.translation = output }
@@ -830,8 +827,8 @@ final class ConversationStore {
         speechSettingChanged()
     }
 
-    /// True when a Soniox key is available for speech, from Settings or the broker.
-    var canSpeakTranslations: Bool { SonioxSpeaker.credential(settings) != nil }
+    /// Local voices also work without a Soniox credential.
+    var canSpeakTranslations: Bool { true }
 
     /// A language change applies immediately, including while Settings is open.
     /// Old turns must not be spoken for a newly selected listener.
@@ -894,15 +891,22 @@ final class ConversationStore {
         }
     }
 
-    private func activeSpeaker() -> SonioxSpeaker? {
-        if let speaker { return speaker }
-        guard let credential = SonioxSpeaker.credential(settings) else { return nil }
-        let speaker = SonioxSpeaker(credential: credential)
+    private func activeSpeaker() -> (any TranslationSpeaker)? {
+        let local = usesOnDeviceServices || SonioxSpeaker.credential(settings) == nil
+        if let speaker, speakerUsesOnDevice == local { return speaker }
+        speaker?.stop()
+        let speaker: any TranslationSpeaker
+        if local {
+            speaker = OfflineSpeaker(script: settings.chineseScript)
+        } else if let credential = SonioxSpeaker.credential(settings) {
+            speaker = SonioxSpeaker(credential: credential)
+        } else { return nil }
         speaker.onError = { [weak self] message in
             self?.setSpeaksTranslations(false)
             self?.alert = message
         }
         self.speaker = speaker
+        speakerUsesOnDevice = local
         return speaker
     }
 
@@ -935,7 +939,18 @@ final class ConversationStore {
         if handoff { engine?.networkPathChanged() }
         guard online != isOnline else { return }
         isOnline = online
+        // Invalidate an in-flight cloud TTS stream as soon as connectivity
+        // changes. Subsequent sentences choose the matching local/cloud voice.
+        speaker?.stop()
+        speaker = nil
         engine?.networkAvailable = online
+        if !online {
+            // A cloud request may still be waiting on its socket. Restart it
+            // locally now instead of waiting for that request to time out.
+            translations.values.forEach { $0.cancel() }
+            translations.removeAll()
+            for utterance in utterances where utterance.needsTranslation { translate(utterance) }
+        }
         refreshStatus()
     }
 
@@ -964,6 +979,10 @@ final class ConversationStore {
     }
 
     private func after(_ delay: Duration, _ action: @escaping () -> Void) {
+        if delay == .zero {
+            action()
+            return
+        }
         Task {
             if delay > .zero { try? await Task.sleep(for: delay) }
             action()

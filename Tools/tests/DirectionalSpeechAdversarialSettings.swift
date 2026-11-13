@@ -20,13 +20,15 @@ final class Utterance {
 final class ConversationStore {
     let settings: AppSettings
     let languages: LanguagePair
-    var speaker: SonioxSpeaker?
+    var speaker: (any TranslationSpeaker)?
+    var speakerUsesOnDevice = false
+    var usesOnDeviceServices = false
     var speakingSince: Date? = .distantPast
     var spoken: [UUID: Int] = [:]
     var speechFlushes: [UUID: Task<Void, Never>] = [:]
     var alert: String?
     init(settings: AppSettings) { self.settings = settings; self.languages = settings.languages }
-    func testSpeaker() -> SonioxSpeaker { activeSpeaker()! }
+    func testSpeaker() -> SonioxSpeaker { activeSpeaker() as! SonioxSpeaker }
     func accept(_ turn: Utterance, text: String, complete: Bool) {
         speak(turn, stable: text, complete: complete)
     }

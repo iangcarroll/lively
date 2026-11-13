@@ -25,8 +25,8 @@ server session connects. The audio heard during that wait is kept in a short
 buffer and replayed to the server when it comes online, then the provisional
 on-device turns are replaced by the server's more accurate transcript. If the
 server never arrives — or drops mid-conversation — the on-device recognizer
-carries the conversation. The first time it does, Lively offers to download the
-Apple translation languages, both directions. On-device listening is iOS/macOS
+carries the conversation when its models are installed. Prepare both speech and
+translation in **Settings › Offline Languages** before going offline. On-device listening is iOS/macOS
 only; Android keeps ML Kit for typed text (see
 [android/README.md](android/README.md)).
 
@@ -43,6 +43,45 @@ When speaking isn't practical, the keyboard button opens a text field. Typed
 lines go to DeepSeek through the key broker, falling back to on-device
 translation (Apple's Translation framework; ML Kit on Android). Voxtral uses its
 own Mistral translator for them.
+
+## Offline conversations (iOS / macOS)
+
+Open **Settings › Offline Languages**, then **Download languages** while online.
+The screen checks the full speech models for both conversation languages and
+translation models in both directions. Unsupported languages are marked for the
+current device. Change the pair in Settings to prepare another pair; Apple's
+speech storage limit may require releasing an unused language first.
+
+Choose **Use on-device translation** to keep recognition and translation local,
+even while connected. Before each person speaks, choose their language in the
+**Who's speaking?** selector above the conversation. Local recognition uses that
+language explicitly; online cloud recognition still detects both languages.
+Typed text, edits, and text read from photos also use local translation in this
+mode or when the network is unavailable, without waiting for a cloud request.
+Missing models produce download guidance instead of starting a download while
+listening. When a cloud conversation loses its connection, downloaded local
+models take over immediately; the cloud provider reconnects when online again.
+
+Spoken translations use installed Apple voices while on-device or offline, or
+when no Soniox key is available. Missing voices must be downloaded in system
+Accessibility settings; the download screen checks voices separately. Local
+speech uses the same headphone/speaker routing and microphone echo gating as
+online speech. The app does not include cloud providers' models or promise that
+every supported online language is available offline.
+
+Apple shares and manages these assets, and may remove unused models. Reopen the
+download screen before travel, then verify a fresh launch in airplane mode with
+both languages. Releasing a speech language frees an app reservation; it does
+not immediately delete shared system files. Manage translation downloads in
+Apple's Translate settings. Android's existing ML Kit typed/photo fallback is
+unchanged; this offline spoken-conversation setup is for iOS/macOS.
+
+Device preflight on 2026-11-13 confirmed both English/Chinese speech models,
+both translation directions, and both local voices installed on an iPhone 17 Pro
+running iOS 27.0.1. Real English and Chinese system synthesis also completed on
+macOS. A fresh airplane-mode conversation, both spoken directions, and local
+voice routing on the iPhone remain separate acceptance checks; model readiness
+and the automated suites alone do not establish those results.
 
 The camera button at the start of the text field translates a photo, such as
 a sign or a menu. Take one (iPhone and iPad) or choose one from Photos. Its
@@ -281,6 +320,11 @@ ownership, and error cleanup. Negative controls deliberately break routing and
 settings behavior in temporary source copies and check that the tests detect it.
 The microphone lifecycle suite also exercises real AVFoundation conversion with
 a generated audio file; Thread Sanitizer checks its concurrent lifecycle work.
+The offline suites cover selected-language recognition, local text and voice
+selection, network loss, both translation download directions, system asset
+removal, quota and download failures, cancellation, and stale callbacks. Speech
+and translation services are controlled in these regressions; they don't prove
+real model accuracy or replace an airplane-mode conversation on a phone.
 
 These tests do not replace an iPhone check with AirPods: verify both languages,
 unplug/reconnect during playback, and confirm that incoming speech stays in the

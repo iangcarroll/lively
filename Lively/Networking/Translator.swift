@@ -213,13 +213,17 @@ struct AppleTranslator: TranslationService {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let session = TranslationSession(
-                        installedSource: Self.language(source, script: script),
-                        target: Self.language(target, script: script)
-                    )
+                    let session: TranslationSession
+                    if #available(iOS 26.4, macOS 26.4, *) {
+                        session = TranslationSession(installedSource: Self.language(source, script: script), target: Self.language(target, script: script), preferredStrategy: .lowLatency)
+                    } else {
+                        session = TranslationSession(installedSource: Self.language(source, script: script), target: Self.language(target, script: script))
+                    }
                     let response = try await session.translate(text)
                     continuation.yield(response.targetText)
                     continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
                 } catch {
                     continuation.finish(throwing: TranslationError.onDevice(languageName: target.englishName))
                 }
@@ -243,7 +247,7 @@ enum TranslationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .onDevice(let name): "\(name) isn't available on this device"
+        case .onDevice(let name): "Offline translation into \(name) isn't ready. Download both languages in Settings → Offline Languages while connected to the internet."
         case .service(let message, _): message
         case .http(401), .http(403): "API key rejected"
         case .http(429): "Rate limited"

@@ -38,6 +38,10 @@ broker, account and Pro allowance:
   on-device ASR plus translation. Android keeps the ML Kit fallback for typed
   text and uses Soniox or Voxtral for speech. This is the app's one intentional
   platform difference; see [../README.md](../README.md#engines).
+- iOS/macOS now has an Offline Languages screen to prepare full speech and
+  bidirectional translation models, an explicit speaker-language selector, and
+  local spoken output using installed system voices. This Apple-framework
+  implementation does not change Android's existing ML Kit typed/photo fallback.
 - Swipe a turn in the transcript, or long-press it, to delete it. Long-press
   also offers Edit, which fixes a misheard transcript and translates it
   again; in face-to-face, long-press one of your own lines.

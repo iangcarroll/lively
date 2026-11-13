@@ -141,7 +141,7 @@ extension SpeechProvider {
             }
             return SpeechPipeline(
                 engine: HybridSpeechEngine(
-                    local: OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript),
+                    local: OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript, spokenLanguage: settings.offlineSpokenLanguage),
                     cloud: cloud
                 ),
                 translator: translator,

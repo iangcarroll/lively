@@ -81,6 +81,23 @@ final class AppSettings {
         }
     }
 
+    private var offlineSpokenLanguageCode: String {
+        didSet { defaults.set(offlineSpokenLanguageCode, forKey: "offlineSpokenLanguage") }
+    }
+
+    /// Offline recognition uses an explicit language instead of guessing from
+    /// competing recognizers. Changing the pair keeps this selection valid.
+    var offlineSpokenLanguage: Language {
+        get {
+            let language = Language(offlineSpokenLanguageCode)
+            return languages.contains(language) ? language : languages.first
+        }
+        set {
+            guard languages.contains(newValue) else { return }
+            offlineSpokenLanguageCode = newValue.rawValue
+        }
+    }
+
     static let defaultTranslationModel = "mistral-small-latest"
     static let transcriptionModel = "voxtral-mini-transcribe-realtime-3"
 
@@ -113,6 +130,7 @@ final class AppSettings {
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel
         speaksTranslations = defaults.bool(forKey: "speaksTranslations")
         speechListenerLanguageCode = defaults.string(forKey: "speechListenerLanguage") ?? stored.first.rawValue
+        offlineSpokenLanguageCode = defaults.string(forKey: "offlineSpokenLanguage") ?? stored.first.rawValue
         for credential in SpeechProvider.allCredentials {
             credentials[credential.id] = Keychain.read(account: credential.id) ?? ""
         }

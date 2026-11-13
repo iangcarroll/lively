@@ -39,6 +39,7 @@ def main():
     for marker, source in [("// INSERT_ACTUAL_LANGUAGE", language),
                            ("// INSERT_ACTUAL_SETTINGS", settings),
                            ("// INSERT_ACTUAL_SPEAKER", speaker),
+                           ("// INSERT_ACTUAL_TRANSLATION_SPEAKER", (root / "Lively/Networking/TranslationSpeaker.swift").read_text()),
                            ("// INSERT_ACTUAL_SPEECH_METHODS", speech_methods)]:
         if fixture.count(marker) != 1:
             raise RuntimeError("Expected one source marker: " + marker)

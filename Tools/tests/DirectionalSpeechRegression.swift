@@ -18,6 +18,7 @@ struct ProviderCredential {
 struct SpeechProvider {
     let id: String
     static let fallback = SpeechProvider(id: "test")
+    static let onDevice = SpeechProvider(id: "on-device")
     static let allCredentials: [ProviderCredential] = [.soniox]
     var credentials: [ProviderCredential] { Self.allCredentials }
     static func with(id: String) -> SpeechProvider { Self(id: id) }
@@ -98,6 +99,15 @@ final class URLSessionWebSocketTask {
 // INSERT_ACTUAL_LANGUAGE
 // INSERT_ACTUAL_SETTINGS
 // INSERT_ACTUAL_SPEAKER
+// INSERT_ACTUAL_TRANSLATION_SPEAKER
+
+final class OfflineSpeaker {
+    let player = SpeechPlayer()
+    var onError: (String) -> Void = { _ in }
+    init(script: ChineseScript) {}
+    func speak(_ text: String, in language: Language, output: SpeechPlayer.Output) {}
+    func stop() { player.stop() }
+}
 
 final class Utterance {
     let id = UUID()
@@ -141,6 +151,17 @@ final class ConversationStore {
         // Persistence is tested against the full production AppSettings source.
         TestDefaults.standard.values = [:]
         let settings = AppSettings()
+        check(settings.offlineSpokenLanguage == .english, "default offline speaker is not first language")
+        settings.offlineSpokenLanguage = .chinese
+        check(AppSettings().offlineSpokenLanguage == .chinese, "offline speaker did not survive reload")
+        let changedPair = AppSettings()
+        changedPair.languages = LanguagePair(first: .english, second: Language("fr"))
+        check(changedPair.offlineSpokenLanguage == .english, "removed offline speaker did not fall back")
+        changedPair.offlineSpokenLanguage = .chinese
+        check(changedPair.offlineSpokenLanguage == .english, "invalid offline speaker escaped current pair")
+        changedPair.offlineSpokenLanguage = Language("fr")
+        check(AppSettings().offlineSpokenLanguage == Language("fr"), "new offline speaker did not persist")
+        TestDefaults.standard.values = [:]
         check(settings.speechListenerLanguage == .english, "default listener is not first language")
         settings.speechListenerLanguage = .chinese
         check(TestDefaults.standard.string(forKey: "speechListenerLanguage") == "zh", "listener not persisted")

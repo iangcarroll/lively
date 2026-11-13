@@ -86,7 +86,8 @@ struct NoiseGate { mutating func reset() {} }
     var stopCount = 0
     func stop() { stopCount += 1 }
 }
-@MainActor final class SonioxSpeaker {
+@MainActor protocol TranslationSpeaker: AnyObject { func stop() }
+@MainActor final class SonioxSpeaker: TranslationSpeaker {
     let player = Player()
     var stopCount = 0
     func stop() { stopCount += 1; player.stop() }

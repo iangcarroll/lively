@@ -56,6 +56,17 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        OfflineLanguagesView(settings: settings)
+                            .id("\(settings.languages.first.rawValue)-\(settings.languages.second.rawValue)-\(settings.chineseScript.rawValue)")
+                    } label: {
+                        Label { Text("Offline Languages") } icon: { SettingsIcon(systemImage: "arrow.down.circle.fill", color: .indigo) }
+                    }
+                } footer: {
+                    Text("Prepare speech and translation downloads for conversations without an internet connection.")
+                }
+
+                Section {
                     Picker(selection: $settings.pickupRange) {
                         ForEach(PickupRange.allCases) { Text($0.label).tag($0) }
                     } label: {
@@ -71,7 +82,6 @@ struct SettingsView: View {
                     Toggle(isOn: $settings.speaksTranslations) {
                         Label { Text("Speak translations aloud") } icon: { SettingsIcon(systemImage: "speaker.wave.2.fill", color: .blue) }
                     }
-                    .disabled(SonioxSpeaker.credential(settings) == nil)
                     if SpeechPlayer.supportsDirectionalOutput {
                         Picker("Your language", selection: $settings.speechListenerLanguage) {
                             ForEach(settings.languages.all) { language in
@@ -195,13 +205,10 @@ struct SettingsView: View {
     }
 
     private var speechFooter: String {
-        guard SonioxSpeaker.credential(settings) != nil else {
-            return "Speaking translations aloud needs a Soniox API key."
-        }
         if SpeechPlayer.supportsDirectionalOutput {
             let incoming = settings.speechListenerLanguage.englishName
             let outgoing = settings.languages.other(than: settings.speechListenerLanguage).englishName
-            return "Incoming \(incoming) translations play through your headphones. Outgoing \(outgoing) translations play through the device speaker. "
+            return "On-device mode uses installed system voices; online speech uses Soniox when a key is available. Incoming \(incoming) translations play through your headphones. Outgoing \(outgoing) translations play through the device speaker. "
                 + "Connect headphones with a microphone; incoming audio stays silent when no compatible headset is connected. "
                 + "Lively pauses microphone audio while the speaker is playing so it won't translate itself."
         }
