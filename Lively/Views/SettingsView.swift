@@ -82,10 +82,7 @@ struct SettingsView: View {
                     Toggle(isOn: $settings.speaksTranslations) {
                         Label { Text("Speak translations aloud") } icon: { SettingsIcon(systemImage: "speaker.wave.2.fill", color: .blue) }
                     }
-                    .disabled(settings.speechVoice == .original && SonioxSpeaker.credential(settings) == nil)
-                    Picker("Voice", selection: $settings.speechVoice) {
-                        ForEach(SpeechVoice.allCases) { Text($0.label).tag($0) }
-                    }
+                    .disabled(SonioxSpeaker.credential(settings) == nil)
                     if SpeechPlayer.supportsDirectionalOutput {
                         Picker("Your language", selection: $settings.speechListenerLanguage) {
                             ForEach(settings.languages.all) { language in
@@ -209,9 +206,7 @@ struct SettingsView: View {
     }
 
     private var speechFooter: String {
-        let voice = settings.speechVoice == .original
-            ? "The original Soniox voice needs internet and sends translated text to Soniox. Offline translations stay visible without changing to a device voice. "
-            : "Installed device voices work offline and can sound different from the original voice. "
+        let voice = "The original Soniox voice needs internet and sends translated text to Soniox. Offline translations stay visible while spoken output is paused. "
         if SpeechPlayer.supportsDirectionalOutput {
             let incoming = settings.speechListenerLanguage.englishName
             let outgoing = settings.languages.other(than: settings.speechListenerLanguage).englishName

@@ -262,7 +262,7 @@ struct SpeakAloudToggle: View {
     }
 }
 
-/// Switches spoken translations, using the selected online or local voice.
+/// Switches spoken translations using the original online voice.
 struct SpeakAloudButton: View {
     let store: ConversationStore
     var settings: AppSettings = .shared

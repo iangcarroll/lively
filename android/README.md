@@ -39,8 +39,9 @@ broker, account and Pro allowance:
   text and uses Soniox or Voxtral for speech. This is the app's one intentional
   platform difference; see [../README.md](../README.md#engines).
 - iOS/macOS now has an Offline Languages screen to prepare full speech and
-  bidirectional translation models, an explicit speaker-language selector, and
-  local spoken output using installed system voices. This Apple-framework
+  bidirectional translation models and an explicit speaker-language selector.
+  Spoken output uses Soniox and pauses offline; Apple system voices are not
+  offered. This Apple-framework
   implementation does not change Android's existing ML Kit typed/photo fallback.
 - Swipe a turn in the transcript, or long-press it, to delete it. Long-press
   also offers Edit, which fixes a misheard transcript and translates it

@@ -6,14 +6,12 @@ struct SpeechProvider {
     static let onDevice = Self(id: "on-device")
 }
 enum ProviderCredential { case mistral }
-enum SpeechVoice { case original, onDevice }
 final class AppSettings {
     var provider = SpeechProvider(id: "cloud")
     var languages = LanguagePair(first: .english, second: Language("fr"))
     var chineseScript = ChineseScript.simplified
     var translationModel = "test"
     var speaksTranslations = true
-    var speechVoice = SpeechVoice.original
     var hasSpeechCredential = true
     func credential(_ credential: ProviderCredential) -> String { "test" }
 }
@@ -33,11 +31,10 @@ enum Calls {
     static var missingPack = false
     static var pending: [AsyncThrowingStream<String, Error>.Continuation] = []
     static var cloudCancellations = 0
-    static var localSpeakers = 0
     static var cloudSpeakers = 0
     static func reset() {
         local = []; cloud = 0; holdCloud = false; missingPack = false
-        pending = []; cloudCancellations = 0; localSpeakers = 0; cloudSpeakers = 0
+        pending = []; cloudCancellations = 0; cloudSpeakers = 0
     }
 }
 struct AppleTranslator: TranslationService {
@@ -90,14 +87,6 @@ final class SonioxSpeaker {
     func speak(_ text: String, in language: Language, output: SpeechPlayer.Output) {}
     func stop() { stops += 1 }
 }
-final class OfflineSpeaker {
-    let player = SpeechPlayer()
-    var onError: (String) -> Void = { _ in }
-    var stops = 0
-    init(script: ChineseScript) { Calls.localSpeakers += 1 }
-    func speak(_ text: String, in language: Language, output: SpeechPlayer.Output) {}
-    func stop() { stops += 1 }
-}
 enum NWInterface { enum InterfaceType { case wifi, cellular } }
 final class FakeEngine {
     var networkAvailable = true
@@ -118,7 +107,6 @@ final class ConversationStore {
     var translator: (any TranslationService)?
     var translations: [UUID: Task<Void, Never>] = [:]
     var speaker: (any TranslationSpeaker)?
-    var speakerUsesOnDevice = false
     var speakingSince: Date? = .distantPast
     var spoken: [UUID: Int] = [:]
     var speechFlushes: [UUID: Task<Void, Never>] = [:]
@@ -164,7 +152,7 @@ final class ConversationStore {
               "explicit on-device typed translation is local before microphone startup")
         check(explicit.translator == nil && explicit.speechCompletions == 1,
               "typed offline translation needs no listening engine")
-        check(explicit.chooseSpeaker() is SonioxSpeaker && Calls.localSpeakers == 0,
+        check(explicit.chooseSpeaker() is SonioxSpeaker,
               "on-device recognition retains the original voice while connected")
 
         Calls.reset()
@@ -178,11 +166,14 @@ final class ConversationStore {
               "offline typed input translates both directions without a cloud request")
         check(Set(Calls.local.map { $0.1.rawValue + ">" + $0.2.rawValue }) == ["en>fr", "fr>en"],
               "both source/target directions reach local translation")
-        check(disconnected.chooseSpeaker() == nil && Calls.cloudSpeakers == 0 && Calls.localSpeakers == 0,
+        check(disconnected.chooseSpeaker() == nil && Calls.cloudSpeakers == 0,
               "offline original voice neither starts cloud speech nor silently changes voices")
-        disconnected.settings.speechVoice = .onDevice
-        check(disconnected.chooseSpeaker() is OfflineSpeaker && Calls.cloudSpeakers == 0,
-              "explicit device voice works offline without starting cloud speech")
+        disconnected.settings.provider = .onDevice
+        check(disconnected.chooseSpeaker() == nil && Calls.cloudSpeakers == 0,
+              "explicit on-device recognition stays silent offline")
+        disconnected.settings.hasSpeechCredential = false
+        check(disconnected.chooseSpeaker() == nil,
+              "offline speech stays unavailable without a speech key")
 
         Calls.reset()
         let stopgap = ConversationStore()
@@ -192,7 +183,7 @@ final class ConversationStore {
         await until { spoken.translationState == .current }
         check(Calls.local.count == 1 && Calls.cloud == 0,
               "local stopgap overrides a captured cloud translator")
-        check(stopgap.chooseSpeaker() is SonioxSpeaker && Calls.localSpeakers == 0,
+        check(stopgap.chooseSpeaker() is SonioxSpeaker,
               "local recognition stopgap preserves the selected original voice while online")
 
         Calls.reset()
@@ -209,30 +200,23 @@ final class ConversationStore {
         let flush = Task<Void, Never> { try? await Task.sleep(for: .seconds(60)) }
         connected.speechFlushes[UUID()] = flush
         connected.spoken[UUID()] = 12
-        connected.settings.speechVoice = .onDevice
         connected.speechRoutingDidChange()
         check(oldSpeaker?.stops == 1 && connected.speaker == nil,
-              "explicit voice change immediately stops the older producer")
+              "routing change immediately stops the older producer")
         check(flush.isCancelled && connected.speechFlushes.isEmpty && connected.spoken.isEmpty,
-              "voice change cancels old deferred speech and sent-text state")
+              "routing change cancels old deferred speech and sent-text state")
         check(connected.speakingSince.map { $0 >= cutoff } == true,
-              "voice change advances the old-turn speech cutoff")
-        let selectedLocal = connected.chooseSpeaker() as? OfflineSpeaker
-        check(selectedLocal != nil, "explicit device voice replaces original speech")
-        connected.settings.speechVoice = .original
-        connected.speechRoutingDidChange()
-        check(selectedLocal?.stops == 1 && connected.chooseSpeaker() is SonioxSpeaker,
-              "returning to the original voice stops the local producer")
+              "routing change advances the old-turn speech cutoff")
+        let freshOriginal = connected.chooseSpeaker() as? SonioxSpeaker
+        check(freshOriginal != nil && freshOriginal !== oldSpeaker,
+              "fresh speech uses a new original producer")
 
         Calls.reset()
         let missingVoiceKey = ConversationStore()
         missingVoiceKey.settings.hasSpeechCredential = false
         check(!missingVoiceKey.canSpeakTranslations && missingVoiceKey.chooseSpeaker() == nil
-                && Calls.localSpeakers == 0 && Calls.cloudSpeakers == 0,
+                && Calls.cloudSpeakers == 0,
               "missing original voice credentials do not silently enable a different voice")
-        missingVoiceKey.settings.speechVoice = .onDevice
-        check(missingVoiceKey.canSpeakTranslations && missingVoiceKey.chooseSpeaker() is OfflineSpeaker,
-              "explicit local speech works without a cloud speech credential")
 
         Calls.reset()
         Calls.holdCloud = true
@@ -244,8 +228,8 @@ final class ConversationStore {
         await until { interrupted.utterances.first?.translationState == .current }
         check(Calls.local.count == 1 && Calls.cloud == 1,
               "network loss restarts an in-flight cloud request locally immediately")
-        check(cloudSpeech?.stops == 1 && interrupted.chooseSpeaker() == nil && Calls.localSpeakers == 0,
-              "network loss cancels original speech without substituting a device voice")
+        check(cloudSpeech?.stops == 1 && interrupted.chooseSpeaker() == nil,
+              "network loss cancels original speech while offline translations remain available")
         Calls.pending[0].yield("late cloud reply")
         Calls.pending[0].finish()
         await drain()

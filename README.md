@@ -62,14 +62,12 @@ Missing models produce download guidance instead of starting a download while
 listening. When a cloud conversation loses its connection, downloaded local
 models take over immediately; the cloud provider reconnects when online again.
 
-The original Soniox voice stays the default, including when recognition and
+Spoken translations use the original Soniox voice, including when recognition and
 text translation use on-device models. That voice needs internet and sends the
-translated text to Soniox; offline translations stay visible without silently
-switching voices. For fully offline speech, explicitly choose **Settings ›
-Speech-to-Speech › Voice › Device voice**. Installed Apple voices can sound
-different from the original voice. Missing voices must be downloaded in system
-Accessibility settings; the download screen checks voices separately. Device
-speech keeps the same headphone/speaker routing and microphone echo gating.
+translated text to Soniox. Offline recognition and translation continue on
+screen while spoken output is paused. Apple system voices are not offered, and
+no replacement offline speech engine has been integrated. Online spoken output
+keeps the same headphone/speaker routing and microphone echo gating.
 The app does not include cloud providers' models or promise that every supported
 online language is available offline.
 
@@ -78,7 +76,7 @@ download screen before travel, then verify a fresh launch in airplane mode with
 both languages. Releasing a speech language frees an app reservation; it does
 not immediately delete shared system files. Manage translation downloads in
 Apple's Translate settings. Android's existing ML Kit typed/photo fallback is
-unchanged; this offline spoken-conversation setup is for iOS/macOS.
+unchanged; this offline recognition and translation setup is for iOS/macOS.
 
 Device checks on 2026-11-13 used an iPhone 17 Pro running iOS 27.0.1. Fixed
 English and Chinese recordings passed through the real microphone file-input
@@ -94,9 +92,7 @@ succeeding on the bounded local retry. The app still reports actual system
 readiness and never converts a failed check into a saved ready flag. Missing
 models still fail with download guidance.
 
-Separate local speech checks produced audio, received playback completion
-callbacks, and applied the headphone/speaker channel maps successfully. The
-original Soniox Chinese voice was also replayed and confirmed by listening.
+The original Soniox Chinese voice was replayed and confirmed by listening.
 Actual network radios stayed connected during automated checks, so a fresh
 airplane-mode launch and a live two-person offline conversation remain
 unverified. These fixture checks establish the on-device pipeline; they don't
@@ -339,8 +335,8 @@ ownership, and error cleanup. Negative controls deliberately break routing and
 settings behavior in temporary source copies and check that the tests detect it.
 The microphone lifecycle suite also exercises real AVFoundation conversion with
 a generated audio file; Thread Sanitizer checks its concurrent lifecycle work.
-The offline suites cover selected-language recognition, local text and voice
-selection, network loss, both translation download directions, system asset
+The offline suites cover selected-language recognition, local text translation,
+spoken-output suppression offline, network loss, both translation download directions, system asset
 removal, quota and download failures, cancellation, and stale callbacks. Speech
 and translation services are controlled in these regressions; they don't prove
 real model accuracy or replace an airplane-mode conversation on a phone.

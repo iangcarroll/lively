@@ -89,7 +89,6 @@ final class ConversationStore {
     /// Speech-to-speech: reads translations into the second language aloud.
     /// Made when first needed.
     private var speaker: (any TranslationSpeaker)?
-    private var speakerUsesOnDevice = false
     /// Characters of each turn's translation already sent to the speaker;
     /// `Int.max` once the whole turn has been.
     private var spoken: [UUID: Int] = [:]
@@ -827,7 +826,7 @@ final class ConversationStore {
         speechSettingChanged()
     }
 
-    var canSpeakTranslations: Bool { settings.speechVoice == .onDevice || SonioxSpeaker.credential(settings) != nil }
+    var canSpeakTranslations: Bool { SonioxSpeaker.credential(settings) != nil }
 
     /// A language change applies immediately, including while Settings is open.
     /// Old turns must not be spoken for a newly selected listener.
@@ -891,26 +890,19 @@ final class ConversationStore {
     }
 
     private func activeSpeaker() -> (any TranslationSpeaker)? {
-        let local = settings.speechVoice == .onDevice
-        if !local, !isOnline {
+        guard isOnline else {
             speaker?.stop()
             speaker = nil
             return nil
         }
-        if let speaker, speakerUsesOnDevice == local { return speaker }
-        speaker?.stop()
-        let speaker: any TranslationSpeaker
-        if local {
-            speaker = OfflineSpeaker(script: settings.chineseScript)
-        } else if let credential = SonioxSpeaker.credential(settings) {
-            speaker = SonioxSpeaker(credential: credential)
-        } else { return nil }
+        if let speaker { return speaker }
+        guard let credential = SonioxSpeaker.credential(settings) else { return nil }
+        let speaker = SonioxSpeaker(credential: credential)
         speaker.onError = { [weak self] message in
             self?.setSpeaksTranslations(false)
             self?.alert = message
         }
         self.speaker = speaker
-        speakerUsesOnDevice = local
         return speaker
     }
 

@@ -11,7 +11,7 @@ import tempfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--thread-sanitizer", action="store_true",
-                        help="also check microphone lifecycle and local synthesis for data races")
+                        help="also check microphone lifecycle for data races")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
 
@@ -26,7 +26,6 @@ def main():
         ("offline_packs_regression.py", ["--negative-controls"]),
         ("offline_store_regression.py", ["--negative-controls"]),
         ("apple_translator_regression.py", ["--negative-controls"]),
-        ("offline_speaker_regression.py", ["--negative-controls"] + (["--thread-sanitizer"] if args.thread_sanitizer else [])),
     ]
     for name, options in suites:
         print(f"Running {name}", flush=True)

@@ -46,9 +46,8 @@ def main():
         mutations = [
             ("typed-local-selection-removed", "if usesOnDeviceServices { return AppleTranslator() }", ""),
             ("spoken-local-selection-removed", "self?.demo == nil && self?.usesOnDeviceServices == true ? AppleTranslator() : translator", "translator"),
-            ("voice-preference-ignored", "let local = settings.speechVoice == .onDevice", "let local = usesOnDeviceServices || SonioxSpeaker.credential(settings) == nil"),
-            ("offline-original-network-guard-removed", "if !local, !isOnline {", "if false {"),
-            ("voice-switch-not-cancelled", "func speechRoutingDidChange() {\n        speaker?.stop()", "func speechRoutingDidChange() {"),
+            ("offline-original-network-guard-removed", "guard isOnline else {", "guard true else {"),
+            ("routing-switch-not-cancelled", "func speechRoutingDidChange() {\n        speaker?.stop()", "func speechRoutingDidChange() {"),
             ("cloud-voice-not-cancelled", "speaker?.stop()\n        speaker = nil\n        engine?.networkAvailable = online", "speaker = nil\n        engine?.networkAvailable = online"),
         ]
         for name, old, new in mutations:

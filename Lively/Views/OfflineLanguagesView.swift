@@ -40,21 +40,7 @@ struct OfflineLanguagesView: View {
                 Button("Use on-device translation") { settings.providerID = SpeechProvider.onDevice.id }
                     .disabled(!packs.ready || packs.isDownloading)
             } footer: {
-                Text("On-device recognition and text translation run locally. The original voice still needs internet; choose Device voice in Speech-to-Speech for fully offline spoken output. Tap the speaker's language before speaking. System downloads already started may finish after you stop preparing or leave this screen.")
-            }
-
-            Section {
-                ForEach(packs.languages.all) { language in
-                    LabeledContent("\(language.englishName) voice", value: OfflineSpeaker.hasVoice(for: language, script: packs.script) ? "Available" : "Download in system settings")
-                }
-            } header: {
-                Text("Spoken translations")
-            } footer: {
-                #if os(iOS)
-                Text("Voices are separate from translation downloads. If a voice is missing, download it in iPhone Settings → Accessibility → Read & Speak → Voices (Spoken Content on older iOS versions). Then return here. Speech still follows your headphone and speaker settings.")
-                #else
-                Text("Voices are separate from translation downloads. Add missing voices in System Settings → Accessibility → Read & Speak, then return here.")
-                #endif
+                Text("On-device recognition and text translation run locally. The original voice needs internet, so offline translations appear on screen while spoken output is paused. Tap the speaker's language before speaking. System downloads already started may finish after you stop preparing or leave this screen.")
             }
 
             if !packs.reservedLocales.isEmpty {
