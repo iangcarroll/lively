@@ -72,6 +72,13 @@ struct SettingsView: View {
                         Label { Text("Speak translations aloud") } icon: { SettingsIcon(systemImage: "speaker.wave.2.fill", color: .blue) }
                     }
                     .disabled(SonioxSpeaker.credential(settings) == nil)
+                    if SpeechPlayer.supportsDirectionalOutput {
+                        Picker("Your language", selection: $settings.speechListenerLanguage) {
+                            ForEach(settings.languages.all) { language in
+                                Text(language.englishName).tag(language)
+                            }
+                        }
+                    }
                 } header: {
                     Text("Speech-to-Speech")
                 } footer: {
@@ -190,6 +197,13 @@ struct SettingsView: View {
     private var speechFooter: String {
         guard SonioxSpeaker.credential(settings) != nil else {
             return "Speaking translations aloud needs a Soniox API key."
+        }
+        if SpeechPlayer.supportsDirectionalOutput {
+            let incoming = settings.speechListenerLanguage.englishName
+            let outgoing = settings.languages.other(than: settings.speechListenerLanguage).englishName
+            return "Incoming \(incoming) translations play through your headphones. Outgoing \(outgoing) translations play through the device speaker. "
+                + "Connect headphones with a microphone; incoming audio stays silent when no compatible headset is connected. "
+                + "Lively pauses microphone audio while the speaker is playing so it won't translate itself."
         }
         return "Translations into \(settings.languages.second.englishName) are read aloud through the speaker as they arrive. "
             + "Lively doesn't listen while it speaks, so it won't translate itself, unless you're using headphones. "

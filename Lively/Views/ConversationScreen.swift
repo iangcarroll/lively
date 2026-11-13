@@ -95,6 +95,15 @@ struct ConversationScreen: View {
         .onChange(of: showSettings) { _, shown in
             if !shown { store.settingsDidClose() }
         }
+        .onChange(of: settings.languages) { _, _ in
+            store.speechRoutingDidChange()
+        }
+        .onChange(of: settings.speechListenerLanguage) { _, _ in
+            store.speechRoutingDidChange()
+        }
+        .onChange(of: settings.speaksTranslations) { _, enabled in
+            store.setSpeaksTranslations(enabled)
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView(settings: settings, onClear: { store.clear() }, onShowWelcome: { showOnboarding = true })
         }

@@ -59,10 +59,26 @@ final class AppSettings {
         didSet { defaults.set(translationModel, forKey: "translationModel") }
     }
 
-    /// Speech-to-speech mode: translations into the second language are read
-    /// aloud through the speaker. Off unless turned on.
+    /// Speech-to-speech mode. On supported iPhones, incoming translations
+    /// go to a headset and outgoing translations go to the built-in speaker.
     var speaksTranslations: Bool {
         didSet { defaults.set(speaksTranslations, forKey: "speaksTranslations") }
+    }
+
+    private var speechListenerLanguageCode: String {
+        didSet { defaults.set(speechListenerLanguageCode, forKey: "speechListenerLanguage") }
+    }
+
+    /// The headset wearer's language, independent of the face-to-face layout.
+    var speechListenerLanguage: Language {
+        get {
+            let language = Language(speechListenerLanguageCode)
+            return languages.contains(language) ? language : languages.first
+        }
+        set {
+            guard languages.contains(newValue) else { return }
+            speechListenerLanguageCode = newValue.rawValue
+        }
     }
 
     static let defaultTranslationModel = "mistral-small-latest"
@@ -96,6 +112,7 @@ final class AppSettings {
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel
         speaksTranslations = defaults.bool(forKey: "speaksTranslations")
+        speechListenerLanguageCode = defaults.string(forKey: "speechListenerLanguage") ?? stored.first.rawValue
         for credential in SpeechProvider.allCredentials {
             credentials[credential.id] = Keychain.read(account: credential.id) ?? ""
         }

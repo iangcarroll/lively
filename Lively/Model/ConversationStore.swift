@@ -58,6 +58,9 @@ final class ConversationStore {
     private var interface: NWInterface.InterfaceType?
     private var demo: DemoConversation?
     private var audioPump: Task<Void, Never>?
+    /// A press can end while permission or audio startup is still pending.
+    private var listeningStart: Task<Void, Never>?
+    private var listeningGeneration = UUID()
     /// Sends quiet chunks as silence, per the pickup range in Settings.
     private var gate = NoiseGate()
     /// Ends a paused engine's session once it's been idle for `warmPause`.
@@ -106,10 +109,8 @@ final class ConversationStore {
             }
         }
         mic.onInterrupted = { [weak self] in
-            Task { @MainActor in
-                self?.stopListening()
-                self?.alert = "The microphone stopped. Tap the mic to start again."
-            }
+            self?.stopListening()
+            self?.alert = "The microphone stopped. Tap the mic to start again."
         }
 
         pathMonitor.pathUpdateHandler = { [weak self] path in
@@ -122,6 +123,7 @@ final class ConversationStore {
             }
         }
         pathMonitor.start(queue: DispatchQueue(label: "lively.path"))
+        speechSettingChanged()
         regionProber?.probe()
         prefetchKey()
     }
@@ -171,11 +173,15 @@ final class ConversationStore {
     // MARK: - Listening
 
     func toggleListening() {
-        isListening ? stopListening() : startListening()
+        if isListening || listeningStart != nil {
+            stopListening()
+        } else {
+            startListening()
+        }
     }
 
     func startListening() {
-        guard !isListening else { return }
+        guard !isListening, listeningStart == nil else { return }
         if let demo {
             isListening = true
             transcriberStatus = .live
@@ -189,8 +195,15 @@ final class ConversationStore {
             alert = "Add your \(names) in Settings to start."
             return
         }
-        Task {
-            guard await MicCapture.requestPermission() else {
+        let generation = UUID()
+        listeningGeneration = generation
+        listeningStart = Task {
+            defer {
+                if listeningGeneration == generation { listeningStart = nil }
+            }
+            let permitted = await MicCapture.requestPermission()
+            guard !Task.isCancelled, listeningGeneration == generation else { return }
+            guard permitted else {
                 alert = "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone."
                 return
             }
@@ -198,22 +211,24 @@ final class ConversationStore {
             isListening = true
             gate.reset()
             // Someone wants to talk: cut off a translation being read out.
-            speaker?.player.stop()
+            speaker?.stop()
             Self.keepScreenAwake(true)
             // Connect while the mic starts up. Audio that arrives before the
             // session is ready waits in the socket's backlog.
             startEngine(provider)
+            guard !Task.isCancelled, listeningGeneration == generation, isListening else { return }
             do {
-                // Activating the audio session can take a few hundred ms; keep it off the main thread.
-                try await Task.detached(priority: .userInitiated) { [mic] in try mic.start() }.value
+                // Capture serializes graph changes off the main thread.
+                try await mic.start()
             } catch {
+                guard !Task.isCancelled, listeningGeneration == generation else { return }
                 stopListening()
                 releaseEngine()
                 alert = error.localizedDescription
                 return
             }
-            // Stopped while the mic was starting.
-            if !isListening { mic.stop() }
+            // stopListening already stopped this request. A newer press may
+            // now own the mic, so an old completion must leave it alone.
         }
     }
 
@@ -250,6 +265,9 @@ final class ConversationStore {
     }
 
     func stopListening() {
+        listeningGeneration = UUID()
+        listeningStart?.cancel()
+        listeningStart = nil
         guard isListening else { return }
         isListening = false
         demo?.stop()
@@ -646,7 +664,19 @@ final class ConversationStore {
     /// True when a Soniox key is available for speech, from Settings or the broker.
     var canSpeakTranslations: Bool { SonioxSpeaker.credential(settings) != nil }
 
+    /// A language change applies immediately, including while Settings is open.
+    /// Old turns must not be spoken for a newly selected listener.
+    func speechRoutingDidChange() {
+        speaker?.stop()
+        speaker = nil
+        speechFlushes.values.forEach { $0.cancel() }
+        speechFlushes.removeAll()
+        spoken.removeAll()
+        speakingSince = settings.speaksTranslations ? .now : nil
+    }
+
     private func speechSettingChanged() {
+        AudioSessionUsers.setDirectionalSpeechEnabled(settings.speaksTranslations && SpeechPlayer.supportsDirectionalOutput)
         if settings.speaksTranslations {
             if speakingSince == nil { speakingSince = .now }
         } else {
@@ -657,19 +687,26 @@ final class ConversationStore {
         }
     }
 
-    /// Reads a turn's translation aloud if it's into the second language,
-    /// a sentence at a time. `stable` is the part of the translation that
+    /// Reads each direction to its listener, a sentence at a time.
+    /// `stable` is the part of the translation that
     /// won't change; `complete` means nothing more is coming.
     private func speak(_ utterance: Utterance, stable: String, complete: Bool) {
         guard settings.speaksTranslations, let speakingSince, utterance.createdAt >= speakingSince,
-              utterance.target == languages.second else { return }
+              utterance.languages == settings.languages else { return }
+        let output: SpeechPlayer.Output
+        if SpeechPlayer.supportsDirectionalOutput {
+            output = utterance.target == settings.speechListenerLanguage ? .headphones : .speaker
+        } else {
+            guard utterance.target == languages.second else { return }
+            output = .automatic
+        }
         let sent = spoken[utterance.id] ?? 0
         guard stable.count > sent else { return }
         let fresh = String(stable.dropFirst(sent))
         let ready = complete ? fresh : Self.completeSentences(in: fresh)
         if !ready.isEmpty {
             guard let speaker = activeSpeaker() else { return }
-            speaker.speak(ready, in: utterance.target)
+            speaker.speak(ready, in: utterance.target, output: output)
         }
         speechFlushes.removeValue(forKey: utterance.id)?.cancel()
         if complete {
