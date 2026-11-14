@@ -5,7 +5,7 @@
 	<!-- Shared with the widget extension, which shows the language pair. -->
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.sh.ian.lively</string>
+		<string>$(LIVELY_APP_GROUP)</string>
 	</array>
 </dict>
 </plist>

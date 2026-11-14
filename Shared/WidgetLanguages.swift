@@ -10,14 +10,22 @@ nonisolated struct WidgetLanguages: Codable, Equatable, Sendable {
     var firstTag: String
     var secondTag: String
 
-    static let appGroup = "group.sh.ian.lively"
+    static let appGroup = configuredValue("LivelyAppGroup", fallback: "group.sh.ian.lively")
+    static let urlScheme = configuredValue("LivelyURLScheme", fallback: "lively")
     /// The widget kind, for reloading its timelines when the pair changes.
     static let widgetKind = "LivelyWidget"
 
     /// Opens Lively and starts listening.
-    static let listenURL = URL(string: "lively://listen")!
+    static let listenURL = URL(string: "\(urlScheme)://listen")!
     /// Opens Lively with the type-to-translate bar.
-    static let typeURL = URL(string: "lively://type")!
+    static let typeURL = URL(string: "\(urlScheme)://type")!
+
+    /// Older builds and test bundles may not have the shared configuration keys.
+    private static func configuredValue(_ key: String, fallback: String) -> String {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+              !value.isEmpty, !value.contains("$(") else { return fallback }
+        return value
+    }
 
     /// Lively's default pair, until the app has written one.
     static let fallback = WidgetLanguages(firstName: "English", secondName: "中文", firstTag: "EN", secondTag: "中文")

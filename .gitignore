@@ -8,3 +8,5 @@ build/
 Tools/probe/out/
 Tools/probe/.env.local
 __pycache__/
+# Local signing configuration; copy Config/Personal.xcconfig.example.
+Config/Personal.xcconfig

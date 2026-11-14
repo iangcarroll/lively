@@ -1,0 +1,14 @@
+// Copy to Config/Personal.xcconfig (ignored by Git).
+// Use with Tools/release/testflight.sh --config Config/Personal.xcconfig.
+// The App Store Connect record is named "Lively – Specters"; the icon stays "Lively".
+LIVELY_APP_BUNDLE_ID = net.specters312.lively
+LIVELY_APP_GROUP = group.net.specters312.lively
+LIVELY_URL_SCHEME = lively-specters
+
+// An empty broker disables the upstream account and subscription service.
+// For an owned HTTPS broker, xcconfig needs https:/$()/example.com (// starts a comment).
+LIVELY_KEY_BROKER_URL =
+
+// Pass the paid membership's Team ID and an increasing build number explicitly:
+// --team 72D8527G28 --build-number 1
+// Do not add account passwords, private keys, or signing certificates here.

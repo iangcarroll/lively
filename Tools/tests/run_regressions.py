@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run audio, offline language, and translation regressions with Xcode on macOS."""
+"""Run audio, offline language, translation, and release regressions on macOS."""
 
 import argparse
 from pathlib import Path
@@ -16,6 +16,7 @@ def main():
     root = Path(__file__).resolve().parents[2]
 
     suites = [
+        ("test_release_script.py", []),
         ("conversation_startup_regression.py", ["--negative-controls"]),
         ("directional_speech_regression.py", ["--negative-controls"]),
         ("test_speech_player.py", []),

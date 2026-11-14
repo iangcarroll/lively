@@ -226,7 +226,7 @@ struct ConversationScreen: View {
     /// listening, `lively://type` opens the text bar. Ignored until the
     /// welcome tour is done, since it picks the languages.
     private func open(_ url: URL) {
-        guard url.scheme == "lively", onboardingDone || isDemo, !showOnboarding else { return }
+        guard url.scheme?.lowercased() == WidgetLanguages.urlScheme.lowercased(), onboardingDone || isDemo, !showOnboarding else { return }
         switch url.host() {
         case "listen": store.startListening()
         case "type": setTextInput(true)
