@@ -49,6 +49,8 @@ broker, account and Pro allowance:
   change Android: spoken output still uses Soniox and needs internet, and the
   ML Kit typed/photo fallback remains as before. See the
   [offline setup and testing limits](../README.md#offline-conversations-ios--macos).
+  The iOS Release app excludes device-QA screens, fixture recordings, and demo
+  launch modes; its regression tests and validation reports stay in the repository.
 - Swipe a turn in the transcript, or long-press it, to delete it. Long-press
   also offers Edit, which fixes a misheard transcript and translates it
   again; in face-to-face, long-press one of your own lines.

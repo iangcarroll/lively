@@ -244,9 +244,11 @@ struct SettingsView: View {
     }
 
     private var engineFooter: String {
-        var lines = [provider.summary]
+        var lines = [provider.id == SpeechProvider.onDevice.id
+            ? "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline."
+            : provider.summary]
         lines += provider.credentials.map(\.help)
-        lines.append("Keys are stored in the Keychain on this device.")
+        if !provider.credentials.isEmpty { lines.append("Keys are stored in the Keychain on this device.") }
         if provider.options.contains(.speed) {
             lines.append("Faster speed shows words sooner; Accurate waits a little longer for better transcripts.")
         }
@@ -255,18 +257,17 @@ struct SettingsView: View {
 
     private var speechFooter: String {
         let voice = settings.speechSource == .original
-            ? "The original Soniox voice needs internet and sends translated text to Soniox. Offline translations stay visible while spoken output is paused. "
-            : "Downloaded voices run on this device after the shared voice pack is installed. Choose a voice for each language in the library; previews pause listening. "
+            ? "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. "
+            : "Downloaded voices speak on this device after installation. Previews pause listening. "
         if SpeechPlayer.supportsDirectionalOutput {
             let incoming = settings.speechListenerLanguage.englishName
             let outgoing = settings.languages.other(than: settings.speechListenerLanguage).englishName
-            return voice + "Incoming \(incoming) translations play through your headphones. Outgoing \(outgoing) translations play through the device speaker. "
-                + "Connect headphones with a microphone; incoming audio stays silent when no compatible headset is connected. "
-                + "Lively pauses microphone audio while the speaker is playing so it won't translate itself."
+            return voice + "Incoming \(incoming) plays through headphones; outgoing \(outgoing) uses the device speaker. "
+                + "Incoming audio stays silent without a compatible headset with a microphone. "
+                + "Listening pauses during speaker playback."
         }
-        return voice + "Translations into \(settings.languages.second.englishName) are read aloud through the speaker as they arrive. "
-            + "Lively doesn't listen while it speaks, so it won't translate itself, unless you're using headphones. "
-            + "You can also turn it on and off from the ⋯ menu in face-to-face."
+        return voice + "Translations into \(settings.languages.second.englishName) play through your current audio output. "
+            + "Listening pauses during speaker playback."
     }
 
     private func previewVoice(_ voice: NeuralVoice) async throws {

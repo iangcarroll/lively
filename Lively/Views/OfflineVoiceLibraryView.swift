@@ -37,7 +37,7 @@ struct OfflineVoiceLibraryView: View {
                         Text(language.name == language.nativeName ? language.name : "\(language.name) · \(language.nativeName)").tag(language.id)
                     }
                 }
-                LabeledContent("Kokoro voices", value: packs.statusText)
+                LabeledContent("Download", value: packs.statusText)
                 if packs.isDownloading {
                     ProgressView(value: packs.progress) {
                         Text("\(bytes(packs.downloadedBytes)) of \(bytes(packs.totalBytes))")
@@ -52,8 +52,7 @@ struct OfflineVoiceLibraryView: View {
                 if let error = packs.error { Text(error).foregroundStyle(.red) }
                 if let previewError { Text(previewError).foregroundStyle(.red) }
                 if packs.isReady {
-                    Button("Check downloaded files") { Task { await packs.refresh() } }
-                    Button("Delete shared voice pack", role: .destructive) {
+                    Button("Remove download", role: .destructive) {
                         confirmsDeletion = true
                     }
                     .disabled(packs.isBusy)
@@ -61,7 +60,7 @@ struct OfflineVoiceLibraryView: View {
             } header: {
                 Text("54 voices · 8 languages")
             } footer: {
-                Text("One shared download (\(bytes(packs.totalBytes))) makes every voice below available offline. Voices don't need separate copies of the model. Deleting the shared pack removes all 54 downloaded voices and keeps your selections. Voice availability is separate from speech recognition and translation languages.")
+                Text("One download (\(bytes(packs.totalBytes))) includes all 54 voices for offline speech. Choose your conversation languages separately in Settings.")
             }
 
             ForEach(filteredLanguages) { language in
@@ -69,8 +68,6 @@ struct OfflineVoiceLibraryView: View {
                     ForEach(filteredVoices(language)) { voice in voiceRow(voice) }
                 } header: {
                     Text(language.name == language.nativeName ? language.name : "\(language.name) · \(language.nativeName)")
-                } footer: {
-                    Text("Used for translations into \(language.name). Choose the conversation languages separately in Settings; selecting a voice doesn't change them.")
                 }
             }
             if filteredLanguages.isEmpty {
@@ -92,14 +89,14 @@ struct OfflineVoiceLibraryView: View {
         .formStyle(.grouped)
         .navigationTitle("Offline Voices")
         .searchable(text: $query, prompt: "Search voices or languages")
-        .confirmationDialog("Delete all 54 offline voices?", isPresented: $confirmsDeletion, titleVisibility: .visible) {
-            Button("Delete shared voice pack", role: .destructive) {
+        .confirmationDialog("Remove all downloaded voices?", isPresented: $confirmsDeletion, titleVisibility: .visible) {
+            Button("Remove download", role: .destructive) {
                 stopPreview()
                 Task { await packs.delete(beforeRemoving: onBeforeDelete) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the shared voice model and every downloaded preset. Your voice selections stay saved. You can download the pack again later.")
+            Text("Your voice selections stay saved. Download the voice pack again to hear them offline.")
         }
         .task { await packs.refresh() }
         .onChange(of: scenePhase) { _, phase in
@@ -134,7 +131,7 @@ struct OfflineVoiceLibraryView: View {
 
             Button { preview(voice) } label: {
                 Image(systemName: previewingID == voice.id ? "stop.fill" : "play.fill")
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 44)
                     .contentShape(.rect)
             }
             .buttonStyle(.borderless)

@@ -22,7 +22,7 @@ struct OfflineLanguagesView: View {
             } header: {
                 Text("\(packs.languages.first.englishName) ↔ \(packs.languages.second.englishName)")
             } footer: {
-                Text("Download the full speech and translation models before you travel. These cover both directions, including typed text and text read from photos. Change the conversation languages in Settings to prepare another pair.")
+                Text("Prepare both languages before going offline. These downloads also cover typed text and text read from photos.")
             }
 
             Section {
@@ -34,13 +34,12 @@ struct OfflineLanguagesView: View {
                         if packs.ready { Task { await packs.refresh() } } else { packs.download() }
                     }
                     .disabled(!packs.canDownload)
-                    Button("Refresh status") { Task { await packs.refresh() } }
                 }
                 if let error = packs.error { Text(error).foregroundStyle(.red) }
                 Button("Use on-device translation") { settings.providerID = SpeechProvider.onDevice.id }
                     .disabled(!packs.ready || packs.isDownloading)
             } footer: {
-                Text("On-device recognition and text translation run locally. For offline spoken output, install the pack in Offline Voice Library and select Downloaded voices in Speech-to-Speech. The original voice needs internet. Tap the speaker's language before speaking. System downloads already started may finish after you stop preparing or leave this screen.")
+                Text("For offline audio, download voices in the Offline Voice Library and select Downloaded voices in Speech-to-Speech. Choose the speaker's language before talking. System downloads may continue after you cancel preparation.")
             }
 
             if !packs.reservedLocales.isEmpty {
@@ -56,7 +55,7 @@ struct OfflineLanguagesView: View {
                 } header: {
                     Text("Speech language storage")
                 } footer: {
-                    Text("Apple limits how many speech languages an app can keep. Release an unused language to make room. The system may remove released models later; translation downloads are managed in Apple's Translate settings. Downloads are shared with the system and can change, so check readiness before going offline.")
+                    Text("Apple limits how many speech languages Lively can keep. Release an unused language to make room; Apple may remove its files later. Manage translation downloads in Apple's Translate settings, and check readiness before going offline.")
                 }
             }
         }
