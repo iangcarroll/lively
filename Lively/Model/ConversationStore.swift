@@ -72,7 +72,16 @@ final class ConversationStore {
     private var dropoutIndex: Int?
     /// The interface the network path last used, to spot handoffs.
     private var interface: NWInterface.InterfaceType?
+    #if DEBUG
     private var demo: DemoConversation?
+    #endif
+    private var isDemo: Bool {
+        #if DEBUG
+        demo != nil
+        #else
+        false
+        #endif
+    }
     private var audioPump: Task<Void, Never>?
     /// A press can end while permission or audio startup is still pending.
     private var listeningStart: Task<Void, Never>?
@@ -98,14 +107,26 @@ final class ConversationStore {
     /// Turns from before speech-to-speech was switched on aren't read out.
     private var speakingSince: Date?
 
+    #if DEBUG
     init(settings: AppSettings = .shared, demo: Bool = false) {
         self.settings = settings
         languages = settings.languages
-        if settings.speaksTranslations { speakingSince = .now }
         if demo {
             self.demo = DemoConversation()
             self.translator = DemoTranslator()
         }
+        setUpServices()
+    }
+    #else
+    init(settings: AppSettings = .shared) {
+        self.settings = settings
+        languages = settings.languages
+        setUpServices()
+    }
+    #endif
+
+    private func setUpServices() {
+        if settings.speaksTranslations { speakingSince = .now }
 
         // One stream keeps chunks in order on their way from the audio thread.
         let (chunks, continuation) = AsyncStream<(Data, Float)>.makeStream(bufferingPolicy: .bufferingNewest(500))
@@ -155,7 +176,7 @@ final class ConversationStore {
     /// languages. Not from `init`: SwiftUI makes and throws away stores while
     /// it re-renders, and each would open a session.
     func prewarm() {
-        guard !Self.didPrewarm, demo == nil, engine == nil, !isListening, settings.hasCredentials else { return }
+        guard !Self.didPrewarm, !isDemo, engine == nil, !isListening, settings.hasCredentials else { return }
         Self.didPrewarm = true
         makeEngine(settings.provider).prewarm()
         scheduleIdleTeardown()
@@ -182,7 +203,7 @@ final class ConversationStore {
 
     /// Set when Soniox keys come from the broker, which mints in any of its regions.
     private var regionProber: RegionProber? {
-        guard demo == nil, settings.providerID == SpeechProvider.soniox.id,
+        guard !isDemo, settings.providerID == SpeechProvider.soniox.id,
               settings.credential(.soniox).isEmpty else { return nil }
         return SonioxKeyProvider.shared?.regions
     }
@@ -199,6 +220,7 @@ final class ConversationStore {
 
     func startListening() {
         guard !isListening, listeningStart == nil else { return }
+        #if DEBUG
         if let demo {
             isListening = true
             transcriberStatus = .live
@@ -206,6 +228,7 @@ final class ConversationStore {
             demo.play(into: self)
             return
         }
+        #endif
         let provider = settings.provider
         guard provider.id == SpeechProvider.onDevice.id || settings.hasCredentials else {
             let names = provider.credentials.map(\.name).formatted(.list(type: .and))
@@ -383,7 +406,9 @@ final class ConversationStore {
         listeningStart = nil
         guard isListening else { return }
         isListening = false
+        #if DEBUG
         demo?.stop()
+        #endif
         mic.stop()
         pauseEngine()
         level = 0
@@ -779,7 +804,7 @@ final class ConversationStore {
             while !Task.isCancelled {
                 // Re-evaluate after a failed cloud attempt so a connection
                 // loss never leaves local translation waiting for the network.
-                let service: TranslationService = self?.demo == nil && self?.usesOnDeviceServices == true ? AppleTranslator() : translator
+                let service: TranslationService = self?.isDemo != true && self?.usesOnDeviceServices == true ? AppleTranslator() : translator
                 do {
                     var output = ""
                     // Show tokens as they stream for a first translation. When

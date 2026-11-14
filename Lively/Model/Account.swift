@@ -39,26 +39,32 @@ final class Account {
         hasFreePro = token != nil && UserDefaults.standard.bool(forKey: Self.freeProKey)
     }
 
+    #if DEBUG
     /// Demo mode (`-LivelyDemo YES`) never reaches the broker: any email
     /// gets a code, and the code is 123456.
     private var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }
+    #endif
 
     /// Emails a 6-digit code to `email`.
     func sendCode(to email: String) async throws {
+        #if DEBUG
         if isDemo {
             try await Task.sleep(for: .milliseconds(600))
             return
         }
+        #endif
         _ = try await post("v1/auth/email/start", ["email": email], as: Empty.self)
     }
 
     func signIn(email: String, code: String) async throws {
+        #if DEBUG
         if isDemo {
             try await Task.sleep(for: .milliseconds(600))
             guard code == "123456" else { throw AccountError(message: "That code didn't work. Try again.") }
             self.email = email
             return
         }
+        #endif
         let body = try await post("v1/auth/email/verify", ["email": email, "code": code], as: SignedIn.self)
         Keychain.write(body.token, account: Self.tokenAccount)
         Keychain.write(body.user.email, account: Self.emailAccount)
@@ -70,7 +76,10 @@ final class Account {
     /// Rereads the account from the broker, which may have granted or taken
     /// away free Pro. Signs out if the session has ended.
     func refresh() async {
-        guard let token, !isDemo else { return }
+        guard let token else { return }
+        #if DEBUG
+        guard !isDemo else { return }
+        #endif
         var request = URLRequest(url: brokerURL.appending(path: "v1/auth/me"))
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         guard let (data, response) = try? await session.data(for: request),
@@ -84,7 +93,10 @@ final class Account {
 
     /// Deletes the account on the broker, then signs out here.
     func deleteAccount() async throws {
-        if let token, !isDemo {
+        #if DEBUG
+        if isDemo { forget(); return }
+        #endif
+        if let token {
             var request = URLRequest(url: brokerURL.appending(path: "v1/auth/delete"))
             request.httpMethod = "POST"
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

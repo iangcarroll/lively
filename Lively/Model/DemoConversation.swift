@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A scripted conversation for screenshots, previews and trying the UI
@@ -83,3 +84,4 @@ struct DemoTranslator: TranslationService {
         }
     }
 }
+#endif

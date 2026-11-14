@@ -9,7 +9,9 @@ struct ConversationScreen: View {
     @State private var showOnboarding = false
     @State private var showPro = false
     @AppStorage("onboardingDone") private var onboardingDone = false
+    #if DEBUG
     @State private var didStartDemoAutomatically = false
+    #endif
     @State private var showsTextInput = false
     @FocusState private var textInputFocused: Bool
     /// The turn being corrected in the text bar.
@@ -201,6 +203,7 @@ struct ConversationScreen: View {
                 showOnboarding = true
                 return
             }
+            #if DEBUG
             if isDemo {
                 if isDemoAutoPlay && !didStartDemoAutomatically {
                     didStartDemoAutomatically = true
@@ -208,6 +211,7 @@ struct ConversationScreen: View {
                 }
                 return
             }
+            #endif
             if !onboardingDone {
                 showOnboarding = true
             } else if !settings.hasCredentials {
@@ -253,12 +257,26 @@ struct ConversationScreen: View {
     }
 
     /// Launch with `-LivelyOnboarding YES` to see the welcome tour every time.
-    private var forcesOnboarding: Bool { UserDefaults.standard.bool(forKey: "LivelyOnboarding") }
+    private var forcesOnboarding: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "LivelyOnboarding")
+        #else
+        false
+        #endif
+    }
 
-    private var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }
+    private var isDemo: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "LivelyDemo")
+        #else
+        false
+        #endif
+    }
+    #if DEBUG
     private var isDemoAutoPlay: Bool {
         UserDefaults.standard.bool(forKey: "LivelyDemoAutoPlay")
     }
+    #endif
 
     private func topBar(wide: Bool, column: StatusColumn?) -> some View {
         HStack(spacing: 10) {

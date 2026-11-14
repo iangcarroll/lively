@@ -28,7 +28,7 @@ def main():
     args = parser.parse_args()
     store = (ROOT / "Lively/Model/ConversationStore.swift").read_text()
     methods = "\n".join(block(store, declaration) for declaration in [
-        r"private var textTranslator:", r"private var usesOnDeviceServices:",
+        r"private var textTranslator:", r"private var usesOnDeviceServices:", r"private var isDemo:",
         r"var translatesTypedTextOnDevice:",
         r"var canSpeakTranslations:", r"func speechRoutingDidChange\(",
         r"func submitTyped\(", r"private func translate\(", r"private func activeSpeaker\(",
@@ -45,7 +45,7 @@ def main():
     if args.negative_controls:
         mutations = [
             ("typed-local-selection-removed", "if usesOnDeviceServices { return AppleTranslator() }", ""),
-            ("spoken-local-selection-removed", "self?.demo == nil && self?.usesOnDeviceServices == true ? AppleTranslator() : translator", "translator"),
+            ("spoken-local-selection-removed", "self?.isDemo != true && self?.usesOnDeviceServices == true ? AppleTranslator() : translator", "translator"),
             ("offline-original-network-guard-removed", "guard settings.speechSource == .downloaded || isOnline else {", "guard true else {"),
             ("downloaded-offline-disabled", "guard settings.speechSource == .downloaded || isOnline else {", "guard isOnline else {"),
             ("downloaded-needs-cloud-credentials", "settings.speechSource == .downloaded || SonioxSpeaker.credential(settings) != nil", "SonioxSpeaker.credential(settings) != nil"),
