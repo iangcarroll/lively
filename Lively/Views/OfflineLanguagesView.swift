@@ -40,7 +40,7 @@ struct OfflineLanguagesView: View {
                 Button("Use on-device translation") { settings.providerID = SpeechProvider.onDevice.id }
                     .disabled(!packs.ready || packs.isDownloading)
             } footer: {
-                Text("On-device recognition and text translation run locally. The original voice needs internet, so offline translations appear on screen while spoken output is paused. Tap the speaker's language before speaking. System downloads already started may finish after you stop preparing or leave this screen.")
+                Text("On-device recognition and text translation run locally. For offline spoken output, install the pack in Offline Voice Library and select Downloaded voices in Speech-to-Speech. The original voice needs internet. Tap the speaker's language before speaking. System downloads already started may finish after you stop preparing or leave this screen.")
             }
 
             if !packs.reservedLocales.isEmpty {
