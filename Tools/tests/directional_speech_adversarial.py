@@ -35,6 +35,7 @@ def settings_source(root, disable_routing_change=False):
         ("// INSERT_ACTUAL_LANGUAGE", (root / "Lively/Model/Language.swift").read_text()),
         ("// INSERT_ACTUAL_SETTINGS", settings),
         ("// INSERT_ACTUAL_SPEAKER", (root / "Lively/Networking/SonioxSpeaker.swift").read_text()),
+        ("// INSERT_ACTUAL_TRANSLATION_SPEAKER", (root / "Lively/Networking/TranslationSpeaker.swift").read_text()),
     ]:
         if mocks.count(marker) != 1:
             raise RuntimeError("Expected one source marker: " + marker)

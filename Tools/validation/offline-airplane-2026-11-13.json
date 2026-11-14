@@ -1,0 +1,846 @@
+{
+  "airplaneRadioSwitchObserved": false,
+  "allRequiredCasesCompleted": true,
+  "audibilityConfirmedByUser": false,
+  "cancelled": false,
+  "checks": [
+    {
+      "id": "http-tripwire",
+      "name": "App HTTP denial self-test",
+      "passed": true
+    },
+    {
+      "completedFramesBeforeCase": 0,
+      "id": "typed-en",
+      "name": "typed-en",
+      "newGeneratedPCMBytes": 99600,
+      "newScheduledPCMBytes": 99600,
+      "passed": true,
+      "reasons": [],
+      "recognizerLiveObserved": false,
+      "source": "Where is the train station?",
+      "sourceLanguage": "en",
+      "speech": {
+        "activeLineID": "",
+        "busy": false,
+        "enqueued": [
+          {
+            "id": "A1893D5E-DCDF-4638-BDD7-FC6E272FF49A",
+            "isPreview": false,
+            "language": "ja",
+            "output": "speaker",
+            "text": "駅はどこですか",
+            "voice": "jm_kumo",
+            "voiceID": "jm_kumo"
+          }
+        ],
+        "errors": [],
+        "generatedPCMBytes": 99600,
+        "player": {
+          "category": "AVAudioSessionCategoryMultiRoute",
+          "completedBuffers": 1,
+          "completedFrames": 49800,
+          "engineRunning": true,
+          "errors": [],
+          "inputRoute": [
+            {
+              "channels": 1,
+              "type": "MicrophoneBuiltIn"
+            },
+            {
+              "channels": 1,
+              "type": "BluetoothHFP"
+            }
+          ],
+          "isAudible": false,
+          "lastMap": [
+            -1,
+            -1,
+            0,
+            0
+          ],
+          "mapStatus": 0,
+          "maps": [
+            {
+              "channels": [
+                -1,
+                -1,
+                0,
+                0
+              ],
+              "mixerVolume": 1,
+              "output": "speaker",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.75
+            },
+            {
+              "channels": [
+                -1,
+                -1,
+                0,
+                0
+              ],
+              "mixerVolume": 1,
+              "output": "speaker",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.75
+            }
+          ],
+          "mixerVolume": 1,
+          "mode": "AVAudioSessionModeDualRoute",
+          "pcmBytes": 99600,
+          "queuedBuffers": 0,
+          "requestedOutput": "speaker",
+          "requestedOutputs": [
+            "speaker"
+          ],
+          "route": [
+            {
+              "channels": 2,
+              "type": "BluetoothHFP"
+            },
+            {
+              "channels": 2,
+              "type": "Speaker"
+            }
+          ],
+          "scheduledBuffers": 1,
+          "scheduledFrames": 49800,
+          "volume": 0.75
+        },
+        "queuedLines": 0
+      },
+      "speechBaseline": {},
+      "targetLanguage": "ja",
+      "translation": "駅はどこですか",
+      "translationSeconds": 0.523230708
+    },
+    {
+      "completedFramesBeforeCase": 0,
+      "id": "typed-ja",
+      "name": "typed-ja",
+      "newGeneratedPCMBytes": 96000,
+      "newScheduledPCMBytes": 96000,
+      "passed": true,
+      "reasons": [],
+      "recognizerLiveObserved": false,
+      "source": "駅はどこですか。",
+      "sourceLanguage": "ja",
+      "speech": {
+        "activeLineID": "",
+        "busy": false,
+        "enqueued": [
+          {
+            "id": "C711D477-A67B-46CB-9569-343DF9329460",
+            "isPreview": false,
+            "language": "en",
+            "output": "headphones",
+            "text": "Where is the station?",
+            "voice": "af_alloy",
+            "voiceID": "af_alloy"
+          }
+        ],
+        "errors": [],
+        "generatedPCMBytes": 96000,
+        "player": {
+          "category": "AVAudioSessionCategoryMultiRoute",
+          "completedBuffers": 1,
+          "completedFrames": 48000,
+          "engineRunning": true,
+          "errors": [],
+          "inputRoute": [
+            {
+              "channels": 1,
+              "type": "MicrophoneBuiltIn"
+            },
+            {
+              "channels": 1,
+              "type": "BluetoothHFP"
+            }
+          ],
+          "isAudible": false,
+          "lastMap": [
+            0,
+            0,
+            -1,
+            -1
+          ],
+          "mapStatus": 0,
+          "maps": [
+            {
+              "channels": [
+                0,
+                0,
+                -1,
+                -1
+              ],
+              "mixerVolume": 1,
+              "output": "headphones",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.75
+            },
+            {
+              "channels": [
+                0,
+                0,
+                -1,
+                -1
+              ],
+              "mixerVolume": 1,
+              "output": "headphones",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.75
+            }
+          ],
+          "mixerVolume": 1,
+          "mode": "AVAudioSessionModeDualRoute",
+          "pcmBytes": 96000,
+          "queuedBuffers": 0,
+          "requestedOutput": "headphones",
+          "requestedOutputs": [
+            "headphones"
+          ],
+          "route": [
+            {
+              "channels": 2,
+              "type": "BluetoothHFP"
+            },
+            {
+              "channels": 2,
+              "type": "Speaker"
+            }
+          ],
+          "scheduledBuffers": 1,
+          "scheduledFrames": 48000,
+          "volume": 0.75
+        },
+        "queuedLines": 0
+      },
+      "speechBaseline": {},
+      "targetLanguage": "en",
+      "translation": "Where is the station?",
+      "translationSeconds": 0.208576583
+    },
+    {
+      "completedFramesBeforeCase": 0,
+      "id": "spoken-en",
+      "name": "spoken-en",
+      "newGeneratedPCMBytes": 99600,
+      "newScheduledPCMBytes": 99600,
+      "passed": true,
+      "reasons": [],
+      "recognizerLiveObserved": true,
+      "source": "Where is the train station?",
+      "sourceLanguage": "en",
+      "speech": {
+        "activeLineID": "",
+        "busy": false,
+        "enqueued": [
+          {
+            "id": "6A8E68D3-9D3B-4805-A7A6-8FBE1F5FCC71",
+            "isPreview": false,
+            "language": "ja",
+            "output": "speaker",
+            "text": "駅はどこですか",
+            "voice": "jm_kumo",
+            "voiceID": "jm_kumo"
+          }
+        ],
+        "errors": [],
+        "generatedPCMBytes": 99600,
+        "player": {
+          "category": "AVAudioSessionCategoryMultiRoute",
+          "completedBuffers": 1,
+          "completedFrames": 49800,
+          "engineRunning": true,
+          "errors": [],
+          "inputRoute": [
+            {
+              "channels": 1,
+              "type": "MicrophoneBuiltIn"
+            },
+            {
+              "channels": 1,
+              "type": "BluetoothHFP"
+            }
+          ],
+          "isAudible": false,
+          "lastMap": [
+            -1,
+            -1,
+            0,
+            0
+          ],
+          "mapStatus": 0,
+          "maps": [
+            {
+              "channels": [
+                -1,
+                -1,
+                0,
+                0
+              ],
+              "mixerVolume": 1,
+              "output": "speaker",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.800000011920929
+            },
+            {
+              "channels": [
+                -1,
+                -1,
+                0,
+                0
+              ],
+              "mixerVolume": 1,
+              "output": "speaker",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.800000011920929
+            }
+          ],
+          "mixerVolume": 1,
+          "mode": "AVAudioSessionModeDualRoute",
+          "pcmBytes": 99600,
+          "queuedBuffers": 0,
+          "requestedOutput": "speaker",
+          "requestedOutputs": [
+            "speaker"
+          ],
+          "route": [
+            {
+              "channels": 2,
+              "type": "BluetoothHFP"
+            },
+            {
+              "channels": 2,
+              "type": "Speaker"
+            }
+          ],
+          "scheduledBuffers": 1,
+          "scheduledFrames": 49800,
+          "volume": 0.800000011920929
+        },
+        "queuedLines": 0
+      },
+      "speechBaseline": {},
+      "targetLanguage": "ja",
+      "translation": "駅はどこですか",
+      "translationSeconds": 3.584141125
+    },
+    {
+      "completedFramesBeforeCase": 0,
+      "id": "spoken-ja",
+      "name": "spoken-ja",
+      "newGeneratedPCMBytes": 96000,
+      "newScheduledPCMBytes": 96000,
+      "passed": true,
+      "reasons": [],
+      "recognizerLiveObserved": true,
+      "source": "駅はどこですか ？",
+      "sourceLanguage": "ja",
+      "speech": {
+        "activeLineID": "",
+        "busy": false,
+        "enqueued": [
+          {
+            "id": "18E2FB5F-EAE8-4A11-8217-41E750B32F35",
+            "isPreview": false,
+            "language": "en",
+            "output": "headphones",
+            "text": "Where is the station?",
+            "voice": "af_alloy",
+            "voiceID": "af_alloy"
+          }
+        ],
+        "errors": [],
+        "generatedPCMBytes": 96000,
+        "player": {
+          "category": "AVAudioSessionCategoryMultiRoute",
+          "completedBuffers": 1,
+          "completedFrames": 48000,
+          "engineRunning": true,
+          "errors": [],
+          "inputRoute": [
+            {
+              "channels": 1,
+              "type": "MicrophoneBuiltIn"
+            },
+            {
+              "channels": 1,
+              "type": "BluetoothHFP"
+            }
+          ],
+          "isAudible": false,
+          "lastMap": [
+            0,
+            0,
+            -1,
+            -1
+          ],
+          "mapStatus": 0,
+          "maps": [
+            {
+              "channels": [
+                0,
+                0,
+                -1,
+                -1
+              ],
+              "mixerVolume": 1,
+              "output": "headphones",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.800000011920929
+            },
+            {
+              "channels": [
+                0,
+                0,
+                -1,
+                -1
+              ],
+              "mixerVolume": 1,
+              "output": "headphones",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.800000011920929
+            }
+          ],
+          "mixerVolume": 1,
+          "mode": "AVAudioSessionModeDualRoute",
+          "pcmBytes": 96000,
+          "queuedBuffers": 0,
+          "requestedOutput": "headphones",
+          "requestedOutputs": [
+            "headphones"
+          ],
+          "route": [
+            {
+              "channels": 2,
+              "type": "BluetoothHFP"
+            },
+            {
+              "channels": 2,
+              "type": "Speaker"
+            }
+          ],
+          "scheduledBuffers": 1,
+          "scheduledFrames": 48000,
+          "volume": 0.800000011920929
+        },
+        "queuedLines": 0
+      },
+      "speechBaseline": {},
+      "targetLanguage": "en",
+      "translation": "Where is the station?",
+      "translationSeconds": 3.372373666
+    },
+    {
+      "completedFramesBeforeCase": 48000,
+      "id": "restart-ja",
+      "name": "restart-ja",
+      "newGeneratedPCMBytes": 96000,
+      "newScheduledPCMBytes": 96000,
+      "passed": true,
+      "reasons": [],
+      "recognizerLiveObserved": true,
+      "source": "駅はどこですか ？",
+      "sourceLanguage": "ja",
+      "speech": {
+        "activeLineID": "",
+        "busy": false,
+        "enqueued": [
+          {
+            "id": "18E2FB5F-EAE8-4A11-8217-41E750B32F35",
+            "isPreview": false,
+            "language": "en",
+            "output": "headphones",
+            "text": "Where is the station?",
+            "voice": "af_alloy",
+            "voiceID": "af_alloy"
+          },
+          {
+            "id": "24776BD7-2431-44B7-A3D2-ED5362B26B2C",
+            "isPreview": false,
+            "language": "en",
+            "output": "headphones",
+            "text": "Where is the station?",
+            "voice": "af_alloy",
+            "voiceID": "af_alloy"
+          }
+        ],
+        "errors": [],
+        "generatedPCMBytes": 192000,
+        "player": {
+          "category": "AVAudioSessionCategoryMultiRoute",
+          "completedBuffers": 2,
+          "completedFrames": 96000,
+          "engineRunning": true,
+          "errors": [],
+          "inputRoute": [
+            {
+              "channels": 1,
+              "type": "MicrophoneBuiltIn"
+            },
+            {
+              "channels": 1,
+              "type": "BluetoothHFP"
+            }
+          ],
+          "isAudible": false,
+          "lastMap": [
+            0,
+            0,
+            -1,
+            -1
+          ],
+          "mapStatus": 0,
+          "maps": [
+            {
+              "channels": [
+                0,
+                0,
+                -1,
+                -1
+              ],
+              "mixerVolume": 1,
+              "output": "headphones",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.800000011920929
+            },
+            {
+              "channels": [
+                0,
+                0,
+                -1,
+                -1
+              ],
+              "mixerVolume": 1,
+              "output": "headphones",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.800000011920929
+            },
+            {
+              "channels": [
+                0,
+                0,
+                -1,
+                -1
+              ],
+              "mixerVolume": 1,
+              "output": "headphones",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.800000011920929
+            }
+          ],
+          "mixerVolume": 1,
+          "mode": "AVAudioSessionModeDualRoute",
+          "pcmBytes": 192000,
+          "queuedBuffers": 0,
+          "requestedOutput": "headphones",
+          "requestedOutputs": [
+            "headphones",
+            "headphones"
+          ],
+          "route": [
+            {
+              "channels": 2,
+              "type": "BluetoothHFP"
+            },
+            {
+              "channels": 2,
+              "type": "Speaker"
+            }
+          ],
+          "scheduledBuffers": 2,
+          "scheduledFrames": 96000,
+          "volume": 0.800000011920929
+        },
+        "queuedLines": 0
+      },
+      "speechBaseline": {
+        "activeLineID": "",
+        "busy": false,
+        "enqueued": [
+          {
+            "id": "18E2FB5F-EAE8-4A11-8217-41E750B32F35",
+            "isPreview": false,
+            "language": "en",
+            "output": "headphones",
+            "text": "Where is the station?",
+            "voice": "af_alloy",
+            "voiceID": "af_alloy"
+          }
+        ],
+        "errors": [],
+        "generatedPCMBytes": 96000,
+        "player": {
+          "category": "AVAudioSessionCategoryMultiRoute",
+          "completedBuffers": 1,
+          "completedFrames": 48000,
+          "engineRunning": true,
+          "errors": [],
+          "inputRoute": [
+            {
+              "channels": 1,
+              "type": "MicrophoneBuiltIn"
+            },
+            {
+              "channels": 1,
+              "type": "BluetoothHFP"
+            }
+          ],
+          "isAudible": false,
+          "lastMap": [
+            0,
+            0,
+            -1,
+            -1
+          ],
+          "mapStatus": 0,
+          "maps": [
+            {
+              "channels": [
+                0,
+                0,
+                -1,
+                -1
+              ],
+              "mixerVolume": 1,
+              "output": "headphones",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.800000011920929
+            },
+            {
+              "channels": [
+                0,
+                0,
+                -1,
+                -1
+              ],
+              "mixerVolume": 1,
+              "output": "headphones",
+              "route": [
+                {
+                  "channels": 2,
+                  "kind": "headphones"
+                },
+                {
+                  "channels": 2,
+                  "kind": "speaker"
+                }
+              ],
+              "status": 0,
+              "volume": 0.800000011920929
+            }
+          ],
+          "mixerVolume": 1,
+          "mode": "AVAudioSessionModeDualRoute",
+          "pcmBytes": 96000,
+          "queuedBuffers": 0,
+          "requestedOutput": "headphones",
+          "requestedOutputs": [
+            "headphones"
+          ],
+          "route": [
+            {
+              "channels": 2,
+              "type": "BluetoothHFP"
+            },
+            {
+              "channels": 2,
+              "type": "Speaker"
+            }
+          ],
+          "scheduledBuffers": 1,
+          "scheduledFrames": 48000,
+          "volume": 0.800000011920929
+        },
+        "queuedLines": 0
+      },
+      "targetLanguage": "en",
+      "translation": "Where is the station?",
+      "translationSeconds": 3.376541417
+    },
+    {
+      "id": "audio-cleanup",
+      "name": "All audio-session claims released",
+      "passed": true,
+      "remainingClaims": {}
+    },
+    {
+      "id": "network-continuity",
+      "name": "No usable network throughout the test",
+      "passed": true
+    },
+    {
+      "attempts": 0,
+      "id": "no-app-http",
+      "name": "Zero intercepted app HTTP attempts",
+      "passed": true
+    }
+  ],
+  "completedAt": "2026-11-14T06:11:18Z",
+  "device": {
+    "model": "iPhone 17 Pro",
+    "systemVersion": "iOS 27.0.1"
+  },
+  "finished": true,
+  "fixtureOnly": true,
+  "freshProcessSincePreparation": true,
+  "liveMicrophoneRecorded": false,
+  "manualConfirmation": {
+    "radioSwitchObservedByAutomation": false,
+    "source": "User confirmation after the instructed airplane-mode test",
+    "statement": "That all worked it sounded good as well"
+  },
+  "networkStatus": "unsatisfied",
+  "networkTransitions": [
+    {
+      "interfaces": [],
+      "secondsFromTestStart": -2.26,
+      "status": "unsatisfied"
+    }
+  ],
+  "overallPassed": true,
+  "pathUnavailableSinceLaunch": true,
+  "phase": "All automated offline checks passed",
+  "requiredCaseIDs": [
+    "typed-en",
+    "typed-ja",
+    "spoken-en",
+    "spoken-ja",
+    "restart-ja"
+  ],
+  "runID": "01D43616-A9C7-493F-BD6F-2DB0E2243228",
+  "scope": {
+    "input": "Fixed English and Japanese recordings through the production DEBUG audio-file input; no live microphone recording",
+    "limits": [
+      "Synthetic recordings do not establish accuracy across real speakers or noisy rooms.",
+      "Radio switch and physical audibility are user-confirmed rather than directly observed by the automated runner.",
+      "The HTTP tripwire does not observe all framework-service or WebSocket traffic."
+    ],
+    "speech": "Actual selected Kokoro voices and explicit conversation output routing"
+  },
+  "startedAt": "2026-11-14T06:10:39Z",
+  "storeNetworkPolicyForcedOffline": false,
+  "tripwireScope": "Intercepted app URLSession HTTP requests only; not all framework-service or WebSocket traffic."
+}

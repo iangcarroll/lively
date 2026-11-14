@@ -4,9 +4,15 @@ struct SettingsView: View {
     @Bindable var settings: AppSettings
     var onClear: () -> Void
     var onShowWelcome: () -> Void = {}
+    var onPauseForVoicePreview: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     /// Unsaved key edits by `ProviderCredential.id`.
     @State private var keyDrafts: [String: String] = [:]
+    @State private var voicePreview: NeuralSpeaker?
+    @State private var voicePreviewSession = NeuralPreviewSession()
+    @State private var voicePreviewStatus: String?
+    @State private var voicePreviewOperation = UUID()
 
     var body: some View {
         NavigationStack {
@@ -56,6 +62,17 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        OfflineLanguagesView(settings: settings)
+                            .id("\(settings.languages.first.rawValue)-\(settings.languages.second.rawValue)-\(settings.chineseScript.rawValue)")
+                    } label: {
+                        Label { Text("Offline Languages") } icon: { SettingsIcon(systemImage: "arrow.down.circle.fill", color: .indigo) }
+                    }
+                } footer: {
+                    Text("Prepare speech and translation downloads for conversations without an internet connection.")
+                }
+
+                Section {
                     Picker(selection: $settings.pickupRange) {
                         ForEach(PickupRange.allCases) { Text($0.label).tag($0) }
                     } label: {
@@ -71,7 +88,42 @@ struct SettingsView: View {
                     Toggle(isOn: $settings.speaksTranslations) {
                         Label { Text("Speak translations aloud") } icon: { SettingsIcon(systemImage: "speaker.wave.2.fill", color: .blue) }
                     }
-                    .disabled(SonioxSpeaker.credential(settings) == nil)
+                    .disabled(settings.speechSource == .original && SonioxSpeaker.credential(settings) == nil)
+                    Picker("Spoken voice", selection: $settings.speechSource) {
+                        ForEach(SpeechSource.allCases) { Text($0.label).tag($0) }
+                    }
+                    NavigationLink {
+                        OfflineVoiceLibraryView(
+                            onSelectVoice: { _ in settings.speechSource = .downloaded },
+                            onPreview: previewVoice,
+                            onStopPreview: stopVoicePreview,
+                            onBeforeDelete: {
+                                closeVoicePreview()
+                                await NeuralSpeaker.releaseCachedModel()
+                            }
+                        )
+                        .safeAreaInset(edge: .bottom) {
+                            if let voicePreviewStatus, !voicePreviewStatus.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(spacing: 12) {
+                                        if voicePreviewStatus.hasPrefix("Playing") { Image(systemName: "waveform") }
+                                        else { ProgressView() }
+                                        Text(voicePreviewStatus).font(.callout)
+                                    }
+                                    #if os(iOS)
+                                    Text("Use the volume buttons to adjust playback.")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    #endif
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                                .background(.regularMaterial)
+                            }
+                        }
+                        .onDisappear { closeVoicePreview() }
+                    } label: {
+                        Label { Text("Offline Voice Library") } icon: { SettingsIcon(systemImage: "waveform.circle.fill", color: .indigo) }
+                    }
                     if SpeechPlayer.supportsDirectionalOutput {
                         Picker("Your language", selection: $settings.speechListenerLanguage) {
                             ForEach(settings.languages.all) { language in
@@ -171,6 +223,13 @@ struct SettingsView: View {
                 keyDrafts[credential.id] = settings.credential(credential)
             }
         }
+        .onDisappear {
+            closeVoicePreview()
+            if settings.speechSource == .original { Task { await NeuralSpeaker.releaseCachedModel() } }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { closeVoicePreview() }
+        }
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 520)
         #endif
@@ -185,9 +244,11 @@ struct SettingsView: View {
     }
 
     private var engineFooter: String {
-        var lines = [provider.summary]
+        var lines = [provider.id == SpeechProvider.onDevice.id
+            ? "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline."
+            : provider.summary]
         lines += provider.credentials.map(\.help)
-        lines.append("Keys are stored in the Keychain on this device.")
+        if !provider.credentials.isEmpty { lines.append("Keys are stored in the Keychain on this device.") }
         if provider.options.contains(.speed) {
             lines.append("Faster speed shows words sooner; Accurate waits a little longer for better transcripts.")
         }
@@ -195,19 +256,51 @@ struct SettingsView: View {
     }
 
     private var speechFooter: String {
-        guard SonioxSpeaker.credential(settings) != nil else {
-            return "Speaking translations aloud needs a Soniox API key."
-        }
+        let voice = settings.speechSource == .original
+            ? "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. "
+            : "Downloaded voices speak on this device after installation. Previews pause listening. "
         if SpeechPlayer.supportsDirectionalOutput {
             let incoming = settings.speechListenerLanguage.englishName
             let outgoing = settings.languages.other(than: settings.speechListenerLanguage).englishName
-            return "Incoming \(incoming) translations play through your headphones. Outgoing \(outgoing) translations play through the device speaker. "
-                + "Connect headphones with a microphone; incoming audio stays silent when no compatible headset is connected. "
-                + "Lively pauses microphone audio while the speaker is playing so it won't translate itself."
+            return voice + "Incoming \(incoming) plays through headphones; outgoing \(outgoing) uses the device speaker. "
+                + "Incoming audio stays silent without a compatible headset with a microphone. "
+                + "Listening pauses during speaker playback."
         }
-        return "Translations into \(settings.languages.second.englishName) are read aloud through the speaker as they arrive. "
-            + "Lively doesn't listen while it speaks, so it won't translate itself, unless you're using headphones. "
-            + "You can also turn it on and off from the ⋯ menu in face-to-face."
+        return voice + "Translations into \(settings.languages.second.englishName) play through your current audio output. "
+            + "Listening pauses during speaker playback."
+    }
+
+    private func previewVoice(_ voice: NeuralVoice) async throws {
+        try Task.checkCancellation()
+        onPauseForVoicePreview()
+        stopVoicePreview()
+        let token = UUID()
+        voicePreviewOperation = token
+        defer { if voicePreviewOperation == token { voicePreviewStatus = nil } }
+        voicePreviewStatus = "Preparing audio…"
+        AudioSessionUsers.setDirectionalSpeechEnabled(SpeechPlayer.supportsDirectionalOutput)
+        try await voicePreviewSession.prepare()
+        try Task.checkCancellation()
+        guard voicePreviewOperation == token else { throw CancellationError() }
+        let preview = NeuralSpeaker()
+        voicePreview = preview
+        preview.onPreviewStatus = { [weak preview] status in
+            if let preview, voicePreview === preview, voicePreviewOperation == token { voicePreviewStatus = status }
+        }
+        try await preview.preview(voice: voice)
+    }
+
+    private func closeVoicePreview() {
+        stopVoicePreview()
+        voicePreviewSession.close()
+        AudioSessionUsers.setDirectionalSpeechEnabled(settings.speaksTranslations && SpeechPlayer.supportsDirectionalOutput)
+    }
+
+    private func stopVoicePreview() {
+        voicePreviewOperation = UUID()
+        voicePreview?.stop()
+        voicePreview = nil
+        voicePreviewStatus = nil
     }
 
     private var versionLine: String {

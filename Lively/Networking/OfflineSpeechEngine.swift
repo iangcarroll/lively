@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import CoreMedia
 import Speech
 import os
 
@@ -8,18 +9,18 @@ import os
 /// this engine reports transcript updates plus turn boundaries and leaves the
 /// translation to `ConversationStore`.
 ///
-/// One `SpeechTranscriber` runs per side of the pair and the script / language
-/// detector picks which one heard the turn. Everything is local: no audio or
+/// The speaker is selected explicitly: a fixed-locale recognizer cannot reliably
+/// identify which of two languages was spoken. Everything is local: no audio or
 /// text leaves the device.
 final class OfflineSpeechEngine: SpeechEngine {
     var onEvent: (SpeechEvent) -> Void = { _ in }
     var onStatus: (SpeechEngineStatus) -> Void = { _ in }
     var networkAvailable = true
-    /// Final ASR results trail the end of a turn by a few hundred milliseconds.
-    var textLag: Duration { .milliseconds(500) }
+    /// This engine holds the boundary itself while final ASR results arrive.
+    var textLag: Duration { .zero }
 
-    private let languages: LanguagePair
     private let script: ChineseScript
+    private let spokenLanguage: Language
 
     private static let sampleRate: Double = 16_000
     private static let sourceFormat = AVAudioFormat(
@@ -38,48 +39,69 @@ final class OfflineSpeechEngine: SpeechEngine {
     private var isRunning = false
     /// Invalidates an in-flight start when the engine is stopped.
     private var runID = 0
+    private var inputFrames: Int64 = 0
+    private var turnStartTime = CMTime.zero
     /// Audio heard while the analyzers and language assets are starting up.
     private var pendingAudio: [Data] = []
     private static let maxPendingChunks = 375 // 30 s of 80 ms chunks
 
     /// The language of the current turn, once a recognizer has plausible text.
     private var active: Language?
-    /// Latest text each recognizer produced this turn, used to choose the
-    /// language when neither result clearly identifies it.
-    private var candidates: [Language: String] = [:]
     /// Finalized text of the current turn, and the volatile tail after it.
     private var committed = ""
     private var volatile = ""
+    private var finalizedThrough = CMTime.negativeInfinity
     /// A turn is receiving audio or waiting for its final results.
     private var turnOpen = false
     /// Results are ignored after this instant, once a turn's grace has passed.
     private var ignoreResultsAfter: ContinuousClock.Instant?
     private var heardSpeech = false
     private var silenceTimer: Task<Void, Never>?
+    private var closingTurn: Task<Void, Never>?
+    private var turnID = 0
     private var loggedTranscript = false
     private let logger = Logger(subsystem: "sh.ian.lively", category: "offline")
 
-    init(languages: LanguagePair, script: ChineseScript) {
-        self.languages = languages
+    init(languages: LanguagePair, script: ChineseScript, spokenLanguage: Language? = nil) {
         self.script = script
+        let chosen = spokenLanguage ?? languages.first
+        self.spokenLanguage = languages.contains(chosen) ? chosen : languages.first
+    }
+
+    deinit {
+        startTask?.cancel()
+        silenceTimer?.cancel()
+        closingTurn?.cancel()
+        resultTasks.values.forEach { $0.cancel() }
+        inputs.values.forEach { $0.finish() }
+        let analyzers = Array(analyzers.values)
+        Task {
+            for analyzer in analyzers { await analyzer.cancelAndFinishNow() }
+        }
     }
 
     // MARK: - SpeechEngine
 
     func start() {
         guard !isRunning, startTask == nil else { return }
-        onStatus(.connecting)
         let runID = self.runID
         startTask = Task { [weak self] in
             await self?.setUp(runID: runID)
         }
+        onStatus(.connecting)
     }
 
     func stop() {
+        tearDown()
+        onStatus(.idle)
+    }
+
+    private func tearDown() {
         runID += 1
         startTask?.cancel()
         startTask = nil
         isRunning = false
+        inputFrames = 0
         pendingAudio.removeAll()
         silenceTimer?.cancel()
         silenceTimer = nil
@@ -95,7 +117,6 @@ final class OfflineSpeechEngine: SpeechEngine {
             Task { await analyzer.cancelAndFinishNow() }
         }
         resetTurn()
-        onStatus(.idle)
     }
 
     func pause() { stop() }
@@ -115,18 +136,21 @@ final class OfflineSpeechEngine: SpeechEngine {
     }
 
     private func feed(_ chunk: Data) {
-        noteAudio(chunk)
+        let startTime = CMTime(value: inputFrames, timescale: Int32(Self.sampleRate))
+        inputFrames += Int64(chunk.count / MemoryLayout<Int16>.size)
+        noteAudio(chunk, startTime: startTime)
 
-        for language in languages.all {
+        for language in [spokenLanguage] {
             guard let continuation = inputs[language],
                   let buffer = makeBuffer(from: chunk) else { continue }
-            if let (converter, format) = converters[language],
-               !format.isEqual(Self.sourceFormat),
-               let converted = convert(buffer, using: converter, to: format) {
-                continuation.yield(AnalyzerInput(buffer: converted))
-            } else {
-                continuation.yield(AnalyzerInput(buffer: buffer))
+            guard let (converter, format) = converters[language] else { continue }
+            if format.isEqual(Self.sourceFormat) {
+                continuation.yield(AnalyzerInput(buffer: buffer, bufferStartTime: startTime))
+            } else if let converted = convert(buffer, using: converter, to: format) {
+                continuation.yield(AnalyzerInput(buffer: converted, bufferStartTime: startTime))
             }
+            // A failed conversion must never send the source buffer to an
+            // analyzer configured for a different sample rate or PCM format.
         }
     }
 
@@ -140,65 +164,71 @@ final class OfflineSpeechEngine: SpeechEngine {
     // MARK: - Setup
 
     private func setUp(runID: Int) async {
-        defer { startTask = nil }
+        // Resources stay local until the whole setup succeeds. A stopped task
+        // can clean up after an await without touching a newer run's analyzer.
+        var stagedAnalyzer: SpeechAnalyzer?
+        var stagedInput: AsyncStream<AnalyzerInput>.Continuation?
+        defer {
+            if runID == self.runID { startTask = nil }
+            stagedInput?.finish()
+            if let analyzer = stagedAnalyzer {
+                Task { await analyzer.cancelAndFinishNow() }
+            }
+        }
         do {
-            var prepared: [(Language, SpeechTranscriber, AVAudioFormat)] = []
-            for language in languages.all {
-                guard !Task.isCancelled, runID == self.runID else { return }
-                let locale = Self.locale(for: language, script: script)
-                guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
-                    throw OfflineSpeechError.unsupported(language.englishName)
-                }
-                let transcriber = SpeechTranscriber(
-                    locale: supported,
-                    transcriptionOptions: [],
-                    reportingOptions: [.volatileResults, .fastResults],
-                    attributeOptions: []
-                )
-                let status = await AssetInventory.status(forModules: [transcriber])
-                guard status != .unsupported else {
-                    throw OfflineSpeechError.unsupported(language.englishName)
-                }
-                if status != .installed, let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                    try await request.downloadAndInstall()
-                }
-                guard !Task.isCancelled, runID == self.runID else { return }
-                let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) ?? Self.sourceFormat
-                prepared.append((language, transcriber, format))
+            guard !Task.isCancelled, runID == self.runID else { return }
+            guard SpeechTranscriber.isAvailable else { throw OfflineSpeechError.unavailable }
+            let language = spokenLanguage
+            let locale = Self.locale(for: language, script: script)
+            guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
+                throw OfflineSpeechError.unsupported(language.englishName)
             }
+            guard !Task.isCancelled, runID == self.runID else { return }
+            let transcriber = Self.makeTranscriber(locale: supported)
+            let status = await AssetInventory.status(forModules: [transcriber])
+            guard !Task.isCancelled, runID == self.runID else { return }
+            guard status != .unsupported else { throw OfflineSpeechError.unsupported(language.englishName) }
+            guard status == .installed else { throw OfflineSpeechError.notDownloaded(language.englishName) }
+            let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) ?? Self.sourceFormat
+            guard !Task.isCancelled, runID == self.runID else { return }
+            guard let converter = AVAudioConverter(from: Self.sourceFormat, to: format) else {
+                throw OfflineSpeechError.audioFormat
+            }
+            let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream(
+                bufferingPolicy: .bufferingNewest(Self.maxPendingChunks)
+            )
+            let analyzer = SpeechAnalyzer(modules: [transcriber])
+            stagedAnalyzer = analyzer
+            stagedInput = continuation
+            try await analyzer.start(inputSequence: stream)
+            guard !Task.isCancelled, runID == self.runID else { return }
 
-            for (language, transcriber, format) in prepared {
-                guard !Task.isCancelled, runID == self.runID else { return }
-                let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream()
-                let analyzer = SpeechAnalyzer(modules: [transcriber])
-                try await analyzer.start(inputSequence: stream)
-                transcribers[language] = transcriber
-                analyzers[language] = analyzer
-                inputs[language] = continuation
-                if let converter = AVAudioConverter(from: Self.sourceFormat, to: format) {
-                    converters[language] = (converter, format)
-                }
-            }
-
-            guard !Task.isCancelled, runID == self.runID else {
-                stop()
-                return
-            }
+            transcribers[language] = transcriber
+            analyzers[language] = analyzer
+            inputs[language] = continuation
+            converters[language] = (converter, format)
+            stagedAnalyzer = nil
+            stagedInput = nil
             isRunning = true
             startResults(runID: runID)
             let pending = pendingAudio
             pendingAudio.removeAll()
-            for chunk in pending { feed(chunk) }
+            for chunk in pending {
+                guard !Task.isCancelled, runID == self.runID else { return }
+                feed(chunk)
+            }
+            guard !Task.isCancelled, runID == self.runID else { return }
             onStatus(.live)
-            logger.info("on-device recognizers ready for \(self.languages.all.map(\.rawValue).joined(separator: "+"), privacy: .public)")
+            logger.info("on-device recognizer ready for \(language.rawValue, privacy: .public)")
         } catch is CancellationError {
-            stop()
+            guard runID == self.runID else { return }
+            tearDown()
+            onStatus(.idle)
         } catch {
             guard runID == self.runID else { return }
-            isRunning = false
+            tearDown()
             logger.error("on-device recognizer unavailable: \(error.localizedDescription, privacy: .public)")
             onStatus(.failed(error.localizedDescription))
-            stop()
         }
     }
 
@@ -207,13 +237,14 @@ final class OfflineSpeechEngine: SpeechEngine {
             resultTasks[language] = Task { [weak self] in
                 do {
                     for try await result in transcriber.results {
-                        guard !Task.isCancelled else { return }
-                        self?.handle(result, from: language)
+                        guard let self, !Task.isCancelled, runID == self.runID else { return }
+                        self.handle(result, from: language)
                     }
                 } catch is CancellationError {
                     // The analyzer was cancelled while stopping.
                 } catch {
                     guard let self, runID == self.runID, self.isRunning else { return }
+                    self.tearDown()
                     self.onStatus(.failed(error.localizedDescription))
                 }
             }
@@ -226,24 +257,25 @@ final class OfflineSpeechEngine: SpeechEngine {
         guard isRunning, turnOpen else { return }
         if let ignoreResultsAfter, ContinuousClock.now >= ignoreResultsAfter { return }
 
-        let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
+        // A result from the previous turn may arrive after new speech opens
+        // another one. Keep only words whose audio belongs to this turn.
+        let lowerBound = max(turnStartTime, finalizedThrough)
+        guard result.range.end > lowerBound else { return }
+        var attributed = result.text
+        if result.range.start < lowerBound {
+            let range = CMTimeRange(start: lowerBound, end: result.range.end)
+            guard let kept = attributed.rangeOfAudioTimeRangeAttributes(intersecting: range) else { return }
+            attributed = AttributedString(attributed[kept])
+        }
+        let text = String(attributed.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        if active == nil {
-            candidates[language] = text
-            // The wrong recognizer still produces text for the other language;
-            // only the one whose language matches what was said may claim the
-            // turn. A couple of characters is too little to tell them apart,
-            // so short text waits for the turn to end.
-            guard let detected = Language.detect(text, in: languages),
-                  detected == language, text.count >= 3 else { return }
-            active = language
-            logger.info("turn language \(language.rawValue, privacy: .public) after \(text.count, privacy: .public) chars")
-        }
-        guard active == language else { return }
+        guard language == spokenLanguage else { return }
+        active = language
 
         if result.isFinal {
             appendFinal(text)
+            finalizedThrough = result.range.end
             volatile = ""
         } else {
             guard text != volatile else { return }
@@ -253,7 +285,6 @@ final class OfflineSpeechEngine: SpeechEngine {
     }
 
     private func appendFinal(_ text: String) {
-        guard !committed.hasSuffix(text) else { return }
         committed = join(committed, text)
     }
 
@@ -264,9 +295,6 @@ final class OfflineSpeechEngine: SpeechEngine {
             loggedTranscript = true
             logger.info("on-device transcript received (\(text.count, privacy: .public) chars)")
         }
-        #if DEBUG
-        logger.debug("on-device text: \(text, privacy: .public)")
-        #endif
         onEvent(.replaceText(text, active))
     }
 
@@ -282,15 +310,17 @@ final class OfflineSpeechEngine: SpeechEngine {
 
     // MARK: - Turn detection
 
-    private func noteAudio(_ chunk: Data) {
+    private func noteAudio(_ chunk: Data, startTime: CMTime) {
         let speech = Self.isSpeech(chunk)
         if speech {
-            if ignoreResultsAfter != nil { resetTurn() }
+            if ignoreResultsAfter != nil { closeTurn() }
             if !turnOpen {
                 turnOpen = true
                 active = nil
                 committed = ""
                 volatile = ""
+                turnStartTime = startTime
+                onEvent(.turnStarted)
             }
             heardSpeech = true
             silenceTimer?.cancel()
@@ -314,41 +344,49 @@ final class OfflineSpeechEngine: SpeechEngine {
         guard turnOpen, heardSpeech else { return }
         heardSpeech = false
         silenceTimer = nil
-        if active == nil { resolveLanguage() }
-        onEvent(.turnEnded)
+
+        let runID = self.runID
+        let boundary = CMTime(value: inputFrames, timescale: Int32(Self.sampleRate))
+        for analyzer in analyzers.values {
+            Task { [weak self] in
+                do { try await analyzer.finalize(through: boundary) }
+                catch {
+                    guard let self, runID == self.runID, self.isRunning else { return }
+                    self.tearDown()
+                    self.onStatus(.failed(error.localizedDescription))
+                }
+            }
+        }
 
         // Final recognition results can arrive just after the audio goes quiet.
         // Keep accepting them for a moment before closing the turn.
         let deadline = ContinuousClock.now + Self.turnEndGrace
         ignoreResultsAfter = deadline
-        Task { [weak self] in
+        let turnID = self.turnID
+        closingTurn = Task { [weak self] in
             try? await Task.sleep(for: Self.turnEndGrace)
-            guard let self, let current = self.ignoreResultsAfter, ContinuousClock.now >= current else { return }
-            self.resetTurn()
+            guard let self, !Task.isCancelled, turnID == self.turnID,
+                  let current = self.ignoreResultsAfter, ContinuousClock.now >= current else { return }
+            self.closeTurn()
         }
     }
 
-    /// Picks the recognizer with the longest plausible transcript when neither
-    /// claimed the turn, usually for a short utterance.
-    private func resolveLanguage() {
-        guard active == nil else { return }
-        let matching = candidates.filter { Language.detect($0.value, in: languages) == $0.key }
-        let pool = matching.isEmpty ? candidates : matching
-        guard let best = pool.max(by: { $0.value.count < $1.value.count }), best.value.count >= 4 else { return }
-        active = best.key
-        committed = ""
-        volatile = best.value
-        logger.info("turn language \(best.key.rawValue, privacy: .public) resolved at turn end")
-        emitText()
+    private func closeTurn() {
+        guard turnOpen else { return }
+        resetTurn()
+        onEvent(.turnEnded)
     }
 
     private func resetTurn() {
+        turnID += 1
+        closingTurn?.cancel()
+        closingTurn = nil
         turnOpen = false
         heardSpeech = false
         active = nil
-        candidates.removeAll()
         committed = ""
         volatile = ""
+        finalizedThrough = .negativeInfinity
         loggedTranscript = false
         ignoreResultsAfter = nil
         silenceTimer?.cancel()
@@ -402,22 +440,36 @@ final class OfflineSpeechEngine: SpeechEngine {
             status.pointee = .haveData
             return buffer
         }
-        return error == nil ? output : nil
+        return error == nil && output.frameLength > 0 ? output : nil
     }
 
-    private static func locale(for language: Language, script: ChineseScript) -> Locale {
+    static func makeTranscriber(locale: Locale) -> SpeechTranscriber {
+        SpeechTranscriber(locale: locale, transcriptionOptions: [],
+                          reportingOptions: [.volatileResults, .fastResults], attributeOptions: [.audioTimeRange])
+    }
+
+    static func locale(for language: Language, script: ChineseScript) -> Locale {
         guard language == .chinese else { return Locale(identifier: language.rawValue) }
         return Locale(identifier: script == .traditional ? "zh-TW" : "zh-CN")
     }
 }
 
 private enum OfflineSpeechError: LocalizedError {
+    case unavailable
     case unsupported(String)
+    case notDownloaded(String)
+    case audioFormat
 
     var errorDescription: String? {
         switch self {
+        case .unavailable:
+            "On-device speech recognition isn't available on this device."
         case .unsupported(let language):
             "On-device speech recognition isn't available for \(language) on this device."
+        case .notDownloaded(let language):
+            "\(language) speech recognition isn't downloaded. Open Settings > Offline Languages while online to download it."
+        case .audioFormat:
+            "The microphone audio couldn't be converted for on-device speech recognition."
         }
     }
 }
@@ -426,13 +478,13 @@ extension SpeechProvider {
     static let onDevice = SpeechProvider(
         id: "on-device",
         name: "On-device",
-        summary: "Apple's speech recognition and translation run on this device. No key, and no audio leaves it.",
+        summary: "Apple's speech recognition and text translation run on this device. Download voices separately for offline spoken translations.",
         credentials: [],
         options: [],
         languages: Language.appleOnDevice,
         makePipeline: { settings in
             SpeechPipeline(
-                engine: OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript),
+                engine: OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript, spokenLanguage: settings.offlineSpokenLanguage),
                 translator: AppleTranslator()
             )
         }

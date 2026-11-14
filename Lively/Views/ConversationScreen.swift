@@ -9,7 +9,9 @@ struct ConversationScreen: View {
     @State private var showOnboarding = false
     @State private var showPro = false
     @AppStorage("onboardingDone") private var onboardingDone = false
+    #if DEBUG
     @State private var didStartDemoAutomatically = false
+    #endif
     @State private var showsTextInput = false
     @FocusState private var textInputFocused: Bool
     /// The turn being corrected in the text bar.
@@ -24,7 +26,7 @@ struct ConversationScreen: View {
     /// Unfolded iPhone Duo, landscape phones, iPad and Mac get side-by-side columns.
     private static let wideBreakpoint: CGFloat = 640
 
-    var body: some View {
+    private var conversationCanvas: some View {
         GeometryReader { geometry in
             let wide = geometry.size.width >= Self.wideBreakpoint
             let column = StatusColumn(size: geometry.size, insets: geometry.safeAreaInsets)
@@ -85,6 +87,36 @@ struct ConversationScreen: View {
                 }
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if store.isUsingOnDevice || settings.provider.id == SpeechProvider.onDevice.id {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("On-device · Who's speaking?").font(.caption.weight(.semibold))
+                    Picker("Who's speaking?", selection: $settings.offlineSpokenLanguage) {
+                        ForEach(settings.languages.all) { language in
+                            Text(language.nativeName).tag(language)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    if !store.isOnline, settings.speaksTranslations, settings.speechSource == .original {
+                        Text("Original voice needs internet; translations stay visible.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if settings.speaksTranslations, settings.speechSource == .downloaded, !NeuralVoicePacks.shared.isReady {
+                        Text(NeuralVoicePacks.shared.status == .checking
+                             ? "Checking downloaded voices…"
+                             : "Download voices in Settings → Offline Voice Library.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color(.canvas))
+            }
+        }
+    }
+
+    private var observedConversation: some View {
+        conversationCanvas
         .onChange(of: editing == nil) { _, done in
             guard done, textInputOpenedForEdit else { return }
             textInputOpenedForEdit = false
@@ -102,11 +134,37 @@ struct ConversationScreen: View {
         .onChange(of: settings.speechListenerLanguage) { _, _ in
             store.speechRoutingDidChange()
         }
+        .onChange(of: settings.speechSource) { _, _ in store.speechRoutingDidChange() }
+        .onChange(of: NeuralVoicePacks.shared.selectionRevision) { _, _ in store.speechRoutingDidChange() }
+        .onChange(of: NeuralVoicePacks.shared.installedDirectory) { previous, current in
+            // First verification can publish files that a new speaker is
+            // already waiting for. Only replacing or removing an existing
+            // installation invalidates that speaker.
+            if previous != nil { store.speechRoutingDidChange() }
+            if current == nil { Task { await NeuralSpeaker.releaseCachedModel() } }
+        }
+        .onChange(of: settings.offlineSpokenLanguage) { _, _ in
+            if store.isUsingOnDevice || settings.provider.id == SpeechProvider.onDevice.id { store.offlineSpeakerDidChange() }
+        }
+        .onChange(of: settings.providerID) { _, _ in
+            store.offlineSpeakerDidChange()
+        }
+        .onChange(of: settings.chineseScript) { _, _ in
+            store.offlineSpeakerDidChange()
+        }
         .onChange(of: settings.speaksTranslations) { _, enabled in
             store.setSpeaksTranslations(enabled)
         }
+    }
+
+    var body: some View {
+        observedConversation
         .sheet(isPresented: $showSettings) {
-            SettingsView(settings: settings, onClear: { store.clear() }, onShowWelcome: { showOnboarding = true })
+            SettingsView(settings: settings, onClear: { store.clear() }, onShowWelcome: { showOnboarding = true },
+                         onPauseForVoicePreview: {
+                             store.stopListening()
+                             store.speechRoutingDidChange()
+                         })
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $showOnboarding) { onboarding }
@@ -135,20 +193,17 @@ struct ConversationScreen: View {
             #if os(iOS)
             // iOS takes the mic away in the background anyway; stop cleanly.
             if phase == .background { store.didEnterBackground() }
+            if phase == .background { Task { await NeuralSpeaker.releaseCachedModel() } }
             #endif
         }
         .onOpenURL(perform: open)
-        .translationTask(store.offlineDownload) { session in
-            // Offers the download when the on-device fallback needs a
-            // language direction that isn't installed yet.
-            nonisolated(unsafe) let session = session
-            try? await session.prepareTranslation()
-        }
         .onAppear {
+            Task { await NeuralVoicePacks.shared.refresh() }
             if forcesOnboarding {
                 showOnboarding = true
                 return
             }
+            #if DEBUG
             if isDemo {
                 if isDemoAutoPlay && !didStartDemoAutomatically {
                     didStartDemoAutomatically = true
@@ -156,6 +211,7 @@ struct ConversationScreen: View {
                 }
                 return
             }
+            #endif
             if !onboardingDone {
                 showOnboarding = true
             } else if !settings.hasCredentials {
@@ -201,12 +257,26 @@ struct ConversationScreen: View {
     }
 
     /// Launch with `-LivelyOnboarding YES` to see the welcome tour every time.
-    private var forcesOnboarding: Bool { UserDefaults.standard.bool(forKey: "LivelyOnboarding") }
+    private var forcesOnboarding: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "LivelyOnboarding")
+        #else
+        false
+        #endif
+    }
 
-    private var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }
+    private var isDemo: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "LivelyDemo")
+        #else
+        false
+        #endif
+    }
+    #if DEBUG
     private var isDemoAutoPlay: Bool {
         UserDefaults.standard.bool(forKey: "LivelyDemoAutoPlay")
     }
+    #endif
 
     private func topBar(wide: Bool, column: StatusColumn?) -> some View {
         HStack(spacing: 10) {

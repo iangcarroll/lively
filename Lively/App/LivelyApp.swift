@@ -4,7 +4,7 @@ import SwiftUI
 struct LivelyApp: App {
     var body: some Scene {
         WindowGroup {
-            ConversationScreen(store: ConversationStore(demo: UserDefaults.standard.bool(forKey: "LivelyDemo")))
+            ConversationScreen(store: makeStore())
                 .task {
                     Pro.shared.start()
                     await Account.shared?.refresh()
@@ -13,6 +13,14 @@ struct LivelyApp: App {
         #if os(macOS)
         .defaultSize(width: 960, height: 720)
         .windowToolbarStyle(.unifiedCompact)
+        #endif
+    }
+
+    private func makeStore() -> ConversationStore {
+        #if DEBUG
+        ConversationStore(demo: UserDefaults.standard.bool(forKey: "LivelyDemo"))
+        #else
+        ConversationStore()
         #endif
     }
 }

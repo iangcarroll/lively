@@ -495,7 +495,11 @@ nonisolated struct BubbleShape: Shape {
 /// A little phone that lies down on the table and plays a conversation:
 /// each half shows its reader's language, the far half upside down.
 private struct TableDemo: View {
-    private static let script = Array(DemoConversation.script.prefix(3))
+    private static let script: [(String, String)] = [
+        ("Hi! Is this the right place for the bus to the airport?", "你好！这里是去机场的公交车站吗？"),
+        ("是的，就在这里。不过下一班车大概二十分钟以后才到。", "Yes, it's right here. But the next bus won't come for about twenty minutes."),
+        ("Twenty minutes is fine. Do I pay on the bus or buy a ticket first?", "二十分钟没问题。我是在车上付钱，还是要先买票？"),
+    ]
 
     @State private var tilted = false
     /// Lines started so far.

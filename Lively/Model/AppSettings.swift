@@ -65,6 +65,10 @@ final class AppSettings {
         didSet { defaults.set(speaksTranslations, forKey: "speaksTranslations") }
     }
 
+    var speechSource: SpeechSource {
+        didSet { defaults.set(speechSource.rawValue, forKey: "speechSource") }
+    }
+
     private var speechListenerLanguageCode: String {
         didSet { defaults.set(speechListenerLanguageCode, forKey: "speechListenerLanguage") }
     }
@@ -78,6 +82,23 @@ final class AppSettings {
         set {
             guard languages.contains(newValue) else { return }
             speechListenerLanguageCode = newValue.rawValue
+        }
+    }
+
+    private var offlineSpokenLanguageCode: String {
+        didSet { defaults.set(offlineSpokenLanguageCode, forKey: "offlineSpokenLanguage") }
+    }
+
+    /// Offline recognition uses an explicit language instead of guessing from
+    /// competing recognizers. Changing the pair keeps this selection valid.
+    var offlineSpokenLanguage: Language {
+        get {
+            let language = Language(offlineSpokenLanguageCode)
+            return languages.contains(language) ? language : languages.first
+        }
+        set {
+            guard languages.contains(newValue) else { return }
+            offlineSpokenLanguageCode = newValue.rawValue
         }
     }
 
@@ -112,7 +133,11 @@ final class AppSettings {
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel
         speaksTranslations = defaults.bool(forKey: "speaksTranslations")
+        speechSource = SpeechSource(rawValue: defaults.string(forKey: "speechSource") ?? "") ?? .original
+        // The device voice option was removed. Don't retain an old selection.
+        defaults.set(nil, forKey: "speechVoice")
         speechListenerLanguageCode = defaults.string(forKey: "speechListenerLanguage") ?? stored.first.rawValue
+        offlineSpokenLanguageCode = defaults.string(forKey: "offlineSpokenLanguage") ?? stored.first.rawValue
         for credential in SpeechProvider.allCredentials {
             credentials[credential.id] = Keychain.read(account: credential.id) ?? ""
         }
@@ -120,5 +145,16 @@ final class AppSettings {
         // didSet doesn't run here; the widgets may not have this pair yet.
         WidgetLanguages.publish(languages)
         #endif
+    }
+}
+
+enum SpeechSource: String, CaseIterable, Identifiable, Sendable {
+    case original, downloaded
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .original: "Original voice · online"
+        case .downloaded: "Downloaded voices · offline"
+        }
     }
 }

@@ -262,8 +262,7 @@ struct SpeakAloudToggle: View {
     }
 }
 
-/// Switches speech-to-speech mode: translations into the second language
-/// are read aloud. Hidden when there's no Soniox key to speak with.
+/// Switches spoken translations using the original online voice.
 struct SpeakAloudButton: View {
     let store: ConversationStore
     var settings: AppSettings = .shared
@@ -284,8 +283,7 @@ struct SpeakAloudButton: View {
 }
 
 /// An optional text field for typing a line to translate, for when speaking
-/// isn't practical. Opening it offers to download on-device languages, which
-/// typed text uses when no translation key is set. Its photo button reads the
+/// isn't practical. Offline languages are prepared in Settings. Its photo button reads the
 /// text in a photo, such as a sign or a menu, and translates it the same way.
 struct TypeToTranslateBar: View {
     let store: ConversationStore
@@ -313,7 +311,6 @@ struct TypeToTranslateBar: View {
     }
 
     @State private var text = ""
-    @State private var download: TranslationSession.Configuration?
     @State private var photo: PhotosPickerItem?
     @State private var choosesPhoto = false
     @State private var takesPhoto = false
@@ -368,17 +365,6 @@ struct TypeToTranslateBar: View {
         }
         .onAppear {
             focused.wrappedValue = true
-            guard store.translatesTypedTextOnDevice else { return }
-            download = TranslationSession.Configuration(
-                source: AppleTranslator.language(languages.first, script: script),
-                target: AppleTranslator.language(languages.second, script: script)
-            )
-        }
-        .translationTask(download) { session in
-            // Offers the download if the pair isn't on the device yet. The
-            // session is only used here, inside the task SwiftUI gives it to.
-            nonisolated(unsafe) let session = session
-            try? await session.prepareTranslation()
         }
         .photosPicker(isPresented: $choosesPhoto, selection: $photo, matching: .images)
         .onChange(of: photo) { _, item in

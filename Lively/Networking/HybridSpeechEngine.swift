@@ -16,7 +16,26 @@ final class HybridSpeechEngine: SpeechEngine {
     var onStatus: (SpeechEngineStatus) -> Void = { _ in }
     var networkAvailable: Bool {
         get { cloud.networkAvailable }
-        set { cloud.networkAvailable = newValue }
+        set {
+            let wasAvailable = cloud.networkAvailable
+            cloud.networkAvailable = newValue
+            guard running, newValue != wasAvailable else { return }
+            if newValue {
+                cloudFailed = false
+                cloud.start()
+            } else {
+                // A known network loss shouldn't wait for a socket timeout.
+                // Stop that session too, so it cannot finish connecting or
+                // upload buffered audio while the local recognizer takes over.
+                cloudFailed = true
+                if active == .cloud {
+                    switchToLocal()
+                } else if localFailed {
+                    onStatus(.failed("The network is unavailable, and on-device recognition isn't ready. Download languages in Settings > Offline Languages while online."))
+                }
+                cloud.stop()
+            }
+        }
     }
     var textLag: Duration { active == .local ? local.textLag : cloud.textLag }
 
@@ -58,12 +77,14 @@ final class HybridSpeechEngine: SpeechEngine {
         cloudLive = false
         localLive = false
         localFailed = false
-        cloudFailed = false
+        cloudFailed = !networkAvailable
         buffer.removeAll()
         bufferedSeconds = 0
         onStatus(.connecting)
+        guard running else { return }
         local.start()
-        cloud.start()
+        guard running else { return }
+        if networkAvailable { cloud.start() }
     }
 
     func stop() {
@@ -139,6 +160,7 @@ final class HybridSpeechEngine: SpeechEngine {
             guard let self, self.running else { return }
             switch status {
             case .live:
+                guard self.networkAvailable else { return }
                 self.cloudFailed = false
                 self.switchToCloud()
             case .reconnecting, .failed:
@@ -184,11 +206,14 @@ final class HybridSpeechEngine: SpeechEngine {
         onEvent(.sessionReset)
         active = .local
         cloudLive = false
+        localLive = false
+        localFailed = false
         buffer.removeAll()
         bufferedSeconds = 0
         onSourceChange?(.local, 0)
-        local.start()
         onStatus(.connecting)
+        guard running else { return }
+        local.start()
         logger.info("server unavailable; on-device stopgap active")
     }
 

@@ -20,13 +20,16 @@ final class Utterance {
 final class ConversationStore {
     let settings: AppSettings
     let languages: LanguagePair
-    var speaker: SonioxSpeaker?
+    var speaker: (any TranslationSpeaker)?
+    var speakerSource: SpeechSource?
+    var usesOnDeviceServices = false
+    var isOnline = true
     var speakingSince: Date? = .distantPast
     var spoken: [UUID: Int] = [:]
     var speechFlushes: [UUID: Task<Void, Never>] = [:]
     var alert: String?
     init(settings: AppSettings) { self.settings = settings; self.languages = settings.languages }
-    func testSpeaker() -> SonioxSpeaker { activeSpeaker()! }
+    func testSpeaker() -> SonioxSpeaker { activeSpeaker() as! SonioxSpeaker }
     func accept(_ turn: Utterance, text: String, complete: Bool) {
         speak(turn, stable: text, complete: complete)
     }
@@ -103,9 +106,104 @@ final class ConversationStore {
         check(store.speaker == nil && URLSession.shared.sent.count == 4,
               "old pair stays ineligible even when its completion arrives after the cutoff")
 
+        let voiceTurn = Utterance(target: .english, languages: settings.languages)
+        let originalVoice = store.testSpeaker()
+        originalVoice.player.suspendPreparation = true
+        store.accept(voiceTurn, text: "Queued original voice.", complete: true)
+        await until { originalVoice.player.pending.count == 1 }
+        let voiceTail = Utterance(target: Language("fr"), languages: settings.languages)
+        store.accept(voiceTail, text: "deferred original voice", complete: false)
+        let oldFlush = store.speechFlushes.values.first
+        settings.speaksTranslations = false
+        store.speechRoutingDidChange()
+        check(originalVoice.player.stopCount == 1 && store.speaker == nil,
+              "disabling spoken output immediately stops queued original speech")
+        check(oldFlush?.isCancelled == true && store.speechFlushes.isEmpty && store.spoken.isEmpty,
+              "disabling spoken output cancels deferred original speech")
+        originalVoice.player.pending.removeFirst().resume(returning: true)
+        await drainActor()
+        store.accept(voiceTurn, text: "Queued original voice. Late completion.", complete: true)
+        await drainActor()
+        check(URLSession.shared.sent.count == 4 && store.speaker == nil,
+              "old original-voice callbacks cannot synthesize after spoken output is disabled")
+        store.setSpeaksTranslations(true)
+        store.accept(Utterance(target: .english, languages: settings.languages),
+                     text: "Fresh original voice.", complete: true)
+        await until { URLSession.shared.sent.count == 6 }
+        check(store.speaker is SonioxSpeaker,
+              "reenabling spoken output uses the original voice")
+
+        await drainActor()
+        let originalBeforeSourceChange = store.testSpeaker()
+        originalBeforeSourceChange.player.suspendPreparation = true
+        store.accept(Utterance(target: .english, languages: settings.languages),
+                     text: "Queued before choosing downloaded speech.", complete: true)
+        await until { originalBeforeSourceChange.player.pending.count == 1 }
+        let requestsBeforeSourceChange = URLSession.shared.sent.count
+        settings.speechSource = .downloaded
+        NeuralVoicePacks.shared.isReady = true
+        NeuralVoicePacks.shared.status = .ready
+        store.speechRoutingDidChange()
+        store.accept(Utterance(target: Language("fr"), languages: settings.languages),
+                     text: "Nouvelle voix téléchargée.", complete: true)
+        let downloadedAfterSourceChange = store.speaker as? NeuralSpeaker
+        check(originalBeforeSourceChange.player.stopCount == 1
+                && downloadedAfterSourceChange?.lines.map(\.text) == ["Nouvelle voix téléchargée."],
+              "source switch stops queued original synthesis before fresh downloaded speech")
+        originalBeforeSourceChange.player.pending.removeFirst().resume(returning: true)
+        await drainActor()
+        check(URLSession.shared.sent.count == requestsBeforeSourceChange,
+              "old original preparation returning after a source switch cannot send a cloud request")
+        settings.speechSource = .original
+        store.speechRoutingDidChange()
+        store.accept(Utterance(target: .english, languages: settings.languages),
+                     text: "Fresh after choosing original speech.", complete: true)
+        await until { URLSession.shared.sent.count >= requestsBeforeSourceChange + 2 }
+        check(downloadedAfterSourceChange?.stops == 1 && store.speaker is SonioxSpeaker
+                && URLSession.shared.sent.count == requestsBeforeSourceChange + 2,
+              "switching back cancels downloaded production and sends only fresh original text")
+
         settings.speaksTranslations = false
         store.speechRoutingDidChange()
         check(store.speakingSince == nil, "routing change while speech is disabled leaves no eligible turns")
+
+        // Downloaded Japanese speech keeps the same private/public contract;
+        // recognition source and network reachability do not alter its target.
+        let japanese = AppSettings()
+        japanese.languages = LanguagePair(first: .english, second: Language("ja"))
+        japanese.speaksTranslations = true
+        japanese.speechSource = .downloaded
+        japanese.speechListenerLanguage = .english
+        NeuralVoicePacks.shared.isReady = true
+        NeuralVoicePacks.shared.status = .ready
+        let local = ConversationStore(settings: japanese)
+        local.isOnline = false
+        let cloudRequestsBeforeLocal = URLSession.shared.sent.count
+        local.accept(Utterance(target: Language("ja"), languages: japanese.languages),
+                     text: "駅はどこですか。", complete: true)
+        local.accept(Utterance(target: .english, languages: japanese.languages),
+                     text: "Where is the station?", complete: true)
+        let downloaded = local.speaker as? NeuralSpeaker
+        check(downloaded?.lines.map(\.language.rawValue) == ["ja", "en"],
+              "Japanese and English targets reach the downloaded producer without swapping languages")
+        check(downloaded?.lines.map(\.output) == [.speaker, .headphones],
+              "downloaded Japanese uses phone speaker while the listener's English stays in headphones")
+        check(downloaded?.lines.first?.text == "駅はどこですか。"
+                && URLSession.shared.sent.count == cloudRequestsBeforeLocal,
+              "downloaded Japanese preserves translated text without cloud synthesis")
+        japanese.speechListenerLanguage = Language("ja")
+        local.speechRoutingDidChange()
+        local.accept(Utterance(target: Language("ja"), languages: japanese.languages),
+                     text: "次の電車は何時ですか。", complete: true)
+        check(downloaded?.stops == 1
+                && (local.speaker as? NeuralSpeaker)?.lines.map(\.output) == [.headphones],
+              "changing the Japanese listener cancels old downloaded speech and routes fresh Japanese privately")
+        japanese.speechSource = .original
+        local.speechRoutingDidChange()
+        local.accept(Utterance(target: Language("ja"), languages: japanese.languages),
+                     text: "オフラインでは読み上げません。", complete: true)
+        check(local.speaker == nil && URLSession.shared.sent.count == cloudRequestsBeforeLocal,
+              "switching to original speech while offline remains silent")
         print("Adversarial settings result: \(failures) failures")
         exit(failures == 0 ? 0 : 1)
     }

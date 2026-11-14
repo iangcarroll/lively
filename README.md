@@ -25,8 +25,8 @@ server session connects. The audio heard during that wait is kept in a short
 buffer and replayed to the server when it comes online, then the provisional
 on-device turns are replaced by the server's more accurate transcript. If the
 server never arrives — or drops mid-conversation — the on-device recognizer
-carries the conversation. The first time it does, Lively offers to download the
-Apple translation languages, both directions. On-device listening is iOS/macOS
+carries the conversation when its models are installed. Prepare both speech and
+translation in **Settings › Offline Languages** before going offline. On-device listening is iOS/macOS
 only; Android keeps ML Kit for typed text (see
 [android/README.md](android/README.md)).
 
@@ -43,6 +43,97 @@ When speaking isn't practical, the keyboard button opens a text field. Typed
 lines go to DeepSeek through the key broker, falling back to on-device
 translation (Apple's Translation framework; ML Kit on Android). Voxtral uses its
 own Mistral translator for them.
+
+## Offline conversations (iOS / macOS)
+
+Open **Settings › Offline Languages**, then **Download languages** while online.
+The screen checks the full speech models for both conversation languages and
+translation models in both directions. Unsupported languages are marked for the
+current device. Change the pair in Settings to prepare another pair; Apple's
+speech storage limit may require releasing an unused language first.
+
+Choose **Use on-device translation** to keep recognition and translation local,
+even while connected. Before each person speaks, choose their language in the
+**Who's speaking?** selector above the conversation. Local recognition uses that
+language explicitly; online cloud recognition still detects both languages.
+Typed text, edits, and text read from photos also use local translation in this
+mode or when the network is unavailable, without waiting for a cloud request.
+Missing models produce download guidance instead of starting a download while
+listening. When a cloud conversation loses its connection, downloaded local
+models take over immediately; the cloud provider reconnects when online again.
+
+Spoken output is selected separately in **Settings › Speech-to-Speech › Spoken
+voice**. **Original voice · online** (Soniox) is the default: it needs internet
+and sends translated text to Soniox, even when recognition and text translation
+run on-device. With that choice, offline translations remain visible while
+spoken output pauses. **Downloaded voices · offline** use the local Kokoro model
+after an explicit download; they don't send text to a speech service or fall
+back to cloud or Apple system voices. Both choices use the same
+headphone/speaker routing and microphone echo gating. The app doesn't promise
+that every online language is available offline.
+
+Open **Settings › Offline Voice Library** to browse the integrated Kokoro v1.0
+catalog: **54 presets across 8 languages** — English (American and British),
+French, Hindi, Italian, Japanese, Mandarin Chinese, Brazilian Portuguese, and
+Spanish. Japanese has five presets: Alpha, Gongitsune, Nezumi, Tebukuro, and Kumo.
+Use the language filter or search to find them. One shared **92,022,138-byte
+download (about 92 MB)** installs the model and every preset; selecting more
+voices doesn't download another model.
+
+Choose one voice per language. The selection is saved before or after download,
+and selecting a preset switches spoken output to Downloaded voices. Conversation
+languages remain a separate setting: choosing Kumo doesn't change an
+English/Chinese conversation to Japanese. Set Japanese as one side of the pair
+to hear Japanese translations in that voice. Speech recognition and text
+translation models still need their own downloads in **Offline Languages**;
+the voice pack supplies spoken output only.
+
+Downloads show progress, support cancellation and retry, and verify every file's
+size and SHA-256 before making the shared pack available. A partial download
+can't be used for playback. **Remove download** removes all downloaded
+voices after unloading the model and keeps your selections. Local verification
+runs again at startup; the first preview or spoken line can also need time to
+prepare CoreML. The library shows preview preparation status, and playback waits
+for the local check instead of starting a download. Missing or invalid files
+produce download guidance.
+
+The model comes from
+[Kokoro-82M-CoreML-INT8 at revision 4ef656f](https://huggingface.co/aufklarer/Kokoro-82M-CoreML-INT8/tree/4ef656f55554ceb242ed11febbdbbffd60dd5938),
+based on [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M).
+The local runtime adapts
+[speech-swift at revision 31d676c](https://github.com/soniqo/speech-swift/tree/31d676c6a7f1a3f9e3004c06914de54e61f0f987).
+The model and runtime are Apache-2.0; pronunciation resources include MIT
+attributions. The bundled manifest pins every downloaded file. See the
+[runtime documentation](Packages/NeuralVoices/README.md) and
+[notices](Packages/NeuralVoices/NOTICE) for the source, modifications, and licenses.
+
+Apple shares and manages speech recognition and text translation assets, and may
+remove unused models. Reopen Offline Languages before travel, then verify a fresh
+launch in airplane mode with both languages. Releasing a speech language frees
+an app reservation; it does
+not immediately delete shared system files. Manage translation downloads in
+Apple's Translate settings. Android's existing ML Kit typed/photo fallback is
+unchanged; this offline recognition and translation setup is for iOS/macOS.
+
+Device checks on 2026-11-13 used an iPhone 17 Pro running iOS 27.0.1. Fixed
+English and Chinese recordings passed through the real microphone file-input
+path, Speech framework, and installed translation models. Both spoken and typed
+directions produced final translations with the expected meaning. The app's
+network policy was held offline, URLSession requests were blocked, and no app
+network attempts occurred during those cases. No live microphone audio was
+recorded or retained.
+
+The device exposed a cold-start inconsistency: one language-availability check
+reported not installed, and the first translation raised `notInstalled`, before
+succeeding on the bounded local retry. The app still reports actual system
+readiness and never converts a failed check into a saved ready flag. Missing
+models still fail with download guidance.
+
+The original Soniox Chinese voice was replayed and confirmed by listening.
+Those earlier fixture checks kept the network radios connected. The later
+English/Japanese airplane-mode acceptance run below verifies a fresh offline
+launch with downloaded voices. A live two-person offline conversation and
+recognition accuracy across speakers, accents, or noisy rooms remain unverified.
 
 The camera button at the start of the text field translates a photo, such as
 a sign or a menu. Take one (iPhone and iPad) or choose one from Photos. Its
@@ -72,16 +163,20 @@ phone, and **Whole room** everything. **Auto** tracks the room's background
 level and only hears speech well above it, never laxer than Nearby. The
 thresholds live in `Audio/NoiseGate.swift`.
 
-**Speech-to-speech** (off by default) reads translations aloud with
-Soniox Text-to-Speech (`tts-rt-v2`),
-following [Soniox's speech-to-speech guide](https://soniox.com/docs/translation/sts-translation).
+**Speech-to-speech** (off by default) reads translations aloud. Original Soniox
+uses Text-to-Speech (`tts-rt-v2`), following
+[Soniox's speech-to-speech guide](https://soniox.com/docs/translation/sts-translation).
+On iOS and macOS, Downloaded voices use the verified local Kokoro pack described
+above. Android continues to use Soniox.
 Turn it on and off from the ••• menu in face-to-face or in Settings ›
 Speech-to-Speech. While it's on, the transcript's top bar shows a speaker
-button that turns it off. Each sentence is spoken as soon as its translation is final,
-on its own stream over one WebSocket. While it speaks, the mic sends silence so
+button that turns it off. Sentences are queued when their translations become
+final; Soniox uses its own stream over one WebSocket and downloaded voices
+generate audio locally. While it speaks, the mic sends silence so
 Lively doesn't translate its own voice, unless audio goes to headphones; tapping
-or holding the mic cuts it off. It works with either engine whenever a Soniox
-key is available (the broker's `/v1/soniox/tts-key`, or a key in Settings).
+or holding the mic cuts it off. The voice choice is independent of the
+recognition/translation engine. Original Soniox needs a Soniox key (the broker's
+`/v1/soniox/tts-key`, or a key in Settings); downloaded voices need the local pack.
 
 On **iOS 26.2 or later**, choose **Your language** in Settings › Speech-to-Speech.
 Incoming translations into that language play only through connected headphones;
@@ -120,7 +215,7 @@ StoreKit Configuration. The broker doesn't accept those local test
 transactions, so this exercises only the UI. Use a TestFlight build with a
 Sandbox account for the full flow.
 
-To try the UI without a key, add the launch argument `-LivelyDemo YES` and tap the
+In a Debug build, to try the UI without a key, add the launch argument `-LivelyDemo YES` and tap the
 mic. It plays a scripted conversation through the real turn and translation logic.
 For unattended screenshots, also pass `-LivelyDemoAutoPlay YES` to start the demo
 when the conversation screen appears.
@@ -146,6 +241,9 @@ when the conversation screen appears.
 | Key broker: Cloudflare Worker that mints temporary Soniox keys and translates text | `Server/key-broker/` |
 | Turns, utterances, translation scheduling, which sentences to speak | `Model/ConversationStore.swift` |
 | Speech-to-speech: Soniox `tts-rt-v2`, a stream per sentence | `Networking/SonioxSpeaker.swift` |
+| Offline voice catalog, verified shared download, and per-language selections | `Model/NeuralVoiceCatalog.swift`, `Model/NeuralVoicePacks.swift` |
+| Downloaded speech queue, previews, and shared model lifetime | `Networking/NeuralSpeaker.swift` |
+| Local CoreML synthesis and language frontends | `Packages/NeuralVoices/` |
 | Speech-to-speech: 24 kHz playback, mutes the mic while audible | `Audio/SpeechPlayer.swift` |
 
 Engines report events in one of two ways:
@@ -281,6 +379,73 @@ ownership, and error cleanup. Negative controls deliberately break routing and
 settings behavior in temporary source copies and check that the tests detect it.
 The microphone lifecycle suite also exercises real AVFoundation conversion with
 a generated audio file; Thread Sanitizer checks its concurrent lifecycle work.
+The offline suites cover selected-language recognition, local text translation,
+original-voice suppression offline, downloaded-voice selection without cloud
+credentials, network loss, both translation download directions, system asset
+removal, quota and download failures, cancellation, and stale callbacks. Speech
+and translation services are controlled in these regressions; they don't prove
+real model accuracy or replace an airplane-mode conversation on a phone.
+
+The neural voice suites exercise the production catalog and download manager
+with controlled file downloads: all presets, independent saved selections,
+pinned manifests, manifest bounds, hash failures, atomic installation, retry,
+late callbacks, shared cold-start verification, and invalidation before awaited model unloading
+and deletion. Speaker tests cover queues, selected voices and outputs, preview
+completion and cancellation, invalid audio, shared model loading/unloading, and
+installation changes during preparation. Negative controls deliberately remove
+these protections and must be detected. Preview lifecycle tests execute the
+production Settings and library callbacks with delayed dependencies, including
+rapid taps, stale progress and errors, background cleanup, and cancellation of
+conversation speech before previews. The NeuralVoices package tests cover
+Japanese Unicode handling, chunking, request validation, malformed assets,
+cancellation, unloaded streams, and bundled license notices. The aggregate
+command above includes all four suites, with Thread Sanitizer when requested.
+These tests use controlled rendering or frontend-only cases; they don't establish
+real iPhone CoreML synthesis, cold-start latency, pronunciation, or voice quality.
+
+Neural voice device checks on 2026-11-13 used the iPhone 17 Pro running iOS 27.0.1.
+The production download manager fetched and verified all 75 files
+(92,022,138 bytes). Using this model with CoreML's `.all` compute route crashed
+with `SIGABRT` inside Apple's MPSGraph compiler on repeated axes. The CPU-only
+route generated audio successfully; production now defaults to `.cpuOnly` on
+iOS and keeps `.all` on macOS.
+
+With CPU-only inference, the cold Japanese Alpha preview reached its first
+audio/Playing state in 5.15 s including model loading. Its 4.1 s sample contained
+finite audio (RMS 0.077, peak 0.344). Warm English Heart reached audio in 0.40 s
+and produced a 3.375 s finite sample (peak 0.376). Warm Japanese Alpha and Kumo
+reached audio in 0.42 s and 0.44 s, respectively. These measure preview
+preparation and generation, not a full translation conversation. The active
+route was the iPhone speaker (`Speaker:2`), without an active AirPods route.
+The user initially reported hearing neither preview. A separate standard
+playback check reported speaker volume at 5%. After raising it to 55%, the
+listener confirmed that Japanese Alpha and English Heart sounded good. That
+check used pre-rendered clips with AVAudioPlayer; it confirms the samples are
+audible, rather than the full on-phone synthesis and directional playback path.
+A later fresh-process airplane-mode run passed all five required pipeline cases
+and all nine automatic checks in 39 seconds: typed English/Japanese, prerecorded
+spoken English/Japanese, and a same-store Japanese microphone stop/restart. It
+used the selected Kumo Japanese and Alloy English voices. Every generated byte
+was scheduled and every frame completed; the maps isolated Japanese output to
+the phone speaker and English output to AirPods. The observed network path was
+unavailable from process startup through cleanup, with no forced offline policy,
+no intercepted app HTTP attempts after the tripwire self-test, and no retained
+audio-session claims. The user separately confirmed the instructed airplane-mode
+run completed and sounded good.
+
+The [sanitized acceptance report](Tools/validation/offline-airplane-2026-11-13.json)
+keeps the automatic and user confirmations separate. Inputs were fixed recordings
+through the app's Debug audio-file path, rather than a live microphone
+conversation. These results cover two selected voices and fixed phrases; they
+don't establish accuracy across speakers or noisy rooms. The public network API
+doesn't observe the airplane-mode switch, and the HTTP tripwire doesn't observe
+all framework-service traffic.
+
+Regression tests and acceptance reports stay under Tools and the package's test
+target. Release builds exclude the screenshot demo, canned sign-in responses,
+recording injection, and simulated connection faults. Temporary device-QA
+screens, fixture assets, report collectors, and networking tripwires are not part
+of the shipped app.
 
 These tests do not replace an iPhone check with AirPods: verify both languages,
 unplug/reconnect during playback, and confirm that incoming speech stays in the

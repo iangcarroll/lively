@@ -7,6 +7,7 @@ fakes. No credentials, microphone, network requests or app preferences are used.
 """
 
 from pathlib import Path
+import argparse
 import re
 import subprocess
 import tempfile
@@ -25,6 +26,9 @@ def method(source, name):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--negative-controls", action="store_true")
+    args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     settings = (root / "Lively/Model/AppSettings.swift").read_text()
     if settings.count("UserDefaults.standard") != 1 or settings.count("private init()") != 1:
@@ -39,19 +43,39 @@ def main():
     for marker, source in [("// INSERT_ACTUAL_LANGUAGE", language),
                            ("// INSERT_ACTUAL_SETTINGS", settings),
                            ("// INSERT_ACTUAL_SPEAKER", speaker),
+                           ("// INSERT_ACTUAL_TRANSLATION_SPEAKER", (root / "Lively/Networking/TranslationSpeaker.swift").read_text()),
                            ("// INSERT_ACTUAL_SPEECH_METHODS", speech_methods)]:
         if fixture.count(marker) != 1:
             raise RuntimeError("Expected one source marker: " + marker)
         fixture = fixture.replace(marker, source)
+    variants = [("regression", fixture, True)]
+    if args.negative_controls:
+        for name, old, new in [
+            ("source-default-changed", 'SpeechSource(rawValue: defaults.string(forKey: "speechSource") ?? "") ?? .original',
+             'SpeechSource(rawValue: defaults.string(forKey: "speechSource") ?? "") ?? .downloaded'),
+            ("source-persistence-removed", 'didSet { defaults.set(speechSource.rawValue, forKey: "speechSource") }', 'didSet {}'),
+        ]:
+            if fixture.count(old) != 1:
+                raise RuntimeError("Update source-selection mutation anchor: " + old)
+            variants.append((name, fixture.replace(old, new), False))
     with tempfile.TemporaryDirectory(prefix="lively-directional-regression-") as directory:
         work = Path(directory)
-        source = work / "Regression.swift"
-        source.write_text(fixture)
-        binary = work / "regression"
-        subprocess.run(["xcrun", "swiftc", "-swift-version", "6", "-default-isolation", "MainActor",
-                        "-module-cache-path", str(work / "modules"), "-parse-as-library", str(source),
-                        "-o", str(binary)], check=True)
-        subprocess.run([str(binary)], check=True, timeout=30)
+        for name, actual, should_pass in variants:
+            source = work / (name + ".swift")
+            source.write_text(actual)
+            binary = work / name
+            subprocess.run(["xcrun", "swiftc", "-swift-version", "6", "-default-isolation", "MainActor",
+                            "-module-cache-path", str(work / "modules"), "-parse-as-library", str(source),
+                            "-o", str(binary)], check=True, timeout=90)
+            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=30)
+            if should_pass:
+                print(result.stdout, end="")
+                if result.returncode:
+                    raise RuntimeError(result.stderr or "Directional speech regression failed")
+            elif result.returncode == 0 or "FAIL:" not in result.stderr:
+                raise RuntimeError("Negative control was not detected: " + name)
+            else:
+                print("PASS: " + name + " detected deliberate corruption")
 
 
 if __name__ == "__main__":
