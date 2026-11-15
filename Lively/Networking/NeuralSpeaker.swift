@@ -57,7 +57,8 @@ final class NeuralSpeaker: TranslationSpeaker {
     func speak(_ text: String, in language: Language, output: SpeechPlayer.Output = .automatic) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard let voice = voiceProvider(language), voice.languageCode == language.rawValue else {
-            fail(NeuralSpeechError.unsupportedLanguage(language.englishName))
+            // The voice pack covers eight languages. A pair's other side can
+            // still be spoken, so skip this line rather than turn speech off.
             return
         }
         speak(text, voice: voice, output: output)

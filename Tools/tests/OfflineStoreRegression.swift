@@ -22,7 +22,7 @@ protocol TranslationService {
                    context: [Utterance], script: ChineseScript) -> AsyncThrowingStream<String, Error>
 }
 enum TranslationError: LocalizedError {
-    case missingPack
+    case onDevice(languageName: String)
     var isPermanent: Bool { true }
     var errorDescription: String? { "Download languages first" }
 }
@@ -47,7 +47,7 @@ struct AppleTranslator: TranslationService {
                    context: [Utterance], script: ChineseScript) -> AsyncThrowingStream<String, Error> {
         Calls.local.append((text, source, target))
         return AsyncThrowingStream { continuation in
-            if Calls.missingPack { continuation.finish(throwing: TranslationError.missingPack) }
+            if Calls.missingPack { continuation.finish(throwing: TranslationError.onDevice(languageName: target.englishName)) }
             else { continuation.yield("local:" + text); continuation.finish() }
         }
     }
@@ -336,6 +336,23 @@ final class ConversationStore {
         await until { if case .failed = missing.utterances.first?.translationState { return true }; return false }
         check(Calls.local.count == 1 && Calls.cloud == 0,
               "missing local models report failure without sending the text to cloud")
+
+        // A cloud conversation that drops offline without the on-device
+        // models holds the turn, then finishes it in the cloud once online.
+        Calls.reset()
+        Calls.missingPack = true
+        let waiting = ConversationStore()
+        waiting.changeNetwork(false)
+        waiting.submitTyped("Hold this sentence.", language: .english)
+        await until { waiting.utterances.first?.translationState == .waitingForNetwork }
+        check(Calls.local.count == 1 && Calls.cloud == 0, "offline cloud turn without local models waits for the network")
+        waiting.changeNetwork(true)
+        // The held turn polls for the network, so give it real time.
+        for _ in 0..<60 where waiting.utterances.first?.translationState != .current {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        check(Calls.cloud == 1 && waiting.utterances.first?.translation.hasPrefix("local:") == false,
+              "the held turn is translated in the cloud once back online")
         print("Offline store regression: \(assertions) assertions, \(failures) failures")
         if failures > 0 { exit(1) }
     }

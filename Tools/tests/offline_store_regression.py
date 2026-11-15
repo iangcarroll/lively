@@ -45,7 +45,7 @@ def main():
     if args.negative_controls:
         mutations = [
             ("typed-local-selection-removed", "if usesOnDeviceServices { return AppleTranslator() }", ""),
-            ("spoken-local-selection-removed", "self?.isDemo != true && self?.usesOnDeviceServices == true ? AppleTranslator() : translator", "translator"),
+            ("spoken-local-selection-removed", "!resumedOnline && self?.isDemo != true && self?.usesOnDeviceServices == true ? AppleTranslator() : translator", "translator"),
             ("offline-original-network-guard-removed", "guard settings.speechSource == .downloaded || isOnline else {", "guard true else {"),
             ("downloaded-offline-disabled", "guard settings.speechSource == .downloaded || isOnline else {", "guard isOnline else {"),
             ("downloaded-needs-cloud-credentials", "settings.speechSource == .downloaded || SonioxSpeaker.credential(settings) != nil", "SonioxSpeaker.credential(settings) != nil"),

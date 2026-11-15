@@ -88,7 +88,7 @@ struct ConversationScreen: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if store.isUsingOnDevice || settings.provider.id == SpeechProvider.onDevice.id {
+            if store.asksWhoIsSpeaking {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("On-device · Who's speaking?").font(.caption.weight(.semibold))
                     Picker("Who's speaking?", selection: $settings.offlineSpokenLanguage) {

@@ -9,7 +9,7 @@ final class SpeechPlayer {
 
     static var supportsDirectionalOutput: Bool {
         #if os(iOS)
-        if #available(iOS 26.2, *) { return true }
+        if #available(iOS 26.2, *) { return !AudioSessionUsers.directionalSpeechUnavailable }
         #endif
         return false
     }
@@ -119,7 +119,7 @@ final class SpeechPlayer {
             routeBinding.withLock { $0 = nil; mixer.outputVolume = 1 }
             return true
         }
-        guard Self.supportsDirectionalOutput else { return false }
+        guard Self.supportsDirectionalOutput else { return automaticFallback(for: requested) }
         do {
             if !holdsSession {
                 try AudioSessionUsers.begin(.speech)
@@ -144,10 +144,23 @@ final class SpeechPlayer {
             routeBinding.withLock { $0 = ports; mixer.outputVolume = 1 }
             return true
         } catch {
+            // The dual-route session or its channel map couldn't be set up.
+            // Keep speaking through the ordinary route instead of failing.
             preparedPorts = nil
             releaseHeldSession()
-            throw error
+            AudioSessionUsers.markDirectionalSpeechUnavailable()
+            return automaticFallback(for: requested)
         }
+    }
+
+    /// Without dual-route playback there's one output. The other person's
+    /// translation plays through it as before; the listener's own is only
+    /// played when that output is private, never over a loudspeaker.
+    private func automaticFallback(for requested: Output) -> Bool {
+        output = .automatic
+        let mixer = engine.mainMixerNode
+        routeBinding.withLock { $0 = nil; mixer.outputVolume = 1 }
+        return requested == .speaker || Self.outputIsPrivate
     }
 
     private func waitForDrain() async throws {

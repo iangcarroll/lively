@@ -188,7 +188,9 @@ keeping each sentence on its selected output. This uses
 Apple's `multiRoute` / `dualRoute` audio session and maps output channels to the
 appropriate device. On earlier iOS versions, macOS, and Android,
 speech-to-speech continues to speak only translations into the second language
-through the normal audio output.
+through the normal audio output. The same applies for the rest of a launch if
+the dual-route session can't be set up on a device (or in the simulator), so
+listening and speech never fail over routing.
 
 Soniox only outputs Simplified Chinese. When Settings › Chinese is 繁體, Lively
 converts its output on the device.

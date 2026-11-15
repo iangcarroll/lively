@@ -560,6 +560,13 @@ final class ConversationStore {
     /// True when typed text needs on-device languages.
     var translatesTypedTextOnDevice: Bool { textTranslator is AppleTranslator }
 
+    /// On-device recognition hears one language at a time, so the screen asks
+    /// who's speaking. Not during the stopgap that covers the wait for the
+    /// server: that lasts a moment, and its turns are replaced anyway.
+    var asksWhoIsSpeaking: Bool {
+        settings.provider.id == SpeechProvider.onDevice.id || (isUsingOnDevice && (!usingStopgap || !isOnline))
+    }
+
     private var usesOnDeviceServices: Bool {
         settings.provider.id == SpeechProvider.onDevice.id || isUsingOnDevice || !isOnline
     }
@@ -801,10 +808,12 @@ final class ConversationStore {
         utterance.translationState = .working
         translations[utterance.id] = Task { [weak self] in
             var attempt = 0
+            var translator = translator
+            var resumedOnline = false
             while !Task.isCancelled {
                 // Re-evaluate after a failed cloud attempt so a connection
                 // loss never leaves local translation waiting for the network.
-                let service: TranslationService = self?.isDemo != true && self?.usesOnDeviceServices == true ? AppleTranslator() : translator
+                let service: TranslationService = !resumedOnline && self?.isDemo != true && self?.usesOnDeviceServices == true ? AppleTranslator() : translator
                 do {
                     var output = ""
                     // Show tokens as they stream for a first translation. When
@@ -831,6 +840,19 @@ final class ConversationStore {
                     return
                 } catch {
                     if Task.isCancelled { return }
+                    // A cloud conversation that lost its connection tried the
+                    // on-device models. If they aren't downloaded, hold the
+                    // turn until we're back online instead of failing it.
+                    if let self, case .onDevice? = error as? TranslationError, !self.isOnline,
+                       self.settings.provider.id != SpeechProvider.onDevice.id {
+                        utterance.translationState = .waitingForNetwork
+                        while !self.isOnline, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(250)) }
+                        if Task.isCancelled { return }
+                        utterance.translationState = .working
+                        if let current = utterance.isTyped ? self.textTranslator : self.translator { translator = current }
+                        resumedOnline = true
+                        continue
+                    }
                     attempt += 1
                     let permanent = (error as? TranslationError)?.isPermanent ?? false
                     if permanent || attempt >= 4 {

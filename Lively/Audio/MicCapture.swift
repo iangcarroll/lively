@@ -145,14 +145,23 @@ nonisolated final class MicCapture: @unchecked Sendable {
 
     /// Takes the audio session and brings up the tap and engine. On `lifecycle`.
     private func startCapture(_ token: Int) throws {
+        do {
+            try takeSession()
+        } catch {
+            // Where dual-route speech can't be set up, listen as before.
+            guard AudioSessionUsers.retryWithoutDirectionalSpeech(takeSession) else { throw error }
+        }
+        guard isCurrent(token) else { return }
+        try startEngine(token)
+    }
+
+    private func takeSession() throws {
         if holdsSession {
             try AudioSessionUsers.reactivate()
         } else {
             try AudioSessionUsers.begin(.mic)
             holdsSession = true
         }
-        guard isCurrent(token) else { return }
-        try startEngine(token)
     }
 
     /// Releases the tap, the engine and the mic's hold on the audio session.
@@ -487,9 +496,41 @@ nonisolated enum AudioSessionUsers {
         #endif
     }
 
+    /// Dual-route playback couldn't be set up here (the simulator, or a
+    /// device or route that doesn't offer it). Speech then plays through the
+    /// ordinary session for the rest of this launch, as it did before
+    /// directional output existed, rather than not at all.
+    static var directionalSpeechUnavailable: Bool { directionalFailed.withLock { $0 } }
+    private static let directionalFailed = OSAllocatedUnfairLock(initialState: false)
+
+    /// The session failed to start while set up for dual-route speech. Runs
+    /// `retry` with the ordinary session instead, and keeps that choice only
+    /// if it worked; otherwise the failure wasn't about routing.
+    static func retryWithoutDirectionalSpeech(_ retry: () throws -> Void) -> Bool {
+        guard directionalSpeech.withLock({ $0 }), !directionalSpeechUnavailable else { return false }
+        directionalFailed.withLock { $0 = true }
+        do {
+            try retry()
+            return true
+        } catch {
+            directionalFailed.withLock { $0 = false }
+            return false
+        }
+    }
+
+    static func markDirectionalSpeechUnavailable() {
+        directionalFailed.withLock { $0 = true }
+        #if os(iOS)
+        sessionQueue.async {
+            guard !users.withLock({ $0.isEmpty }) else { return }
+            try? configure(AVAudioSession.sharedInstance())
+        }
+        #endif
+    }
+
     #if os(iOS)
     private static func configure(_ session: AVAudioSession) throws {
-        if #available(iOS 26.2, *), directionalSpeech.withLock({ $0 }) {
+        if #available(iOS 26.2, *), directionalSpeech.withLock({ $0 }), !directionalSpeechUnavailable {
             let options: AVAudioSession.CategoryOptions = [.allowBluetoothHFP]
             if session.category != .multiRoute || session.mode != .dualRoute
                 || !session.categoryOptions.contains(options) {

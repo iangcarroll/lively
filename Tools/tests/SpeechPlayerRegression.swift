@@ -170,6 +170,8 @@ nonisolated enum AudioSessionUsers {
     enum User: Hashable { case speech }
     nonisolated(unsafe) static var users: Set<User> = []
     static func begin(_ user: User) throws { users.insert(user) }
+    nonisolated(unsafe) static var directionalSpeechUnavailable = false
+    static func markDirectionalSpeechUnavailable() { directionalSpeechUnavailable = true }
     static func end(_ user: User) {
         precondition(AVAudioEngine.last?.isRunning != true, "released session before stopping engine")
         users.remove(user)
@@ -340,16 +342,19 @@ nonisolated enum AudioSessionUsers {
         do {
             let player = SpeechPlayer()
             MockAudioUnit.failNextMap = true
-            do {
-                _ = try await player.prepare(output: .headphones)
-                preconditionFailure("channel map failure was ignored")
-            } catch {}
+            // A failed map gives up on dual-route playback for this launch
+            // and speaks through the ordinary route, as before it existed.
+            let ready = try await player.prepare(output: .speaker)
+            precondition(ready, "channel map failure didn't fall back to ordinary playback")
+            precondition(!SpeechPlayer.supportsDirectionalOutput, "channel map failure left directional output on")
             precondition(AudioSessionUsers.users.isEmpty, "failed output mapping leaked an audio-session claim")
             player.play(Data([1, 0]))
-            precondition(AVAudioPlayerNode.last!.buffers.isEmpty, "failed output mapping permitted playback")
+            precondition(AVAudioPlayerNode.last!.buffers.count == 1, "fallback playback wasn't queued")
+            player.stop()
+            AudioSessionUsers.directionalSpeechUnavailable = false
         }
         precondition(AudioSessionUsers.users.isEmpty)
-        print("PASS: private route availability, directional maps, playback drain, cancellation, stop invalidation, immediate disconnect muting, reconnection, map failure cleanup")
+        print("PASS: private route availability, directional maps, playback drain, cancellation, stop invalidation, immediate disconnect muting, reconnection, map failure fallback")
     }
     #endif
 

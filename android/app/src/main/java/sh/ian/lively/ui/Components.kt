@@ -49,6 +49,15 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material.icons.rounded.MicOff
+import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.material.icons.rounded.SettingsInputAntenna
+import androidx.compose.ui.text.style.TextAlign
+import sh.ian.lively.model.ChineseScript
+import sh.ian.lively.model.phrases
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -266,6 +275,63 @@ fun MicButton(
                         modifier = Modifier.size(size * 0.42f),
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Stays beside the transcript controls after the empty-state guidance is gone.
+ * Both readers can see that they can speak without touching the microphone.
+ */
+@Composable
+fun TranscriptListeningStatus(
+    status: ConnectionStatus,
+    isListening: Boolean,
+    pair: LanguagePair,
+    script: ChineseScript,
+    modifier: Modifier = Modifier,
+) {
+    val offline = isListening && status == ConnectionStatus.Offline
+    val tint = when {
+        !isListening -> MaterialTheme.colorScheme.onSurfaceVariant
+        offline -> Lively.colors.warning
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val symbol = when {
+        !isListening -> Icons.Rounded.MicOff
+        status == ConnectionStatus.Live -> Icons.Rounded.GraphicEq
+        offline -> Icons.Rounded.WifiOff
+        else -> Icons.Rounded.SettingsInputAntenna
+    }
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            // Opaque underneath, so the transcript doesn't show through.
+            .background(MaterialTheme.colorScheme.background)
+            .background(tint.copy(alpha = if (isListening) 0.1f else 0.04f))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(symbol, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            for (language in pair.all) {
+                val phrases = language.phrases(script)
+                Text(
+                    when {
+                        !isListening -> phrases.tapToStart
+                        status == ConnectionStatus.Live -> phrases.listening
+                        offline -> phrases.waitingForConnection
+                        else -> phrases.connecting
+                    },
+                    style = MaterialTheme.typography.titleMedium.copy(localeList = language.localeList()),
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (language == pair.second) language.ink(pair) else MaterialTheme.colorScheme.onSurface,
+                )
             }
         }
     }

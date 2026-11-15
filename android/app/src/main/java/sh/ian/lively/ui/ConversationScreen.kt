@@ -33,6 +33,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -191,7 +194,9 @@ private fun TranscriptLayout(
 ) {
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
-        val barSpace = PaddingValues(top = insets.calculateTopPadding() + 64.dp, bottom = insets.calculateBottomPadding() + if (showsTextInput) 176.dp else 104.dp)
+        val barSpace = PaddingValues(top = insets.calculateTopPadding() + 64.dp, bottom = insets.calculateBottomPadding() + (if (showsTextInput) 176.dp else 104.dp)
+            // The Start/Stop caption, and the listening prompt once there are turns.
+            + 22.dp + if (store.visibleUtterances.isEmpty()) 0.dp else 84.dp)
         val utterances = store.visibleUtterances
         when {
             utterances.isEmpty() -> EmptyConversation(store.isListening, store.isConnecting, settings.languages, settings.chineseScript, Modifier.padding(barSpace))
@@ -236,6 +241,12 @@ private fun TranscriptLayout(
                     onEndEditing = onEndEditing,
                 )
             }
+            if (store.visibleUtterances.isNotEmpty()) {
+                TranscriptListeningStatus(
+                    store.status, store.isListening, settings.languages, settings.chineseScript,
+                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                )
+            }
             Row(
                 Modifier.padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -249,6 +260,15 @@ private fun TranscriptLayout(
                 }
                 TextInputToggle(showsTextInput, onShowsTextInputChange)
             }
+            // The mic's own label is read by TalkBack; this one is for the eye.
+            Text(
+                if (store.isListening) "Stop" else "Start",
+                Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics {},
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

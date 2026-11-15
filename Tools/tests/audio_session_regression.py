@@ -25,7 +25,7 @@ def main():
     input_mapping = mic_source[input_start:input_end]
     start = mic_source.index("nonisolated enum AudioSessionUsers {")
     source = mic_source[start:]
-    if source.count("#if os(iOS)") != 4:
+    if source.count("#if os(iOS)") != 5:
         raise RuntimeError("Review the extracted iOS audio-session compile branches")
     source = source.replace("#if os(iOS)", "#if LIVELY_IOS_SESSION_TEST")
     fixture = Path(__file__).with_name("AudioSessionRegression.swift").read_text()
