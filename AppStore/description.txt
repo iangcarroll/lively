@@ -1,0 +1,31 @@
+Every word. Both languages.
+
+A quick question at the station. A conversation over dinner. A new place that suddenly feels a little more familiar. Lively helps you understand each other with live voice translation, a shared conversation view, and clear bilingual transcripts.
+
+TALK NATURALLY
+Choose your two languages, tap the microphone, and start talking. With the default online engine, Lively recognizes either language and translates as the conversation unfolds. No need to select a speaker or tap for every sentence.
+
+ONE PHONE. BOTH SIDES.
+Place your iPhone between two people. Face-to-face mode turns each language toward its reader. Switch to the transcript to follow both languages together, or enjoy a spacious side-by-side view on iPad.
+
+MORE WAYS TO SAY IT
+Type when speaking is inconvenient. Translate text from a photo of a menu or sign. Correct a misheard word and translate it again. Choose Simplified or Traditional Chinese output.
+
+HEAR THE TRANSLATION
+Turn on spoken translations to hear the words aloud. Choose online speech or download the offline voice library: 54 voices across eight languages. On supported iPhones, compatible headphones can keep incoming translations in your ears while the other person hears the device speaker.
+
+PREPARE FOR OFFLINE MOMENTS
+Download supported speech and translation models before you travel, then choose on-device translation. Offline spoken output requires the separate voice download. Availability depends on the language and device; online voices still require internet.
+
+YOUR LANGUAGES, YOUR CONVERSATION
+Choose from the app's supported language pairs, including English, Chinese, Japanese, Spanish, French, German, and more. Online and offline language availability can differ.
+
+START WITHOUT AN ACCOUNT
+The default online engine works without a personal API key or account. Get up to one hour of translation a day free, or two hours when you sign in. Lively Pro raises the daily allowance to up to 10 hours. No ads or cross-app tracking.
+
+Lively Pro is an optional auto-renewing subscription. Payment is charged to your Apple Account. It renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple Account's Subscriptions.
+
+Online translation sends audio or text to the selected providers. On-device mode processes supported speech and text locally; the spoken-voice setting is separate. See the privacy policy for details.
+
+Terms of Use: https://lively.ian.sh/terms
+Privacy Policy: https://lively.ian.sh/privacy
