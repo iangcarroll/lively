@@ -106,20 +106,6 @@ private extension View {
         }
     }
 
-    /// Keeps the newest turn in view as turns arrive and grow, like the
-    /// bottom-anchored scroll view this list replaced.
-    func followsNewest(_ utterances: [Utterance], proxy: ScrollViewProxy) -> some View {
-        let last = utterances.last
-        let growth = last.map { $0.trimmedSource.count + $0.translation.count } ?? 0
-        return onAppear { if let last { proxy.scrollTo(last.id, anchor: .bottom) } }
-            .onChange(of: last?.id) { _, id in
-                if let id { withAnimation(.snappy) { proxy.scrollTo(id, anchor: .bottom) } }
-            }
-            .onChange(of: growth) { _, _ in
-                if let last { proxy.scrollTo(last.id, anchor: .bottom) }
-            }
-    }
-
     func transcriptList() -> some View {
         listStyle(.plain)
             .scrollContentBackground(.hidden)

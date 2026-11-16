@@ -95,6 +95,10 @@ reminder; the transcript shows it above the mic. It uses both known languages,
 or an Automatic state while the partner is unknown. The mic keeps its **Stop**
 label while active and **Start** while off. Stopped, connecting, and offline
 guidance stays visible; VoiceOver also keeps the listening instructions visible.
+Headers, reminders, typing fields, and controls reserve their own space above or
+below the transcript. While following the conversation, the newest turn stays
+in view as guidance, text size, or keyboard size changes. Layout changes keep
+your place when you scroll back to read earlier turns.
 
 When speaking isn't practical, the keyboard button opens a text field. Typed
 lines go to DeepSeek through the key broker, falling back to on-device

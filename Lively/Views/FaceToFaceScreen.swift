@@ -33,19 +33,22 @@ struct FaceToFaceScreen: View {
                 .rotationEffect(.degrees(180))
                 .padding(statusColumn?.edges ?? [], statusColumn?.width ?? 0)
             controlStrip
-            FaceToFaceHalf(store: store, language: nearDisplayLanguage, role: nearRole, onEdit: onEdit, showsListeningPrompt: showsListeningPrompt)
-                .safeAreaBar(edge: .bottom) {
-                    if showsTextInput {
-                        // The near person types; the far side reads the translation.
-                        TypeToTranslateBar(
-                            store: store, languages: languages, language: nearDisplayLanguage ?? store.listenerLanguage,
-                            editing: $editing, focused: textInputFocused
-                        ) { onSetTextInput(false) }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                        .transition(.opacity)
-                    }
+            ConversationTranscriptLayout {
+                EmptyView()
+            } transcript: {
+                FaceToFaceHalf(store: store, language: nearDisplayLanguage, role: nearRole, onEdit: onEdit, showsListeningPrompt: showsListeningPrompt)
+            } footer: {
+                if showsTextInput {
+                    // The near person types; the far side reads the translation.
+                    TypeToTranslateBar(
+                        store: store, languages: languages, language: nearDisplayLanguage ?? store.listenerLanguage,
+                        editing: $editing, focused: textInputFocused
+                    ) { onSetTextInput(false) }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .transition(.opacity)
                 }
+            }
         }
         .animation(.snappy, value: nearLanguage)
         .animation(.snappy, value: listenerNear)
@@ -153,14 +156,11 @@ private struct FaceToFaceHalf: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 0) {
+        ConversationTranscriptLayout {
             header
-                .layoutPriority(1)
+        } transcript: {
             transcript
-                .frame(minHeight: 0, maxHeight: .infinity)
-                // The reminder owns its height. Even while either view is
-                // animating, transcript text stays inside the scroll area.
-                .clipped()
+        } footer: {
             if !store.visibleUtterances.isEmpty && showsListeningPrompt {
                 Text(emptyPrompt).font(.headline)
                     .foregroundStyle(language?.ink ?? .secondary)
@@ -171,7 +171,6 @@ private struct FaceToFaceHalf: View {
                     .padding(.vertical, 8)
                     .background((language?.ink ?? .secondary).opacity(0.06))
                     .accessibilityElement(children: .combine)
-                    .layoutPriority(1)
                     .transition(.opacity)
             }
         }
@@ -181,29 +180,36 @@ private struct FaceToFaceHalf: View {
     }
 
     private var transcript: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
-                let recent = Array(store.visibleUtterances.suffix(12))
-                if recent.isEmpty {
-                    emptyState.frame(maxWidth: .infinity)
-                        .opacity(showsListeningPrompt ? 1 : 0)
-                        .accessibilityHidden(!showsListeningPrompt)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    let recent = Array(store.visibleUtterances.suffix(12))
+                    if recent.isEmpty {
+                        emptyState.frame(maxWidth: .infinity)
+                            .opacity(showsListeningPrompt ? 1 : 0)
+                            .accessibilityHidden(!showsListeningPrompt)
+                    }
+                    ForEach(Array(recent.enumerated()), id: \.element.id) { index, utterance in
+                        line(utterance, age: recent.count - 1 - index)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
                 }
-                ForEach(Array(recent.enumerated()), id: \.element.id) { index, utterance in
-                    line(utterance, age: recent.count - 1 - index)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
+                .animation(.snappy, value: store.visibleUtterances.count)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 8)
-            .padding(.bottom, 20)
-            .animation(.snappy, value: store.visibleUtterances.count)
+            .defaultScrollAnchor(store.visibleUtterances.isEmpty ? .top : .bottom, for: .initialOffset)
+            .defaultScrollAnchor(.center, for: .alignment)
+            .scrollIndicators(.hidden)
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .followsNewest(readerUtterances, proxy: proxy)
         }
-        .defaultScrollAnchor(store.visibleUtterances.isEmpty ? .top : .bottom)
-        .defaultScrollAnchor(.center, for: .alignment)
-        .defaultScrollAnchor(.bottom, for: .sizeChanges)
-        .scrollIndicators(.hidden)
-        .scrollEdgeEffectStyle(.soft, for: .top)
+    }
+
+    private var readerUtterances: [Utterance] {
+        // Source-only turns have no listener line to scroll to.
+        store.visibleUtterances.suffix(12).filter { !($0.isSourceOnly && role == .listener) }
     }
 
     private var header: some View {

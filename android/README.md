@@ -32,6 +32,9 @@ not a new Android setup or key requirement; both apps still use
   remain visible. The fading and handoff behavior is scoped to the Swift app;
   Android keeps its bilingual listening prompt above the transcript controls
   and its Start/Stop microphone caption.
+  The Swift layouts also reserve space for guidance and typing controls, follow
+  the newest turn through viewport or text-size changes, and keep manual history
+  scrolling stable during those layout changes.
 - Speech-to-speech, off by default: the ⋮ menu in face-to-face (or Settings) reads
   translations into the second language aloud with Soniox Text-to-Speech,
   muting the mic while it speaks unless headphones are connected.

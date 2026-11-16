@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import platform
 import plistlib
+import re
 import shutil
 import subprocess
 import tempfile
@@ -27,7 +28,10 @@ SOURCES = [
     "Lively/Model/Filler.swift", "Lively/Model/Phrases.swift",
     "Lively/Views/Theme.swift", "Lively/Views/FaceToFaceScreen.swift",
     "Lively/Model/ListeningPromptPolicy.swift", "Lively/Views/ListeningPromptVisibility.swift",
+    "Lively/Views/Transcripts.swift", "Lively/Views/UtteranceBubble.swift",
+    "Lively/Views/ConversationTranscriptLayout.swift",
 ]
+EXTRACTED_SOURCES = ["Lively/Views/Controls.swift", "Lively/Views/ConversationScreen.swift"]
 
 
 def digest(path):
@@ -51,6 +55,40 @@ def replace_once(source, old, new):
     return source.replace(old, new)
 
 
+def declaration(source, signature):
+    start = source.index(signature)
+    opening = source.index("{", start)
+    depth, end = 1, opening + 1
+    while depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    return source[start:end]
+
+
+def production_footer():
+    # Exercise the actual footer that is mounted by ConversationScreen. Only
+    # unrelated audio/icon controls and the text-input dependency are stubbed.
+    controls = (ROOT / EXTRACTED_SOURCES[0]).read_text()
+    screen = (ROOT / EXTRACTED_SOURCES[1]).read_text()
+    return "\n".join([
+        "import SwiftUI", declaration(controls, "struct TranscriptListeningStatus: View"),
+        declaration(screen, "private struct KeyboardButtonBounds: PreferenceKey"),
+        """struct ProductionTranscriptFooter: View {
+ let store: ConversationStore
+ let settings = AppSettings.shared
+ @Binding var showsTextInput: Bool
+ @Binding var editing: Utterance?
+ let showsListeningPrompt: Bool
+ @FocusState private var textInputFocused: Bool
+ @Environment(\\.accessibilityReduceMotion) private var reduceMotion
+ var body: some View { controls(column: nil) }
+ private func setTextInput(_ shown: Bool) { showsTextInput = shown; textInputFocused = shown }
+""",
+        declaration(screen, "private func controls(column: StatusColumn?)"),
+        declaration(screen, "private func controlRow(column: StatusColumn?)"), "}",
+    ])
+
+
 def build_host(work, bundle_id, variant, original):
     source_dir = work / "Sources"
     for name, source in original.items():
@@ -67,6 +105,27 @@ def build_host(work, bundle_id, variant, original):
         path.write_text(replace_once(path.read_text(),
             "} else if utterance.waitsForAutomaticPartner {",
             "} else if utterance.isAwaitingLanguage {"))
+    elif variant == "footer-overlays-transcript":
+        path = source_dir / "ConversationTranscriptLayout.swift"
+        path.write_text(replace_once(path.read_text(),
+            "            footer.layoutPriority(1)\n        }",
+            "        }\n        .overlay(alignment: .bottom) { footer.layoutPriority(1) }"))
+    elif variant == "viewport-reanchor-removed":
+        path = source_dir / "ConversationTranscriptLayout.swift"
+        path.write_text(replace_once(path.read_text(),
+            ".onGeometryChange(for: CGSize.self) { $0.size } action: { viewportSize = $0 }",
+            ".onGeometryChange(for: CGSize.self) { $0.size } action: { _ in }"))
+    elif variant == "manual-scroll-intent-ignored":
+        path = source_dir / "ConversationTranscriptLayout.swift"
+        path.write_text(replace_once(path.read_text(),
+            "phase == .tracking || phase == .interacting || phase == .decelerating", "false"))
+    elif variant == "streaming-alignment-removed":
+        path = source_dir / "ConversationTranscriptLayout.swift"
+        source = path.read_text()
+        source = replace_once(source, declaration(source, ".onChange(of: textRevision)"), "")
+        source = replace_once(source, declaration(source, "private func requestAlignment(for change: Reflow)"),
+                              "private func requestAlignment(for change: Reflow) {}")
+        path.write_text(source)
     sdk = subprocess.check_output(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-path"], text=True).strip()
     architecture = "arm64" if platform.machine() == "arm64" else "x86_64"
     app = work / "StateFixture.app"
@@ -125,11 +184,17 @@ def main():
     parser.add_argument("--device-id", required=True, help="UDID of an already booted iOS Simulator")
     parser.add_argument("--negative-controls", action="store_true")
     parser.add_argument("--output-dir", type=Path, help="keep build logs and xcresults here (must be empty)")
+    parser.add_argument("--only-testing", action="append", default=[], metavar="METHOD",
+                        help="run selected production fixture methods during focused development")
     args = parser.parse_args()
     devices = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "--json"], text=True))
     selected = [d for group in devices["devices"].values() for d in group if d["udid"] == args.device_id]
     if len(selected) != 1 or selected[0]["state"] != "Booted":
         parser.error("Select one already booted Simulator; physical devices are not supported")
+    test_names = re.findall(r"    func (test\w+)\(", (TESTS / "UIStateRegression.swift").read_text())
+    if any(name not in test_names for name in args.only_testing):
+        parser.error("--only-testing must name an existing UIStateRegression test")
+    expected_tests = len(set(args.only_testing)) if args.only_testing else len(test_names)
     work = args.output_dir.resolve() if args.output_dir else Path(tempfile.mkdtemp(prefix="lively-ui-states-"))
     if args.output_dir and work.exists() and any(work.iterdir()):
         parser.error("--output-dir must be empty to preserve earlier evidence")
@@ -140,10 +205,12 @@ def main():
     source_dir = work / "Sources"
     source_dir.mkdir()
     hashes = {}
-    for source in SOURCES:
+    for source in [*SOURCES, *EXTRACTED_SOURCES]:
         path = ROOT / source
         hashes[source] = digest(path)
-        shutil.copy2(path, source_dir / path.name)
+        if source in SOURCES:
+            shutil.copy2(path, source_dir / path.name)
+    (source_dir / "ProductionTranscriptFooter.swift").write_text(production_footer())
     for name in ["UIStateBoundaries.swift", "UIStateHost.swift"]:
         shutil.copy2(TESTS / name, work / name)
     (work / "UIStateRegression.swift").write_text((TESTS / "UIStateRegression.swift").read_text().replace("__UI_STATE_BUNDLE_ID__", host_id))
@@ -169,9 +236,15 @@ def main():
     variants = [("production", None)]
     if args.negative_controls:
         variants += [("missing-empty-error", "testControlledFaceFailureAndNetwork"),
-                     ("false-partner-wait", "testControlledKnownPartnerLiveAndUnknown")]
+                     ("false-partner-wait", "testControlledKnownPartnerLiveAndUnknown"),
+                     ("footer-overlays-transcript", "testPopulatedChatKeepsNewestAboveGuidance"),
+                     ("viewport-reanchor-removed", "testPopulatedFaceKeepsNewestAboveGuidance"),
+                     ("manual-scroll-intent-ignored", "testManualHistoryPositionSurvivesGuidanceAndRevision"),
+                     ("streaming-alignment-removed", "testContinuousSameRowUpdatesKeepNewestBottomVisible")]
     report = {"scope": "Actual view/model sources; controlled Store/settings/unrelated UI boundary only. No speech or hardware proof.",
-              "device": selected[0], "source_sha256": hashes, "custom_main_app_qa_arguments": [], "variants": []}
+              "device": selected[0], "source_sha256": hashes, "custom_main_app_qa_arguments": [],
+              "asset_catalog_sha256": digest(app / "Assets.car"),
+              "selected_production_tests": args.only_testing or test_names, "variants": []}
     try:
         for variant, test in variants:
             app = build_host(work, host_id, variant, original)
@@ -185,10 +258,14 @@ def main():
                        "-resultBundlePath", str(result)]
             if test:
                 command += ["-only-testing:UIStateRegression/UIStateRegression/" + test]
-            code = run([*command, "test"], log, check=False, timeout=240)
+            else:
+                for name in args.only_testing:
+                    command += ["-only-testing:UIStateRegression/UIStateRegression/" + name]
+            code = run([*command, "test"], log, check=False, timeout=600)
             text = log.read_text()
-            passed = code == 0 and "Executed 4 tests, with 0 failures" in text
-            detected = (code != 0 and "** TEST FAILED **" in text and "XCTAssertTrue failed" in text
+            passed = code == 0 and f"Executed {expected_tests} test" in text and "with 0 failures" in text
+            assertion = "XCTAssertTrue failed" if variant in {"missing-empty-error", "false-partner-wait"} else "XCTAssert"
+            detected = (code != 0 and "** TEST FAILED **" in text and assertion in text
                         and "with 1 failure (0 unexpected)" in text and "** BUILD FAILED **" not in text)
             record = {"name": variant, "host_binary_sha256": binary_hash, "exit_code": code,
                       "log": str(log), "log_sha256": digest(log), "result": str(result),
@@ -197,7 +274,7 @@ def main():
             report["variants"].append(record)
             if (test and not detected) or (not test and not passed):
                 raise RuntimeError(f"Unexpected UI result for {variant}; see {log}")
-            print(f"PASS: {variant}" + (" (assertion control detected)" if test else " (4 cases, transcript states and listening fade)"), flush=True)
+            print(f"PASS: {variant}" + (" (assertion control detected)" if test else f" ({expected_tests} cases, transcript states and viewport geometry)"), flush=True)
         report["status"] = "passed"
     except Exception as error:
         report["status"] = "failed"

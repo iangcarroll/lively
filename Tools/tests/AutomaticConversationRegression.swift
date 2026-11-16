@@ -1145,6 +1145,31 @@ import Foundation
         await settle()
     }
 
+    static func editedUnknownLanguageKeepsUserOwnership() async {
+        Calls.reset()
+        let subject = store()
+        send(subject, id: 1, source: "Unidentified original caption.", language: nil,
+             languageFinal: false, partnerEvidence: false)
+        let row = subject.visibleUtterances[0]
+        check(row.isFinal && row.sourceLanguage == nil && !row.isTyped,
+              "the editable fixture is a real closed native caption without a known language")
+        subject.edit(row, to: "A corrected caption.")
+        check(row.isTyped && row.isExplicitTranslationRequest && row.isAutomaticSourceFinal,
+              "an explicit correction claims ownership before waiting for its unknown language")
+        check(row.source == "A corrected caption." && row.sourceLanguage == nil
+              && row.target == nil && row.translationState == .awaitingPartner,
+              "editing an unknown caption preserves the correction without inventing its source or destination")
+        send(subject, id: 1, source: "Late native caption.", language: nil,
+             languageFinal: false, partnerEvidence: false)
+        await settle()
+        check(row.source == "A corrected caption." && row.isTyped,
+              "late same-ID native results cannot overwrite an explicitly edited unknown-language caption")
+        check(subject.detectedPartnerLanguage == nil && Calls.requests.isEmpty && Calls.lines.isEmpty,
+              "unknown-source edits cannot select a partner, request translation, or speak a guessed direction")
+        subject.close()
+        await settle()
+    }
+
     static func savedProtocolThroughStore() async {
         Calls.reset(); Calls.automaticResponses = false
         let subject = ConversationStore()
@@ -1229,6 +1254,7 @@ import Foundation
         await deletionCancelsOldSilenceDeadline()
         await shortTypedInputKeepsReaderSide()
         await explicitEditTranslatesSourceOnlyTurn()
+        await editedUnknownLanguageKeepsUserOwnership()
         await savedProtocolThroughStore()
         print("Automatic conversation regression: \(assertions) assertions passed")
     }

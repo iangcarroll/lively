@@ -65,13 +65,14 @@ struct ConversationScreen: View {
                     // press on the mic mid-hold.
                     // It spans the iPhone Duo's column, so the bottom bar's
                     // buttons in it take taps; everything else keeps clear of it.
-                    ZStack { transcript(wide: wide).padding(column?.edges ?? [], column?.width ?? 0) }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .safeAreaBar(edge: .top) {
-                            topBar(wide: wide, column: column)
-                                .padding(column?.edges ?? [], column?.width ?? 0)
-                        }
-                        .safeAreaBar(edge: .bottom) { controls(column: column) }
+                    ConversationTranscriptLayout {
+                        topBar(wide: wide, column: column)
+                            .padding(column?.edges ?? [], column?.width ?? 0)
+                    } transcript: {
+                        transcript(wide: wide).padding(column?.edges ?? [], column?.width ?? 0)
+                    } footer: {
+                        controls(column: column)
+                    }
                         .ignoresSafeArea(edges: column?.edges ?? [])
                         .transition(.opacity)
                 }

@@ -613,6 +613,13 @@ final class ConversationStore {
         segmentUtterances = segmentUtterances.filter { $0.value !== utterance }
         catchUpUtterances = catchUpUtterances.filter { $0.value !== utterance }
         utterance.setSource(text, language: utterance.isAutomatic ? utterance.sourceLanguage : nil)
+        // The correction belongs to the reader even when retry must wait for
+        // an unidentified source language. Late native results cannot undo it.
+        utterance.isTyped = true
+        utterance.isAutomaticSourceFinal = true
+        utterance.isExplicitTranslationRequest = true
+        utterance.suppressesAutomaticSpeech = false
+        utterance.translatedSource = nil
         retryTranslation(utterance)
     }
 

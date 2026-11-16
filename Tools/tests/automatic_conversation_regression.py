@@ -60,6 +60,8 @@ def main():
             ("short-typed-input-ignores-reader-side", "submitTyped",
              "Language.detect(text, among: Language.soniox) ?? hint",
              "Language.detect(text, among: Language.soniox) ?? listenerLanguage"),
+            ("unknown-source-edit-remains-native-owned", "edit",
+             "        utterance.isTyped = true\n", ""),
             ("source-only-edit-never-binds-listener", "edit",
              "retryTranslation(utterance)",
              "utterance.isTyped = true\n        utterance.isAutomaticSourceFinal = true\n        utterance.isExplicitTranslationRequest = true\n        utterance.suppressesAutomaticSpeech = false\n        utterance.translatedSource = nil\n        translate(utterance)"),
