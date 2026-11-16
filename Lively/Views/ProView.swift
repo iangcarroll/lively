@@ -81,8 +81,8 @@ struct ProView: View {
 }
 
 enum Links {
-    static let terms = URL(string: "https://lively.ian.sh/terms")!
-    static let privacy = URL(string: "https://lively.ian.sh/privacy")!
+    static let terms = URL(string: "https://lively.cautela.hk/terms")!
+    static let privacy = URL(string: "https://lively.cautela.hk/privacy")!
     static let manageSubscriptions = URL(string: "https://apps.apple.com/account/subscriptions")!
 }
 

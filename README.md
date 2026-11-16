@@ -204,7 +204,7 @@ Open `Lively.xcodeproj` and run the **Lively** scheme on an iPhone, iPad
 simulator, or **My Mac**.
 
 Soniox works without any setup. Builds get temporary keys from the deployed
-broker at `https://lively.ian.sh` (see
+broker at `https://lively.cautela.hk` (see
 [Server/key-broker](Server/key-broker/README.md)). For Voxtral, add a Mistral
 key in Settings.
 
@@ -228,7 +228,7 @@ For the new account, register both bundle IDs and the shared App Group, enable
 the group for both targets, and create the `hk.cautela.lively` app in App Store
 Connect. Recreate the monthly/yearly products in [App Store metadata](AppStore/metadata.md)
 under that app and configure its production and sandbox Server Notifications V2
-URL as `https://lively.ian.sh/v1/appstore/notifications`.
+URL as `https://lively.cautela.hk/v1/appstore/notifications`.
 Apple uses `hk.cautela.lively.pro.monthly` and `hk.cautela.lively.pro.yearly`,
 validated by the broker's `APP_STORE_PRODUCT_IDS`. Android keeps its
 `sh.ian.lively` package and `sh.ian.lively.pro.*` products, validated separately

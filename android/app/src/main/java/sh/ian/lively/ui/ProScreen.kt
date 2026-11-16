@@ -220,5 +220,5 @@ private fun ProHeader(title: String = "Lively Pro", subtitle: String = "Translat
     }
 }
 
-private const val TERMS = "https://lively.ian.sh/terms"
-private const val PRIVACY = "https://lively.ian.sh/privacy"
+private const val TERMS = "https://lively.cautela.hk/terms"
+private const val PRIVACY = "https://lively.cautela.hk/privacy"

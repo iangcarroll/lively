@@ -327,7 +327,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIVELY_KEY_BROKER_URL = "https://lively.ian.sh";
+				LIVELY_KEY_BROKER_URL = "https://lively.cautela.hk";
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = hk.cautela.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -375,7 +375,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIVELY_KEY_BROKER_URL = "https://lively.ian.sh";
+				LIVELY_KEY_BROKER_URL = "https://lively.cautela.hk";
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = hk.cautela.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";

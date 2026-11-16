@@ -3,12 +3,14 @@ import { deleteAccount, deleteExpiredAuth, logout, me, startEmailSignIn, verifyE
 import { error, issueSonioxKey, issueSonioxSpeechKey, json, nowSeconds, type Env } from "./broker";
 import { translate } from "./translate";
 
-const SUPPORT_EMAIL = "support@lively.ian.sh";
+const SUPPORT_EMAIL = "support@lively.cautela.hk";
+const PUBLIC_ORIGIN = "https://lively.cautela.hk";
+const PUBLIC_PAGES = new Set(["/", "/privacy", "/support", "/terms", "/delete-account"]);
 
 const privacy = page(
   "Privacy Policy",
-  `<p><strong>Effective October 23, 2026</strong></p>
-  <p>Lively translates live English and Chinese conversations. It is designed to work without an account, advertising, analytics, or tracking.</p>
+  `<p><strong>Effective November 16, 2026</strong></p>
+  <p>Lively is provided by Cautela Limited, a Hong Kong company, and translates live conversations across its supported languages. It is designed to work without an account, advertising, analytics, or tracking.</p>
   <h2>Speech and translations</h2>
   <p>When you start listening, Lively sends microphone audio to the speech provider selected in Settings so it can transcribe and translate the conversation in real time. The default provider is Soniox. Soniox says its real-time API processes audio, transcripts, and translations transiently, does not store that content, and does not use it to train models.</p>
   <p>If you choose the optional Voxtral + Mistral engine, Lively sends audio and transcript text directly to Mistral using the API key you provide. Mistral's terms and privacy practices apply to that processing.</p>
@@ -18,7 +20,7 @@ const privacy = page(
   <p>To use the default provider without creating an account, the app creates a random installation identifier and stores it in your device Keychain (on Android, in app storage encrypted with a key held by the Android Keystore). Lively's key service receives that identifier and your network address to enforce usage limits and prevent abuse. It stores one-way hashes and short-lived counters, not your raw identifier, raw network address, audio, or transcript.</p>
   <h2>Optional account</h2>
   <p>You can optionally sign in for a larger listening allowance. If you do, Lively collects your email address, stores it with a randomly generated account identifier, and stores only hashes of sign-in codes and session tokens. Your email is used only to send a requested sign-in code and operate your account. It is not used for marketing or linked to your conversation content.</p>
-  <p>You can delete your account at any time in Settings → Account → Delete Account or at <a href="/delete-account">lively.ian.sh/delete-account</a>. This immediately deletes your email address, account identifier and sessions from Lively's servers.</p>
+  <p>You can delete your account at any time in Settings → Account → Delete Account or at <a href="/delete-account">lively.cautela.hk/delete-account</a>. This immediately deletes your email address, account identifier and sessions from Lively's servers.</p>
   <h2>Lively Pro purchases</h2>
   <p>Lively Pro is sold through Apple's App Store, and Apple processes your payment. Lively never receives your payment details or Apple ID. To check that a subscription is active, the app sends Lively's key service the signed transaction record the App Store issued, which includes the product, its purchase and expiry dates, and a transaction identifier. Lively uses it only to apply your Pro allowance, and keeps a one-way hash of the transaction identifier in short-lived usage counters. If a purchase is refunded, Lively stores that transaction identifier to stop the refunded subscription from being used.</p>
   <p>On Android, Lively Pro is sold through Google Play, and Google processes your payment. Lively never receives your payment details or Google account. To check that a subscription is active, the app sends Lively's key service the purchase token Google Play issued, and the key service asks Google for the subscription's product, status and expiry date. Lively uses it only to apply your Pro allowance, and keeps a one-way hash of the token in short-lived usage counters.</p>
@@ -34,7 +36,7 @@ const privacy = page(
 
 const support = page(
   "Support",
-  `<p>Lively provides live English ⇄ Chinese conversation translation for iPhone, iPad and Android.</p>
+  `<p>Lively provides live conversation translation for iPhone, iPad, Mac and Android.</p>
   <h2>Before reporting a problem</h2>
   <ul><li>Confirm that microphone access is enabled in Settings → Privacy &amp; Security → Microphone.</li><li>Check that the device has an internet connection.</li><li>Stop and restart listening after changing engines or translation settings.</li></ul>
   <h2>Lively Pro</h2>
@@ -61,8 +63,8 @@ const accountDeletionScript = `const emailForm=document.querySelector('#email-fo
 
 const terms = page(
   "Terms of Use",
-  `<p><strong>Effective October 22, 2026</strong></p>
-  <p>Lively is provided by Certly, Inc. Your use of Lively is governed by <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/">Apple's Licensed Application End User License Agreement</a>, together with these terms.</p>
+  `<p><strong>Effective November 16, 2026</strong></p>
+  <p>Lively is provided by Cautela Limited, a Hong Kong company. Your use of Lively is governed by <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/">Apple's Licensed Application End User License Agreement</a>, together with these terms.</p>
   <h2>Lively Pro</h2>
   <p>Lively Pro is an auto-renewing subscription that raises your daily translation allowance. Payment is charged to your Apple ID when you confirm the purchase. The subscription renews automatically at the same price for the same period unless you turn off auto-renewal at least 24 hours before the current period ends. You can manage or cancel it in the Settings app → your name → Subscriptions. Cancelling takes effect at the end of the current period. Apple handles refunds.</p>
   <p>On Android, Lively Pro is sold through Google Play under <a href="https://play.google.com/about/play-terms/">Google Play's Terms of Service</a>. Payment is charged to your Google account, and the subscription renews automatically until you cancel it in the Play Store app → Payments &amp; subscriptions. Cancelling takes effect at the end of the current period. Google handles refunds.</p>
@@ -91,9 +93,15 @@ const ROUTES: Record<string, { method: string; handle: (request: Request, env: E
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    // Move human-facing pages while preserving API calls from installed builds.
+    // Redirecting authenticated API requests across hosts can drop their headers.
+    if (url.hostname === "lively.ian.sh" && PUBLIC_PAGES.has(url.pathname)
+      && (request.method === "GET" || request.method === "HEAD")) {
+      return Response.redirect(`${PUBLIC_ORIGIN}${url.pathname}${url.search}`, 308);
+    }
     if (url.pathname === "/healthz") return json(200, { ok: true });
     if (url.pathname === "/privacy") return html(privacy);
-    if (url.pathname === "/support") return html(support);
+    if (url.pathname === "/" || url.pathname === "/support") return html(support);
     if (url.pathname === "/terms") return html(terms);
     if (url.pathname === "/delete-account") return html(accountDeletion, true);
     if (url.pathname === "/delete-account.js") {
@@ -134,5 +142,5 @@ function html(body: string, interactive = false): Response {
 }
 
 function page(title: string, content: string): string {
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Lively — ${title}</title><style>:root{color-scheme:light dark;font:17px/1.55 system-ui,-apple-system,sans-serif}body{max-width:720px;margin:0 auto;padding:48px 24px 80px}h1{font-size:2.25rem;letter-spacing:-.03em;margin-bottom:.25em}h2{font-size:1.25rem;margin-top:2em}a{color:#4f46e5}form{display:grid;gap:.6rem;margin:1.5rem 0;max-width:28rem}label{font-weight:600}input,button{box-sizing:border-box;font:inherit;padding:.7rem .8rem;border-radius:.5rem;border:1px solid color-mix(in srgb,currentColor 35%,transparent)}button{width:max-content;cursor:pointer;font-weight:600}.danger{color:#fff;background:#b91c1c;border-color:#b91c1c}[hidden]{display:none!important}@media(prefers-color-scheme:dark){a{color:#a5b4fc}}footer{border-top:1px solid color-mix(in srgb,currentColor 20%,transparent);margin-top:3rem;padding-top:1rem;opacity:.7}</style><main><h1>${title}</h1>${content}</main><footer>Lively · English ⇄ Chinese conversation translation</footer></html>`;
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Lively — ${title}</title><style>:root{color-scheme:light dark;font:17px/1.55 system-ui,-apple-system,sans-serif}body{max-width:720px;margin:0 auto;padding:48px 24px 80px}h1{font-size:2.25rem;letter-spacing:-.03em;margin-bottom:.25em}h2{font-size:1.25rem;margin-top:2em}a{color:#4f46e5}form{display:grid;gap:.6rem;margin:1.5rem 0;max-width:28rem}label{font-weight:600}input,button{box-sizing:border-box;font:inherit;padding:.7rem .8rem;border-radius:.5rem;border:1px solid color-mix(in srgb,currentColor 35%,transparent)}button{width:max-content;cursor:pointer;font-weight:600}.danger{color:#fff;background:#b91c1c;border-color:#b91c1c}[hidden]{display:none!important}@media(prefers-color-scheme:dark){a{color:#a5b4fc}}footer{border-top:1px solid color-mix(in srgb,currentColor 20%,transparent);margin-top:3rem;padding-top:1rem;opacity:.7}</style><main><h1>${title}</h1>${content}</main><footer>Lively · Live conversation translation</footer></html>`;
 }

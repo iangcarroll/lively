@@ -27,7 +27,7 @@ android {
 
         // Lively's key broker (Server/key-broker), which hands out temporary
         // Soniox keys. Empty means Soniox needs a key entered in Settings.
-        buildConfigField("String", "KEY_BROKER_URL", "\"${providers.gradleProperty("livelyKeyBrokerUrl").getOrElse("https://lively.ian.sh")}\"")
+        buildConfigField("String", "KEY_BROKER_URL", "\"${providers.gradleProperty("livelyKeyBrokerUrl").getOrElse("https://lively.cautela.hk")}\"")
     }
 
     // Play upload signing, from ~/.gradle/gradle.properties or -P flags:

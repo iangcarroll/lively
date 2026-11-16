@@ -20,10 +20,10 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
-function post(path: string, body: unknown, { ip = randomIP(), token }: { ip?: string; token?: string } = {}): Request {
+function post(path: string, body: unknown, { ip = randomIP(), token, origin = "https://broker.test" }: { ip?: string; token?: string; origin?: string } = {}): Request {
   const headers: Record<string, string> = { "Content-Type": "application/json", "CF-Connecting-IP": ip };
   if (token !== undefined) headers.Authorization = `Bearer ${token}`;
-  return new Request(`https://broker.test${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+  return new Request(`${origin}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
 }
 
 function randomIP(): string {
@@ -63,7 +63,7 @@ describe("email sign-in", () => {
     expect(send).toHaveBeenCalledOnce();
     const message = send.mock.calls[0][0] as EmailMessageBuilder;
     expect(message.to).toBe(email);
-    expect(message.from).toEqual({ email: "login@x.ian.sh", name: "Lively" });
+    expect(message.from).toEqual({ email: local.EMAIL_FROM, name: "Lively" });
     const code = sentCode();
     expect(message.text).toContain(code);
 
@@ -90,6 +90,26 @@ describe("email sign-in", () => {
     ]);
     expect(dump).not.toContain(sentCode());
     expect(dump).not.toContain(token);
+  });
+
+  it("preserves sign-in and sessions when installed apps move between domains", async () => {
+    const email = randomEmail();
+    const legacy = "https://lively.ian.sh";
+    const current = "https://lively.cautela.hk";
+    const start = await worker.fetch(post("/v1/auth/email/start", { email }, { origin: legacy }), local);
+    expect(start.status).toBe(200);
+    expect(start.headers.has("Location")).toBe(false);
+    const verify = await worker.fetch(post("/v1/auth/email/verify", { email, code: sentCode() }, { origin: current }), local);
+    expect(verify.status).toBe(200);
+    const { token, user } = await verify.json<{ token: string; user: { id: string; email: string } }>();
+    for (const origin of [legacy, current]) {
+      const me = await worker.fetch(new Request(`${origin}/v1/auth/me`, { headers: { Authorization: `Bearer ${token}` } }), local);
+      expect(me.status).toBe(200);
+      expect(await me.json()).toEqual({ user });
+    }
+    expect((await worker.fetch(post("/v1/auth/logout", {}, { token, origin: current }), local)).status).toBe(200);
+    const loggedOut = await worker.fetch(new Request(`${legacy}/v1/auth/me`, { headers: { Authorization: `Bearer ${token}` } }), local);
+    expect(loggedOut.status).toBe(401);
   });
 
   it("keeps the same account across sign-ins", async () => {

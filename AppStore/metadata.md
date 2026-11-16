@@ -8,38 +8,48 @@ existing Play product IDs in the separate `PLAY_PRODUCT_IDS` allowlist.
 ## Product page
 
 - Name: `Lively: Live Translator`
-- Subtitle: `Live English–Chinese speech`
-- Promotional text: `Talk naturally across English and Chinese. Lively recognizes both languages, translates each turn live, and gives each person a view they can read.`
-- Keywords: `translator,translation,Chinese,English,conversation,speech,voice,travel,interpreter,Mandarin`
-- Support URL: `https://lively.ian.sh/support`
-- Marketing URL: none (the repository is private)
+- Subtitle: `Speak, type & translate live`
+- Promotional text: `Understand each other with live translation, a shared face-to-face view, and bilingual transcripts. Type, translate photos, or prepare languages for offline use.`
+- Keywords: `voice,conversation,interpreter,travel,Chinese,English,Japanese,Spanish,photo,offline,speech`
+- Support URL: `https://lively.cautela.hk/support`
+- Marketing URL: `https://lively.cautela.hk`
 - Primary category: Travel
 - Secondary category: Utilities
-- Copyright: `2026 Certly, Inc.`
+- Copyright: `2026 Cautela Limited`
 
 ## Description
 
-Lively helps English and Chinese speakers understand each other in real time.
+Every word. Both languages.
 
-Put your iPhone between two people and start talking. Lively automatically detects which language is being spoken, finds natural turn boundaries, and translates each turn as it happens. There is no need to choose a speaker or press a button for every sentence.
+A quick question at the station. A conversation over dinner. A new place that suddenly feels a little more familiar. Lively helps you understand each other with live voice translation, a shared conversation view, and clear bilingual transcripts.
 
-Designed for face-to-face conversations:
+TALK NATURALLY
+Choose your two languages, tap the microphone, and start talking. With the default online engine, Lively recognizes either language and translates as the conversation unfolds. No need to select a speaker or tap for every sentence.
 
-- Live English ⇄ Chinese transcription and translation
-- Face-to-face phone layout, with each language oriented toward its reader
-- Side-by-side bilingual view on iPad and wider screens
-- Simplified or Traditional Chinese output
-- Resilient listening that recovers from brief network interruptions
-- No account required with the default translation engine
-- Lively Pro: up to 10 hours of translation a day
-- No advertising or cross-app tracking
+ONE PHONE. BOTH SIDES.
+Place your iPhone between two people. Face-to-face mode turns each language toward its reader. Switch to the transcript to follow both languages together, or enjoy a spacious side-by-side view on iPad.
 
-Lively is free to try, with an hour of translation a day, or two when you sign in. Lively Pro is an auto-renewing subscription with up to 10 hours a day. Payment is charged to your Apple Account, and the subscription renews unless cancelled at least 24 hours before the end of the period. Manage it in your Apple Account's Subscriptions.
+MORE WAYS TO SAY IT
+Type when speaking is inconvenient. Translate text from a photo of a menu or sign. Correct a misheard word and translate it again. Choose Simplified or Traditional Chinese output.
 
-Microphone audio is processed by the selected speech provider to provide live transcription and translation. See Lively's privacy policy for details.
+HEAR THE TRANSLATION
+Turn on spoken translations to hear the words aloud. Choose online speech or download the offline voice library: 54 voices across eight languages. On supported iPhones, compatible headphones can keep incoming translations in your ears while the other person hears the device speaker.
 
-Terms of Use: https://lively.ian.sh/terms
-Privacy Policy: https://lively.ian.sh/privacy
+PREPARE FOR OFFLINE MOMENTS
+Download supported speech and translation models before you travel, then choose on-device translation. Offline spoken output requires the separate voice download. Availability depends on the language and device; online voices still require internet.
+
+YOUR LANGUAGES, YOUR CONVERSATION
+Choose from the app's supported language pairs, including English, Chinese, Japanese, Spanish, French, German, and more. Online and offline language availability can differ.
+
+START WITHOUT AN ACCOUNT
+The default online engine works without a personal API key or account. Get up to one hour of translation a day free, or two hours when you sign in. Lively Pro raises the daily allowance to up to 10 hours. No ads or cross-app tracking.
+
+Lively Pro is an optional auto-renewing subscription. Payment is charged to your Apple Account. It renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple Account's Subscriptions.
+
+Online translation sends audio or text to the selected providers. On-device mode processes supported speech and text locally; the spoken-voice setting is separate. See the privacy policy for details.
+
+Terms of Use: https://lively.cautela.hk/terms
+Privacy Policy: https://lively.cautela.hk/privacy
 
 ## Review information
 
@@ -56,34 +66,62 @@ The product IDs must match `Pro.productIDs` in the app and `APP_STORE_PRODUCT_ID
 | Product ID | Reference name | Period | Level |
 |---|---|---|---|
 | `hk.cautela.lively.pro.yearly` | Lively Pro Yearly (Cautela) | 1 year | 1 |
-| `hk.cautela.lively.pro.monthly` | Lively Pro Monthly (Cautela) | 1 month | 2 |
+| `hk.cautela.lively.pro.monthly` | Lively Pro Monthly (Cautela) | 1 month | 1 |
 
 - Display name: `Lively Pro`. Description: `10 hours of live translation a day`.
 - US prices: $4.99/month and $39.99/year, with Apple's regional equivalents.
   `Config/Lively.storekit` uses the same US prices for local testing.
 - Each product needs a review screenshot of the paywall (Settings › Lively Pro).
 - Submit both with the first version that includes Pro.
-- License agreement: Apple's standard EULA, linked from the description and from `https://lively.ian.sh/terms`.
-- App Store Server Notifications V2: `https://lively.ian.sh/v1/appstore/notifications`, for Production and Sandbox.
+- License agreement: Apple's standard EULA, linked from the description and from `https://lively.cautela.hk/terms`.
+- App Store Server Notifications V2: `https://lively.cautela.hk/v1/appstore/notifications`, for Production and Sandbox.
 
 ## Content and privacy declarations
 
 - Content rights: Lively does not contain, show, or access third-party content.
 - Age rating: None for all mature-content categories; no unrestricted web access, user-generated-content feed, remote messaging, advertising, gambling, or health content.
-- Privacy policy: `https://lively.ian.sh/privacy`
-- Account deletion URL: `https://lively.ian.sh/delete-account`
-- Data types:
-  - Email Address — app functionality; linked to the optional account; not used for tracking.
-  - Device ID — app functionality; not linked to identity; not used for tracking.
-  - Audio Data — app functionality; not linked to identity; not used for tracking.
-  - Other User Content — app functionality; not linked to identity; not used for tracking.
-  - Purchase History — app functionality; not linked to identity; not used for tracking.
+- Privacy policy: `https://lively.cautela.hk/privacy`
+- Account deletion URL: `https://lively.cautela.hk/delete-account`
+- Data types (all declared linked; none used for tracking):
+  - Email Address — app functionality; optional account authentication.
+  - User ID — app functionality; optional account and provider credentials.
+  - Product Interaction — app functionality; translation usage counters.
+  - Device ID — app functionality; installation/network identifiers and abuse prevention.
+  - Audio Data — app functionality and other purposes; provider processing and possible model training.
+  - Other User Content — app functionality and other purposes; translation text and possible model training.
+  - Purchase History — app functionality; persistent subscription transaction identifiers.
+- These answers cover every supported engine. The optional Mistral engine uses
+  the user's own API key, so requests can be associated with that provider
+  account. Mistral's retention and training controls depend on the user's plan
+  and settings. The default Soniox real-time engine processes conversation
+  content transiently; Lively's broker does not retain conversation content.
+- Sources: [Apple's disclosure definitions](https://developer.apple.com/app-store/app-privacy-details/),
+  [Mistral privacy policy](https://legal.mistral.ai/terms/privacy-policy/), and
+  [Mistral training controls](https://help.mistral.ai/en/articles/347617-do-you-use-my-user-data-to-train-your-artificial-intelligence-models).
 - Keep these in step with `Lively/PrivacyInfo.xcprivacy`.
 
-## Screenshots
+## Screenshots and creative artwork
 
-- iPhone with Dynamic Island (medium display), 1206 × 2622:
-  - `screenshots/iphone-medium/01-face-to-face.jpg`
-  - `screenshots/iphone-medium/02-transcript.jpg`
-- iPad 13-inch, 2064 × 2752:
-  - `screenshots/ipad-13/01-parallel-transcript.jpg`
+These are marketing compositions with real app captures, feature headlines,
+custom artwork, and device frames. Raw captures are retained separately.
+
+- iPhone medium: `marketing/iphone-medium/`, four PNGs at 1206 × 2622.
+- iPhone large: `marketing/iphone-large/`, four PNGs at 1320 × 2868.
+- iPad 13-inch: `marketing/ipad-13/`, one PNG at 2064 × 2752.
+- Header: `creative/product-page-header.png`, 3840 × 1646.
+- Search results: `creative/search-results.png`, 1920 × 1280.
+- Preview: `marketing/contact-sheet.png`.
+- Rebuild with `swift Tools/store-assets/render.swift` from the repository root.
+  Obtain the official Apple frames as described in `creative/device-frames/README.md`.
+- Main screenshot: “Every word. Both languages.”; four panels total.
+- Subscription review screenshot: `review/lively-pro-paywall.jpg`, captured
+  from the app with the matching local StoreKit catalog.
+- Artwork provenance and prompt: `creative/PROMPT.md`.
+
+The private reviewer address and code are stored in
+App Store Connect review notes. The address and code hash are Worker secrets, never committed here. Sign-in
+remains optional; this account uses the normal free plan so reviewers can
+exercise subscription purchase and restore. Review contact is entered directly
+in App Store Connect.
+
+Public TestFlight link: https://testflight.apple.com/join/9U2kcPRH
