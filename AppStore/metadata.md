@@ -1,5 +1,10 @@
 # Lively App Store metadata
 
+Apple team: `JYM7F5DWS2`. App bundle ID: `hk.cautela.lively`.
+Create a new app record for this bundle ID and recreate the subscription group
+and products below. Their product IDs intentionally retain the shared Android
+identifiers; they do not need to match the Apple bundle ID.
+
 ## Product page
 
 - Name: `Lively Translate`

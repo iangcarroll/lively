@@ -60,7 +60,7 @@ function transaction(overrides: Partial<SignedTransaction> = {}): SignedTransact
   return {
     originalTransactionId: String(2_000_000_000_000_000 + Math.floor(Math.random() * 1e12)),
     productId: "sh.ian.lively.pro.monthly",
-    bundleId: "sh.ian.lively",
+    bundleId: env.APP_BUNDLE_ID,
     environment: "Production",
     type: "Auto-Renewable Subscription",
     signedDate: now - DAY,
@@ -128,6 +128,14 @@ describe("Pro subscriptions", () => {
     expect(sent.max_session_duration_seconds).toBe(7200);
   });
 
+  it.each(["Production", "Sandbox"])("accepts both configured products in %s for the current app", async (environment) => {
+    for (const productId of env.PRO_PRODUCT_IDS.split(",")) {
+      const t = transaction({ productId, environment });
+      expect(await planOf(await worker.fetch(keyRequest({ subscription: await sign(t) }), local))).toBe("pro");
+      expect(sentToSoniox().client_reference_id).toBe(await hash(`subscription:${t.originalTransactionId}`));
+    }
+  });
+
   it("shares one subscription's budget across installs and IPs", async () => {
     const strict = { ...local, PRO_MINUTES_PER_DAY: "4" };
     const jws = await sign(transaction());
@@ -161,6 +169,7 @@ describe("Pro subscriptions", () => {
     ["expired", { expiresDate: Date.now() - 1000 }],
     ["revoked", { revocationDate: Date.now() - DAY }],
     ["another app's", { bundleId: "com.example.other" }],
+    ["old developer account's", { bundleId: "sh.ian.lively" }],
     ["another product's", { productId: "sh.ian.lively.tip" }],
     ["Xcode's local", { environment: "Xcode" }],
     ["no expiry", { expiresDate: undefined }],
@@ -196,6 +205,18 @@ describe("Pro subscriptions", () => {
 });
 
 describe("App Store notifications", () => {
+  it("ignores refunds from the old app even when the transaction ID matches the current app", async () => {
+    const t = transaction({ environment: "Sandbox" });
+    const jws = await sign(t);
+    expect(await planOf(await worker.fetch(keyRequest({ subscription: jws }), local))).toBe("pro");
+
+    expect((await notify("REFUND", { ...t, bundleId: "sh.ian.lively" })).status).toBe(200);
+    expect(await planOf(await worker.fetch(keyRequest({ subscription: jws }), local))).toBe("pro");
+
+    expect((await notify("REFUND", t)).status).toBe(200);
+    expect(await planOf(await worker.fetch(keyRequest({ subscription: jws }), local))).toBe("free");
+  });
+
   it("stops Pro for a refunded subscription, and restores it if the refund is reversed", async () => {
     const t = transaction();
     const jws = await sign(t);

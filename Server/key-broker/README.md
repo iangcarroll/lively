@@ -156,6 +156,13 @@ with `free_pro`.
 
 ### App Store subscriptions
 
+The current Apple app is `hk.cautela.lively` (team `JYM7F5DWS2`). Deploy its
+`APP_BUNDLE_ID` setting before validating purchases from the new TestFlight
+app. Transactions and refund notifications for the old `sh.ian.lively`
+development app are ignored. The shared subscription product IDs remain
+`sh.ian.lively.pro.monthly` and `sh.ian.lively.pro.yearly`, as does Android's
+`PLAY_PACKAGE_NAME=sh.ian.lively`.
+
 The app sends its current StoreKit 2 transaction (`jwsRepresentation`) as
 `Lively-Subscription` with each key request. `src/appstore.ts` checks it
 without calling Apple:

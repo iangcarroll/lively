@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 enum Keychain {
-    private static let service = "sh.ian.lively"
+    private static let service = "hk.cautela.lively"
 
     static func read(account: String) -> String? {
         let query: [String: Any] = [

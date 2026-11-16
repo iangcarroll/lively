@@ -308,7 +308,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Config/Lively-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/Lively-macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = SWA3UUHCJR;
+				DEVELOPMENT_TEAM = JYM7F5DWS2;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -329,7 +329,7 @@
 				);
 				LIVELY_KEY_BROKER_URL = "https://lively.ian.sh";
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = sh.ian.lively;
+				PRODUCT_BUNDLE_IDENTIFIER = hk.cautela.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -356,7 +356,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Config/Lively-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/Lively-macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = SWA3UUHCJR;
+				DEVELOPMENT_TEAM = JYM7F5DWS2;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -377,7 +377,7 @@
 				);
 				LIVELY_KEY_BROKER_URL = "https://lively.ian.sh";
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = sh.ian.lively;
+				PRODUCT_BUNDLE_IDENTIFIER = hk.cautela.lively;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -402,7 +402,7 @@
 				CODE_SIGN_ENTITLEMENTS = LivelyWidgets/LivelyWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SWA3UUHCJR;
+				DEVELOPMENT_TEAM = JYM7F5DWS2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LivelyWidgets/Info.plist;
@@ -413,7 +413,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = sh.ian.lively.widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = hk.cautela.lively.widgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -434,7 +434,7 @@
 				CODE_SIGN_ENTITLEMENTS = LivelyWidgets/LivelyWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SWA3UUHCJR;
+				DEVELOPMENT_TEAM = JYM7F5DWS2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LivelyWidgets/Info.plist;
@@ -445,7 +445,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = sh.ian.lively.widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = hk.cautela.lively.widgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;

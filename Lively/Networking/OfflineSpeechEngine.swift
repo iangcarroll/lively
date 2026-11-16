@@ -60,7 +60,7 @@ final class OfflineSpeechEngine: SpeechEngine {
     private var closingTurn: Task<Void, Never>?
     private var turnID = 0
     private var loggedTranscript = false
-    private let logger = Logger(subsystem: "sh.ian.lively", category: "offline")
+    private let logger = Logger(subsystem: "hk.cautela.lively", category: "offline")
 
     init(languages: LanguagePair, script: ChineseScript, spokenLanguage: Language? = nil) {
         self.script = script
