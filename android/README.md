@@ -155,3 +155,8 @@ draws the same bubbles as the iOS icon.
 | Vision text recognition (`Support/TextRecognizer.swift`) | `support/TextRecognizer.kt` (ML Kit, a model per script) |
 | `StringTransform("Hans-Hant")` | ICU `Transliterator("Hans-Hant")` |
 | `Views/*` | `ui/*` |
+
+Store reviewers can use the dedicated demo email and code supplied privately
+in the store review notes. This uses the same optional Account sign-in screen
+and shared broker as iOS; ordinary users still receive random emailed codes.
+See the [broker review-account setup](../Server/key-broker/README.md#store-reviewer-account).

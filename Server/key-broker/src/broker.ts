@@ -67,6 +67,10 @@ export interface Env {
   CODES_PER_EMAIL_PER_DAY: string;
   CODES_PER_IP_PER_HOUR: string;
   SESSION_DAYS: string;
+  /** Dedicated, data-free store review account. Never a general sign-in override. */
+  APP_REVIEW_EMAIL?: string;
+  /** First 128 bits of SHA-256 of `code:<normalized email>:<code>`, as a Worker secret. */
+  APP_REVIEW_CODE_HASH?: string;
   /** Lively Pro. Lists are comma-separated. */
   APP_BUNDLE_ID: string;
   APP_STORE_PRODUCT_IDS: string;
