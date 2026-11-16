@@ -44,11 +44,10 @@ private struct TranscriptFollowingModifier: ViewModifier {
     @State private var userIsScrolling = false
     @State private var viewportSize = CGSize.zero
     @State private var contentSize = CGSize.zero
-    @State private var pendingNewestID: UUID?
+    @State private var pendingTargetID: UUID?
     @State private var reflowRevision = 0
     @State private var alignmentGeneration = 0
     @State private var alignmentTask: Task<Void, Never>?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var last: Utterance? { utterances.last }
@@ -77,13 +76,18 @@ private struct TranscriptFollowingModifier: ViewModifier {
                source: last?.trimmedSource ?? "", translation: last?.translation ?? "")
     }
 
+    nonisolated private struct NativeLayout: Equatable {
+        let viewport: CGSize
+        let content: CGSize
+    }
+
     func body(content: Content) -> some View {
         content
             .onAppear { scrollToNewest() }
             .onChange(of: last?.id) { _, _ in
                 guard !userIsScrolling else { return }
                 followsBottom = true
-                withAnimation(reduceMotion ? nil : .snappy) { scrollToNewest() }
+                scrollToNewest()
             }
             .onChange(of: textRevision) { previous, current in
                 guard previous.id == current.id, followsBottom, !userIsScrolling else { return }
@@ -96,8 +100,13 @@ private struct TranscriptFollowingModifier: ViewModifier {
             } action: { _, nearBottom in
                 if userIsScrolling { followsBottom = nearBottom }
             }
-            .onScrollGeometryChange(for: CGSize.self) { $0.contentSize } action: { _, size in
-                contentSize = size
+            // View geometry can reach its target before the scroll container
+            // finishes resizing. Follow the container's actual layout instead.
+            .onScrollGeometryChange(for: NativeLayout.self) {
+                NativeLayout(viewport: $0.containerSize, content: $0.contentSize)
+            } action: { _, metrics in
+                viewportSize = metrics.viewport
+                contentSize = metrics.content
             }
             .onScrollPhaseChange { oldPhase, newPhase, context in
                 let wasUserScrolling = isUserPhase(oldPhase)
@@ -111,17 +120,24 @@ private struct TranscriptFollowingModifier: ViewModifier {
                     requestAlignment(for: reflow)
                 }
             }
-            .onGeometryChange(for: CGSize.self) { $0.size } action: { viewportSize = $0 }
             .onChange(of: reflow, initial: true) { _, change in requestAlignment(for: change) }
             .onDisappear { cancelAlignment() }
     }
 
     private func scrollToNewest() {
-        if let last { proxy.scrollTo(last.id, anchor: .bottom) }
+        if let target = last?.id { align(to: target) }
+    }
+
+    private func align(to target: UUID) {
+        // A second request can interrupt an animated scroll before it reaches
+        // the newest turn. Keep alignment immediate while rows animate normally.
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { proxy.scrollTo(target, anchor: .bottom) }
     }
 
     private func requestAlignment(for change: Reflow) {
-        pendingNewestID = change.newestID
+        pendingTargetID = change.newestID
         reflowRevision &+= 1
         guard viewportSize.width > 0, viewportSize.height > 0,
               followsBottom, !userIsScrolling, alignmentTask == nil else { return }
@@ -138,7 +154,7 @@ private struct TranscriptFollowingModifier: ViewModifier {
                 do { try await Task.sleep(for: .milliseconds(50)) }
                 catch { return }
                 guard alignmentGeneration == token, followsBottom, !userIsScrolling else { return }
-                if let pendingNewestID { proxy.scrollTo(pendingNewestID, anchor: .bottom) }
+                if let pendingTargetID { align(to: pendingTargetID) }
                 if revision == reflowRevision { return }
             }
         }

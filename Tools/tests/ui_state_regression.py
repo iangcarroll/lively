@@ -72,6 +72,10 @@ def production_footer():
     screen = (ROOT / EXTRACTED_SOURCES[1]).read_text()
     return "\n".join([
         "import SwiftUI", declaration(controls, "struct TranscriptListeningStatus: View"),
+        declaration(controls, "struct MicButton: View"),
+        declaration(controls, "private struct PressReportingStyle: ButtonStyle"),
+        declaration(controls, "struct GlassIconButton: View"),
+        declaration(controls, "struct StatusPill: View").replace("struct StatusPill: View", "struct FixtureStatusPill: View", 1),
         declaration(screen, "private struct KeyboardButtonBounds: PreferenceKey"),
         """struct ProductionTranscriptFooter: View {
  let store: ConversationStore
@@ -86,6 +90,17 @@ def production_footer():
 """,
         declaration(screen, "private func controls(column: StatusColumn?)"),
         declaration(screen, "private func controlRow(column: StatusColumn?)"), "}",
+        """struct ProductionTranscriptHeader: View {
+ let store: ConversationStore
+ let wide: Bool
+ let settings = AppSettings.shared
+ @State private var phoneShowsTranscript = true
+ @State private var showSettings = false
+ private func openAddress() {}
+ var body: some View { topBar(wide: wide, column: nil) }
+""",
+        declaration(screen, "private func topBar(wide: Bool, column: StatusColumn?)"),
+        "@ViewBuilder\n" + declaration(screen, "private func trailingButtons(wide: Bool)"), "}",
     ])
 
 
@@ -110,11 +125,13 @@ def build_host(work, bundle_id, variant, original):
         path.write_text(replace_once(path.read_text(),
             "            footer.layoutPriority(1)\n        }",
             "        }\n        .overlay(alignment: .bottom) { footer.layoutPriority(1) }"))
-    elif variant == "viewport-reanchor-removed":
+    elif variant == "model-viewport-restored":
         path = source_dir / "ConversationTranscriptLayout.swift"
-        path.write_text(replace_once(path.read_text(),
-            ".onGeometryChange(for: CGSize.self) { $0.size } action: { viewportSize = $0 }",
-            ".onGeometryChange(for: CGSize.self) { $0.size } action: { _ in }"))
+        source = replace_once(path.read_text(), "                viewportSize = metrics.viewport\n", "")
+        path.write_text(replace_once(source,
+            ".onChange(of: reflow, initial: true)",
+            ".onGeometryChange(for: CGSize.self) { $0.size } action: { viewportSize = $0 }\n"
+            "            .onChange(of: reflow, initial: true)"))
     elif variant == "manual-scroll-intent-ignored":
         path = source_dir / "ConversationTranscriptLayout.swift"
         path.write_text(replace_once(path.read_text(),
@@ -125,6 +142,10 @@ def build_host(work, bundle_id, variant, original):
         source = replace_once(source, declaration(source, ".onChange(of: textRevision)"), "")
         source = replace_once(source, declaration(source, "private func requestAlignment(for change: Reflow)"),
                               "private func requestAlignment(for change: Reflow) {}")
+        if ".defaultScrollAnchor(followsBottom ? .bottom : nil, for: .sizeChanges)" in source:
+            source = replace_once(source,
+                ".defaultScrollAnchor(followsBottom ? .bottom : nil, for: .sizeChanges)",
+                ".defaultScrollAnchor(nil, for: .sizeChanges)")
         path.write_text(source)
     sdk = subprocess.check_output(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-path"], text=True).strip()
     architecture = "arm64" if platform.machine() == "arm64" else "x86_64"
@@ -136,6 +157,7 @@ def build_host(work, bundle_id, variant, original):
          "-module-cache-path", str(work / "modules"), "-module-name", "StateFixture",
          *map(str, files), "-o", str(app / "StateFixture")], work / f"build-{variant}.log")
     info = {"CFBundleIdentifier": bundle_id, "CFBundleExecutable": "StateFixture",
+            "NSAccentColorName": "AccentColor",
             "CFBundleName": "StateFixture", "CFBundleDisplayName": "UI State Checks",
             "CFBundlePackageType": "APPL", "CFBundleVersion": "1", "CFBundleShortVersionString": "0.1",
             "CFBundleSupportedPlatforms": ["iPhoneSimulator"], "MinimumOSVersion": "26.0",
@@ -238,12 +260,13 @@ def main():
         variants += [("missing-empty-error", "testControlledFaceFailureAndNetwork"),
                      ("false-partner-wait", "testControlledKnownPartnerLiveAndUnknown"),
                      ("footer-overlays-transcript", "testPopulatedChatKeepsNewestAboveGuidance"),
-                     ("viewport-reanchor-removed", "testPopulatedFaceKeepsNewestAboveGuidance"),
+                     ("model-viewport-restored", "testPopulatedFaceKeepsNewestAboveGuidance"),
                      ("manual-scroll-intent-ignored", "testManualHistoryPositionSurvivesGuidanceAndRevision"),
                      ("streaming-alignment-removed", "testContinuousSameRowUpdatesKeepNewestBottomVisible")]
     report = {"scope": "Actual view/model sources; controlled Store/settings/unrelated UI boundary only. No speech or hardware proof.",
               "device": selected[0], "source_sha256": hashes, "custom_main_app_qa_arguments": [],
               "asset_catalog_sha256": digest(app / "Assets.car"),
+              "instrumented_host_copy": False,
               "selected_production_tests": args.only_testing or test_names, "variants": []}
     try:
         for variant, test in variants:

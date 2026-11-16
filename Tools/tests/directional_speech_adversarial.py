@@ -12,6 +12,7 @@ import argparse
 import re
 import subprocess
 import tempfile
+from test_speech_player import production_retry
 
 
 def method(source, name):
@@ -68,6 +69,7 @@ def main():
     production = production.replace("#if os(iOS)", "#if LIVELY_AUDIO_ROUTING_TEST")
     shared = Path(__file__).with_name("SpeechPlayerRegression.swift").read_text()
     mocks = shared.split("@main struct SpeechPlayerRegression", 1)[0]
+    mocks = mocks.replace("    // INSERT_ACTUAL_DIRECTIONAL_RETRY", production_retry(root))
     marker = "// INSERT_ACTUAL_SPEECH_PLAYER_SOURCE"
     if mocks.count(marker) != 1:
         raise RuntimeError("Expected one source marker in shared API mocks")

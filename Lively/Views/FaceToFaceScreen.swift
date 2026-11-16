@@ -191,6 +191,7 @@ private struct FaceToFaceHalf: View {
                     }
                     ForEach(Array(recent.enumerated()), id: \.element.id) { index, utterance in
                         line(utterance, age: recent.count - 1 - index)
+                            .id(utterance.id)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
                 }
@@ -324,6 +325,7 @@ private struct FaceToFaceHalf: View {
     private var emptyPrompt: String {
         if store.isAutomaticLanguageMode && !store.isOnline { return "Automatic detection needs internet" }
         guard let language else { return store.isListening ? "Listening for another language" : "Automatic" }
+        if store.isListening && store.status == .offline { return language.phrases.waitingForConnection }
         return store.isConnecting ? language.phrases.connecting
             : store.isListening ? language.phrases.listening : language.phrases.tapToStart
     }

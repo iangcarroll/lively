@@ -176,6 +176,9 @@ final class ConversationStore {
     var engine: (any SpeechEngine)?, engineProviderID: String?
     var translator: (any TranslationService)?, primaryTranslator: (any TranslationService)?, fallbackTranslator: (any TranslationService)?
     var textTranslator: any TranslationService { AppleTranslator() }
+    // This harness controls service selection; the offline suite executes the
+    // production online factory and restoration paths with network tripwires.
+    var onlineTextTranslator: any TranslationService { primaryTranslator ?? AppleTranslator() }
     var isDemo = false
     var speaker: (any TranslationSpeaker)?, speakerSource: SpeechSource?
     var speakingSince: Date? = .distantPast

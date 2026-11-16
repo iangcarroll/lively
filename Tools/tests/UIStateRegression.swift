@@ -98,20 +98,21 @@ final class UIStateRegression: XCTestCase {
     func testPopulatedFaceKeepsNewestAboveGuidance() throws {
         continueAfterFailure = false
         let app = fixtureApp()
+        fixtureMenu(app, "Full-screen fixture")
         fixtureMenu(app, "Load history")
-        app.buttons["Stop reminder"].tap()
+        control(app, "Stop reminder")
         assertFaceLatest(app)
         save(app, "Populated face stopped guidance reserves both reader viewports")
-        app.buttons["Start reminder"].tap()
+        control(app, "Start reminder")
         assertFaceLatest(app)
         gone(app.staticTexts["Listening. Go ahead and talk."])
         assertFaceLatest(app)
-        app.buttons["Dark"].tap()
-        app.buttons["Large text"].tap()
-        app.buttons["Stop reminder"].tap()
+        control(app, "Dark")
+        control(app, "Large text")
+        control(app, "Stop reminder")
         assertFaceLatest(app)
         save(app, "Populated face dark accessibility guidance keeps newest turns readable")
-        app.buttons["Start reminder"].tap()
+        control(app, "Start reminder")
         assertFaceLatest(app)
         fixtureMenu(app, "Append turn")
         assertFaceLatest(app, 25)
@@ -123,26 +124,27 @@ final class UIStateRegression: XCTestCase {
     func testPopulatedChatKeepsNewestAboveGuidance() throws {
         continueAfterFailure = false
         let app = fixtureApp()
+        fixtureMenu(app, "Full-screen fixture")
         fixtureMenu(app, "Chat layout")
         fixtureMenu(app, "Load history")
         assertTranscriptLatest(app)
         gone(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Listening. Go ahead and talk.")).firstMatch)
         assertTranscriptLatest(app)
-        app.buttons["Stop reminder"].tap()
+        control(app, "Stop reminder")
         assertTranscriptLatest(app)
         save(app, "Populated chat scrolls newest translation clear of stopped footer")
-        app.buttons["Dark"].tap()
-        app.buttons["Large text"].tap()
+        control(app, "Dark")
+        control(app, "Large text")
         assertTranscriptLatest(app)
-        app.buttons["Start reminder"].tap()
+        control(app, "Start reminder")
         assertTranscriptLatest(app)
         fixtureMenu(app, "Append turn")
         assertTranscriptLatest(app, 25)
         fixtureMenu(app, "Revise latest")
         assertTranscriptLatest(app, 25, englishLabel: "WWW WWW WWWWWW")
         save(app, "Populated chat dark accessibility reminder and newest translation")
-        app.buttons["Large text"].tap()
-        app.buttons["Stop reminder"].tap()
+        control(app, "Large text")
+        control(app, "Stop reminder")
         fixtureMenu(app, "Keyboard")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
         assertTranscriptLatest(app, 25, englishLabel: "WWW WWW WWWWWW")
@@ -152,23 +154,24 @@ final class UIStateRegression: XCTestCase {
     func testPopulatedParallelKeepsNewestAboveGuidance() throws {
         continueAfterFailure = false
         let app = fixtureApp()
+        fixtureMenu(app, "Full-screen fixture")
         fixtureMenu(app, "Parallel layout")
         fixtureMenu(app, "Load history")
         assertTranscriptLatest(app)
         gone(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Listening. Go ahead and talk.")).firstMatch)
         assertTranscriptLatest(app)
-        app.buttons["Stop reminder"].tap()
+        control(app, "Stop reminder")
         assertTranscriptLatest(app)
         save(app, "Populated parallel transcript stays above stopped guidance")
-        app.buttons["Dark"].tap()
-        app.buttons["Large text"].tap()
+        control(app, "Dark")
+        control(app, "Large text")
         assertTranscriptLatest(app)
-        app.buttons["Start reminder"].tap()
+        control(app, "Start reminder")
         assertTranscriptLatest(app)
         fixtureMenu(app, "Append turn")
         assertTranscriptLatest(app, 25)
         save(app, "Parallel dark accessibility reminder preserves newest row")
-        app.buttons["Large text"].tap()
+        control(app, "Large text")
         assertTranscriptLatest(app, 25)
         fixtureMenu(app, "Revise latest")
         assertTranscriptLatest(app, 25, englishLabel: "WWW WWW WWWWWW")
@@ -177,17 +180,29 @@ final class UIStateRegression: XCTestCase {
 
     private func fixtureMenu(_ app: XCUIApplication, _ name: String) {
         app.buttons["Fixture"].tap()
+        if ["Start reminder", "Stop reminder", "Large text", "Dark"].contains(name) {
+            app.buttons["Guidance"].tap()
+        } else if name.hasSuffix(" layout") {
+            app.buttons["Layout"].tap()
+        }
         let item = app.buttons[name]
-        XCTAssertTrue(item.waitForExistence(timeout: 3))
+        XCTAssertTrue(item.exists || item.waitForExistence(timeout: 3))
         item.tap()
+    }
+
+    private func control(_ app: XCUIApplication, _ name: String) {
+        let button = app.buttons[name]
+        if button.exists && button.isHittable { button.tap() }
+        else { fixtureMenu(app, name) }
     }
 
     func testManualHistoryPositionSurvivesGuidanceAndRevision() throws {
         continueAfterFailure = false
         let app = fixtureApp()
+        fixtureMenu(app, "Full-screen fixture")
         fixtureMenu(app, "Chat layout")
         fixtureMenu(app, "Load history")
-        app.buttons["Stop reminder"].tap()
+        control(app, "Stop reminder")
         assertTranscriptLatest(app)
         let viewport = listViewport(app)
         viewport.swipeDown()
@@ -199,13 +214,13 @@ final class UIStateRegression: XCTestCase {
         XCTAssertFalse(visible.isEmpty, "an older readable row must anchor the history check")
         let anchor = visible[visible.count / 2]
         let anchorLabel = anchor.label
-        app.buttons["Start reminder"].tap()
+        control(app, "Start reminder")
         let reminder = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Listening. Go ahead and talk.")).firstMatch
         let faded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: reminder)
         XCTAssertEqual(XCTWaiter.wait(for: [faded], timeout: 7), .completed)
         XCTAssertTrue(app.staticTexts[anchorLabel].isHittable, "reminder fade must preserve the row being read")
         staysOffscreen(last)
-        app.buttons["Stop reminder"].tap()
+        control(app, "Stop reminder")
         staysOffscreen(last)
         XCTAssertTrue(app.staticTexts[anchorLabel].isHittable, "stopped guidance must preserve manual history")
         fixtureMenu(app, "Revise latest")
@@ -218,9 +233,10 @@ final class UIStateRegression: XCTestCase {
     func testContinuousSameRowUpdatesKeepNewestBottomVisible() throws {
         continueAfterFailure = false
         let app = fixtureApp()
+        fixtureMenu(app, "Full-screen fixture")
         fixtureMenu(app, "Chat layout")
         fixtureMenu(app, "Load history")
-        app.buttons["Stop reminder"].tap()
+        control(app, "Stop reminder")
         assertTranscriptLatest(app)
         fixtureMenu(app, "Stream latest")
         let progress = app.staticTexts["Fixture streaming progress"]
@@ -229,13 +245,19 @@ final class UIStateRegression: XCTestCase {
         let viewport = listViewport(app)
         let footer = app.descendants(matching: .any)["Fixture transcript footer"].firstMatch
         for _ in 0..<3 {
-            let aligned = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                guard progress.exists, row.exists, row.isHittable else { return false }
-                let text = row.frame, scroll = viewport.frame
-                return text.maxY <= scroll.maxY + 2 && text.maxY <= footer.frame.minY + 2
-                    && scroll.maxY - text.maxY <= 72
-            }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [aligned], timeout: 2), .completed,
+            // XCTest predicates poll about once per second. Repeatedly inspect
+            // this short coalescing window to avoid aliasing live row growth.
+            let deadline = Date().addingTimeInterval(2)
+            var aligned = false
+            repeat {
+                if progress.exists, row.exists, row.isHittable {
+                    let text = row.frame, scroll = viewport.frame
+                    aligned = text.maxY <= scroll.maxY + 2 && text.maxY <= footer.frame.minY + 2
+                        && scroll.maxY - text.maxY <= 72
+                }
+                if !aligned { Thread.sleep(forTimeInterval: 0.05) }
+            } while !aligned && Date() < deadline
+            XCTAssertTrue(aligned,
                            "newest text bottom must stay in view during \(progress.label); text=\(row.frame), viewport=\(viewport.frame), footer=\(footer.frame)")
             let before = progress.label
             Thread.sleep(forTimeInterval: 0.3)
@@ -265,9 +287,9 @@ final class UIStateRegression: XCTestCase {
     private func assertReadable(_ row: XCUIElement, viewport: XCUIElement,
                                 footer: XCUIElement? = nil, inverted: Bool = false,
                                 file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertTrue(row.waitForExistence(timeout: 5), file: file, line: line)
+        XCTAssertTrue(row.exists || row.waitForExistence(timeout: 5), file: file, line: line)
         XCTAssertTrue(viewport.exists, "actual scroll viewport must exist", file: file, line: line)
-        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+        let predicate = NSPredicate { _, _ in
             guard row.exists, viewport.exists, row.isHittable else { return false }
             let text = row.frame, scroll = viewport.frame
             guard text.height > 0, scroll.height > 0,
@@ -280,8 +302,10 @@ final class UIStateRegression: XCTestCase {
             // A full-screen scroll view includes the home-indicator safe area
             // as well as the production transcript's bottom content padding.
             return gap <= 72
-        }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed,
+        }
+        let settled = XCTNSPredicateExpectation(predicate: predicate, object: nil)
+        let outcome: XCTWaiter.Result = predicate.evaluate(with: nil) ? .completed : XCTWaiter.wait(for: [settled], timeout: 5)
+        XCTAssertEqual(outcome, .completed,
                        "newest text must be readable at its viewport edge; text=\(row.frame), viewport=\(viewport.frame), footer=\(footer?.frame ?? .zero)",
                        file: file, line: line)
     }
@@ -290,11 +314,13 @@ final class UIStateRegression: XCTestCase {
                                   englishLabel: String? = nil,
                                   file: StaticString = #filePath, line: UInt = #line) {
         let readers = app.scrollViews
+        let count = readers.count
+        XCTAssertGreaterThanOrEqual(count, 2, file: file, line: line)
         let nearPrompt = app.staticTexts["Tap the mic to start"].firstMatch
         let farPrompt = app.staticTexts["マイクをタップして開始"].firstMatch
-        assertReadable(englishLabel.map { app.staticTexts[$0].firstMatch } ?? latest(app, index), viewport: readers.element(boundBy: 2),
+        assertReadable(englishLabel.map { app.staticTexts[$0].firstMatch } ?? latest(app, index), viewport: readers.element(boundBy: count - 1),
                        footer: nearPrompt.exists ? nearPrompt : nil, file: file, line: line)
-        assertReadable(app.staticTexts["最新の発言 \(index)"].firstMatch, viewport: readers.element(boundBy: 1),
+        assertReadable(app.staticTexts["最新の発言 \(index)"].firstMatch, viewport: readers.element(boundBy: count - 2),
                        footer: farPrompt.exists ? farPrompt : nil, inverted: true, file: file, line: line)
     }
 

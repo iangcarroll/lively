@@ -10,6 +10,7 @@ import Observation
  var speechListenerLanguage = Language.english
  var languages = LanguagePair.default
  var chineseScript = ChineseScript.simplified
+ var speaksTranslations = false
 }
 @Observable final class ConversationStore {
  enum ConnectionStatus: Equatable { case idle, connecting, live, reconnecting, offline, failed(String) }
@@ -98,27 +99,20 @@ struct StatusPill: View {
     let isListening: Bool
     var compact = false
     var onDevice = false
-    var body: some View { EmptyView() }
-}
-struct GlassIconButton: View {
-    let systemImage: String
-    let label: String
-    var isOn: Bool? = nil
-    let action: () -> Void
-    static let size: CGFloat = 40
-    var body: some View { EmptyView() }
-}
-struct MicButton: View {
-    let isListening: Bool
-    let level: Float
-    let isHearing: Bool
-    let action: () -> Void
-    let onHoldStart: () -> Void
-    let onHoldEnd: () -> Void
-    var body: some View { EmptyView() }
+    // Preserve the real control geometry while keeping the existing row-status
+    // assertions independent from an identically named toolbar status label.
+    var body: some View {
+        FixtureStatusPill(status: status, isListening: isListening, compact: compact, onDevice: onDevice)
+            .accessibilityHidden(true)
+    }
 }
 struct SpeakAloudToggle: View {
     let store: ConversationStore
+    var body: some View { EmptyView() }
+}
+struct SpeakAloudButton: View {
+    let store: ConversationStore
+    let settings: AppSettings
     var body: some View { EmptyView() }
 }
 struct TypeToTranslateBar: View {
@@ -129,7 +123,8 @@ struct TypeToTranslateBar: View {
          onClose: @escaping () -> Void) { self.focused = focused }
     var body: some View {
         TextField("Fixture text input", text: $text)
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .padding(.vertical, 10)
             .focused(focused)
             .onAppear { focused.wrappedValue = true }
     }

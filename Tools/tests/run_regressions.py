@@ -20,6 +20,7 @@ def main():
         ("address_verification_regression.py", ["--negative-controls"]),
         ("conversation_startup_regression.py", ["--negative-controls"]),
         ("listening_prompt_regression.py", ["--negative-controls"]),
+        ("listening_guidance_regression.py", ["--negative-controls"]),
         ("automatic_settings_regression.py", ["--negative-controls"]),
         ("online_conversation_regression.py", ["--negative-controls"]),
         ("soniox_language_regression.py", ["--negative-controls"]),
@@ -42,7 +43,7 @@ def main():
         ("voice_preview_lifecycle_regression.py", ["--negative-controls"]),
     ]
     for name, options in suites:
-        if args.thread_sanitizer and name in {"test_speech_player.py", "neural_voice_packs_regression.py", "neural_speaker_regression.py", "voice_preview_lifecycle_regression.py"}:
+        if args.thread_sanitizer and name in {"test_speech_player.py", "audio_session_regression.py", "neural_voice_packs_regression.py", "neural_speaker_regression.py", "voice_preview_lifecycle_regression.py"}:
             options = [*options, "--thread-sanitizer"]
         print(f"Running {name}", flush=True)
         # Speech fault controls exercise real drain and playback deadlines.

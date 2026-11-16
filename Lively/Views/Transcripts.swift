@@ -283,7 +283,8 @@ struct EmptyConversation: View {
     }
 
     private func prompt(in language: Language) -> String {
-        isConnecting ? language.phrases.connecting
+        if isListening && store.status == .offline { return language.phrases.waitingForConnection }
+        return isConnecting ? language.phrases.connecting
             : isListening ? language.phrases.listening : language.phrases.tapToStart
     }
 }

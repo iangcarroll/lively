@@ -13,9 +13,11 @@ struct StateFixtureView: View {
  @State private var dark = false
  @State private var layout = "Face"
  @State private var showsTextInput = false
+ @State private var fullScreen = false
  @FocusState private var focused: Bool
  var body: some View {
   VStack(spacing: 0) {
+   if !fullScreen {
    ScrollView(.horizontal) {
     HStack { ForEach(["Failed", "Network", "Known live", "Unknown", "Source only", "Closed unknown"], id: \.self) { name in Button(name) { store.select(name) } } }.padding(8)
    }.frame(height: 44)
@@ -26,36 +28,66 @@ struct StateFixtureView: View {
       .accessibilityIdentifier("Fixture streaming progress")
     }
     Spacer()
-    Menu("Fixture") {
-     Button("Load history") { store.populateHistory(); prompt.setActive(false); prompt.setActive(true) }
-     Button("Append turn") { store.appendHistory() }
-     Button("Revise latest") { store.reviseHistory() }
-     Button("Stream latest") { store.streamHistory() }
-     ForEach(["Face", "Chat", "Parallel"], id: \.self) { name in
-      Button(name + " layout") { layout = name }
-     }
-     Button("Keyboard") { showsTextInput.toggle(); if !showsTextInput { focused = false } }
-    }.font(.caption)
+    fixtureMenu
    }.padding(.horizontal, 8)
    HStack {
-    Button("Start reminder") { store.isListening = true; prompt.setActive(false); prompt.setActive(true) }
-    Button("Stop reminder") { store.isListening = false; prompt.setActive(false) }
+    Button("Start reminder") { store.isListening = true; store.status = .live; prompt.setActive(false); prompt.setActive(true) }
+    Button("Stop reminder") { store.isListening = false; store.status = .idle; prompt.setActive(false) }
     Button("Large text") { largeText.toggle() }
     Button("Dark") { dark.toggle() }
    }.font(.caption).buttonStyle(.bordered)
+   }
    conversation
     .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large)
   }.background(Color(.canvas))
+   .overlay(alignment: layout == "Face" ? .trailing : .topTrailing) {
+    if fullScreen {
+     HStack(spacing: 8) {
+      if store.isStreaming {
+       Text("Streaming \(store.streamCount)").font(.caption)
+        .accessibilityIdentifier("Fixture streaming progress")
+      }
+      fixtureMenu
+     }
+     .padding(8)
+     .background(.thinMaterial, in: .capsule)
+     // The host menu covers an unrelated product control, never conversation
+     // text: the middle strip in Face, or the actual top toolbar in transcripts.
+     .padding(.trailing, 8)
+     .padding(.top, layout == "Face" ? 0 : 8)
+    }
+   }
    .preferredColorScheme(dark ? .dark : .light)
    .onAppear { prompt.setActive(true) }
    .onDisappear { prompt.setActive(false); store.stopStreaming() }
+ }
+ private var fixtureMenu: some View {
+  Menu("Fixture") {
+   Button("Full-screen fixture") { fullScreen = true }
+   Button("Load history") { store.populateHistory(); prompt.setActive(false); prompt.setActive(true) }
+   Button("Append turn") { store.appendHistory() }
+   Button("Revise latest") { store.reviseHistory() }
+   Button("Stream latest") { store.streamHistory() }
+   Menu("Guidance") {
+    Button("Start reminder") { store.isListening = true; store.status = .live; prompt.setActive(false); prompt.setActive(true) }
+    Button("Stop reminder") { store.isListening = false; store.status = .idle; prompt.setActive(false) }
+    Button("Large text") { largeText.toggle() }
+    Button("Dark") { dark.toggle() }
+   }
+   Menu("Layout") {
+    ForEach(["Face", "Chat", "Parallel"], id: \.self) { name in
+     Button(name + " layout") { layout = name }
+    }
+   }
+   Button("Keyboard") { showsTextInput.toggle(); if !showsTextInput { focused = false } }
+  }.font(.caption)
  }
  @ViewBuilder private var conversation: some View {
   if layout == "Face" {
    FaceToFaceScreen(store: store, languages: nil, nearLanguage: $near, listenerNear: $listenerNear, showsTextInput: showsTextInput, textInputFocused: $focused, onSetTextInput: { showsTextInput = $0 }, editing: $editing, onEdit: { _ in }, onShowTranscript: {}, onShowSettings: {}, onShowAddress: {}, showsListeningPrompt: !store.isListening || prompt.isVisible)
   } else {
    ConversationTranscriptLayout {
-    Text(layout + " transcript").font(.headline).padding(8)
+    ProductionTranscriptHeader(store: store, wide: layout == "Parallel")
    } transcript: {
     if layout == "Chat" { ChatTranscript(store: store) }
     else { ParallelTranscript(store: store) }

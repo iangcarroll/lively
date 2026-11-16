@@ -14,6 +14,17 @@ import subprocess
 import tempfile
 
 
+def production_retry(root):
+    source = (root / "Lively/Audio/MicCapture.swift").read_text()
+    start = source.index("    static func retryWithoutDirectionalSpeech(")
+    opening = source.index("{", start)
+    depth, end = 1, opening + 1
+    while depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    return source[start:end]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--negative-controls", action="store_true")
@@ -27,6 +38,10 @@ def main():
     source = source.replace(audio_import, "")
     source = source.replace("import AudioToolbox", "")
     fixture = Path(__file__).with_name("SpeechPlayerRegression.swift").read_text()
+    retry_marker = "    // INSERT_ACTUAL_DIRECTIONAL_RETRY"
+    if fixture.count(retry_marker) != 1:
+        raise RuntimeError("Expected one actual directional-retry marker")
+    fixture = fixture.replace(retry_marker, production_retry(root))
     marker = "// INSERT_ACTUAL_SPEECH_PLAYER_SOURCE"
     if fixture.count(marker) != 1:
         raise RuntimeError("Expected one production-source marker in the test fixture")
@@ -39,13 +54,13 @@ def main():
         if args.negative_controls:
             controls = [
                 ("private-fallback-forgets-intent",
-                 "private func automaticFallback(for requested: Output) -> Bool {\n        output = requested",
-                 "private func automaticFallback(for requested: Output) -> Bool {\n        output = .automatic",
+                 "private func bindOrdinaryOutput(for requested: Output) -> Bool {\n        output = requested",
+                 "private func bindOrdinaryOutput(for requested: Output) -> Bool {\n        output = .automatic",
                  "rejected private fallback scheduled PCM"),
                 ("mixed-route-treated-as-private", "!ports.isEmpty && ports.allSatisfy {", "ports.contains {",
                  "ordinary private fallback accepted an empty, public, mixed, or unverified output"),
                 ("fallback-bypasses-route-binding",
-                 "if output == .automatic || (usesAutomaticFallback && output == .speaker) { return true }",
+                 "if output == .automatic { return true }",
                  "if output == .automatic || usesAutomaticFallback { return true }",
                  "rejected private fallback scheduled PCM"),
                 ("queued-private-pcm-not-muted", "mixer.outputVolume = 0", "// Deliberately omit immediate muting.",
@@ -54,12 +69,32 @@ def main():
                  "guard start() else { return }\n        // Activating an ordinary session can itself change the output. Check\n        // the binding again before scheduling against that new route.\n        guard routeIsPrepared else {\n            stop()\n            return\n        }",
                  "guard start() else { return }",
                  "session activation moved private fallback PCM onto a public route"),
+                ("ordinary-failure-disables-capability",
+                 "guard AudioSessionUsers.retryWithoutDirectionalSpeech({ try activateSession() }) else { throw error }",
+                 "guard AudioSessionUsers.retryWithoutDirectionalSpeech({ try activateSession() }) else { AudioSessionUsers.markDirectionalSpeechUnavailable(); throw error }",
+                 "transient ordinary activation failure permanently disabled directional playback or leaked ownership"),
+                ("ordinary-readiness-skips-activation",
+                 "do { try activateSession() }\n        catch { releaseHeldSession(); throw error }",
+                 "// Deliberately claim the ordinary route without activation.",
+                 "ordinary preview latched directional capability off or skipped activation"),
+                ("expired-fallback-skips-activation", "holdsSession && usesAutomaticFallback != wantsDirectional",
+                 "usesAutomaticFallback != wantsDirectional",
+                 "expired fallback skipped activation and claimed readiness after a new activation failure"),
             ]
             for name, old, new, expected in controls:
                 if source.count(old) != 1:
                     raise RuntimeError("Update SpeechPlayer mutation anchor: " + name)
                 changed = source.replace(old, new).replace("#if os(iOS)", "#if LIVELY_AUDIO_ROUTING_TEST")
                 variants.append((name, changed, ["-D", "LIVELY_AUDIO_ROUTING_TEST"], expected))
+            # Coherently ignore the user's ordinary preview policy at both
+            # the initial decision and the post-activation validation.
+            changed = source.replace("AudioSessionUsers.directionalSpeechEnabled", "true")
+            if changed == source:
+                raise RuntimeError("Update ordinary-preview policy mutation")
+            variants.append(("ordinary-preview-treated-as-routing-failure",
+                             changed.replace("#if os(iOS)", "#if LIVELY_AUDIO_ROUTING_TEST"),
+                             ["-D", "LIVELY_AUDIO_ROUTING_TEST"],
+                             "ordinary private preview failed while directional speech was intentionally disabled"))
         for variant, build_source, flags, expected_failure in variants:
             if args.thread_sanitizer:
                 flags = [*flags, "-sanitize=thread"]

@@ -662,6 +662,13 @@ final class ConversationStore {
     private var textTranslator: TranslationService {
         if usesOnDeviceServices { return AppleTranslator() }
         if let translator { return translator }
+        return onlineTextTranslator
+    }
+
+    /// A recovered connection can translate retained text before the speech
+    /// engine has finished replacing its local fallback.
+    private var onlineTextTranslator: TranslationService {
+        if let primaryTranslator { return primaryTranslator }
         if let broker = BrokerTranslator.shared { return FallbackTranslator(primary: broker, fallback: AppleTranslator()) }
         let key = settings.credential(.mistral)
         if !key.isEmpty { return MistralTranslator(apiKey: key, model: settings.translationModel) }
@@ -1338,7 +1345,7 @@ final class ConversationStore {
                         while !self.isOnline, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(250)) }
                         if Task.isCancelled { return }
                         utterance.translationState = .working
-                        if let current = utterance.isTyped ? self.textTranslator : self.translator { translator = current }
+                        translator = self.onlineTextTranslator
                         resumedOnline = true
                         continue
                     }

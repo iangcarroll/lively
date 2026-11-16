@@ -33,6 +33,7 @@ nonisolated final class AVAudioMixerNode: @unchecked Sendable {
 nonisolated final class AVAudioEngine: @unchecked Sendable {
     enum Failure: Error { case unavailable }
     nonisolated(unsafe) static var failNextStart = false
+    nonisolated(unsafe) static var onStart: (@Sendable () -> Void)?
     nonisolated(unsafe) static var last: AVAudioEngine?
     var isRunning = false
     let mainMixerNode = AVAudioMixerNode()
@@ -47,6 +48,7 @@ nonisolated final class AVAudioEngine: @unchecked Sendable {
             throw Failure.unavailable
         }
         isRunning = true
+        Self.onStart?()
     }
     func stop() { isRunning = false }
 }
@@ -168,10 +170,49 @@ nonisolated func AudioUnitSetProperty(_ unit: AudioUnit, _ property: UInt32, _ s
 
 nonisolated enum AudioSessionUsers {
     enum User: Hashable { case speech }
+    enum Failure: Error { case activation }
     nonisolated(unsafe) static var users: Set<User> = []
     nonisolated(unsafe) static var onBegin: (@Sendable () -> Void)?
-    static func begin(_ user: User) throws { users.insert(user); onBegin?() }
-    nonisolated(unsafe) static var directionalSpeechUnavailable = false
+    private static let directionalSpeech = OSAllocatedUnfairLock(initialState: true)
+    private static let directionalFailed = OSAllocatedUnfairLock(initialState: false)
+    static var directionalSpeechEnabled: Bool {
+        get { directionalSpeech.withLock { $0 } }
+        set { directionalSpeech.withLock { $0 = newValue } }
+    }
+    static var directionalSpeechUnavailable: Bool {
+        get { directionalFailed.withLock { $0 } }
+        set { directionalFailed.withLock { $0 = newValue } }
+    }
+    private struct Activation {
+        var failures = 0
+        var ordinaryFailures = 0
+        var attempts: [Bool] = []
+    }
+    private static let activation = OSAllocatedUnfairLock(initialState: Activation())
+    static var activationFailures: Int {
+        get { activation.withLock { $0.failures } }
+        set { activation.withLock { $0.failures = newValue; $0.attempts.removeAll() } }
+    }
+    static var activationAttempts: [Bool] { activation.withLock { $0.attempts } }
+    static var ordinaryActivationFailures: Int {
+        get { activation.withLock { $0.ordinaryFailures } }
+        set { activation.withLock { $0.ordinaryFailures = newValue } }
+    }
+    private static func activate() throws {
+        let directional = directionalSpeechEnabled && !directionalSpeechUnavailable
+        let session = AVAudioSession.sharedInstance()
+        session.category = directional ? .multiRoute : .playAndRecord
+        session.mode = directional ? .dualRoute : .default
+        try activation.withLock {
+            $0.attempts.append(directional)
+            if $0.failures > 0 { $0.failures -= 1; throw Failure.activation }
+            if !directional, $0.ordinaryFailures > 0 { $0.ordinaryFailures -= 1; throw Failure.activation }
+        }
+        onBegin?()
+    }
+    static func begin(_ user: User) throws { try activate(); users.insert(user) }
+    static func reactivate() throws { try activate() }
+    // INSERT_ACTUAL_DIRECTIONAL_RETRY
     static func markDirectionalSpeechUnavailable() { directionalSpeechUnavailable = true }
     static func end(_ user: User) {
         precondition(AVAudioEngine.last?.isRunning != true, "released session before stopping engine")
@@ -348,7 +389,7 @@ nonisolated enum AudioSessionUsers {
             let ready = try await player.prepare(output: .speaker)
             precondition(ready, "channel map failure didn't fall back to ordinary playback")
             precondition(!SpeechPlayer.supportsDirectionalOutput, "channel map failure left directional output on")
-            precondition(AudioSessionUsers.users.isEmpty, "failed output mapping leaked an audio-session claim")
+            precondition(AudioSessionUsers.users == [.speech], "prepared fallback lacks its verified active audio-session claim")
             player.play(Data([1, 0]))
             precondition(AVAudioPlayerNode.last!.buffers.count == 1, "fallback playback wasn't queued")
             player.stop()
@@ -460,11 +501,11 @@ nonisolated enum AudioSessionUsers {
             let player = SpeechPlayer()
             let ready = try await player.prepare(output: .headphones)
             precondition(ready)
-            AudioSessionUsers.onBegin = {
+            AVAudioEngine.onStart = {
                 session.currentRoute = AVAudioSessionRouteDescription(outputs: [speaker])
             }
             player.play(Data([7, 0]))
-            AudioSessionUsers.onBegin = nil
+            AVAudioEngine.onStart = nil
             precondition(AVAudioPlayerNode.last!.buffers.isEmpty,
                          "session activation moved private fallback PCM onto a public route")
         }
@@ -493,6 +534,137 @@ nonisolated enum AudioSessionUsers {
         setRoute(headphones: true)
         print("PASS: private fallback rejects public/mixed routes, mutes queued audio off-main, drops disconnected PCM, revalidates reconnects and activation, and preserves ordinary public playback")
     }
+
+    @MainActor static func activationRecovery() async throws {
+        let session = AVAudioSession.sharedInstance()
+        let headphones = AVAudioSessionPortDescription(uid: "preview-headphones", type: .bluetoothA2DP, channels: 2)
+        AudioSessionUsers.directionalSpeechEnabled = true
+        for output: SpeechPlayer.Output in [.headphones, .speaker] {
+            AudioSessionUsers.directionalSpeechUnavailable = false
+            AudioSessionUsers.activationFailures = 2
+            setRoute(headphones: true)
+            do {
+                let player = SpeechPlayer()
+                var accepted = false, threw = false
+                do { accepted = try await player.prepare(output: output) }
+                catch { threw = true }
+                player.play(Data([10, 0]))
+                precondition(threw && !accepted && AVAudioPlayerNode.last!.buffers.isEmpty,
+                             "failed dual and ordinary activation claimed readiness or queued PCM")
+                precondition(SpeechPlayer.supportsDirectionalOutput && AudioSessionUsers.users.isEmpty,
+                             "transient ordinary activation failure permanently disabled directional playback or leaked ownership")
+                precondition(AudioSessionUsers.activationAttempts == [true, false],
+                             "activation recovery did not try dual then ordinary exactly once")
+                let recovered = try await player.prepare(output: output)
+                player.play(Data([11, 0]))
+                precondition(recovered && SpeechPlayer.supportsDirectionalOutput && AudioSessionUsers.activationAttempts == [true, false, true],
+                             "healthy dual-route playback did not recover after transient activation failures")
+                precondition(AVAudioPlayerNode.last!.buffers == [[Float(11) / 32768]],
+                             "recovery reused failed PCM or did not queue the new directional sample")
+                player.stop()
+            }
+            precondition(AudioSessionUsers.users.isEmpty)
+        }
+
+        // A channel-map error alone does not prove ordinary activation works.
+        AudioSessionUsers.directionalSpeechUnavailable = false
+        AudioSessionUsers.activationFailures = 0
+        AudioSessionUsers.ordinaryActivationFailures = 1
+        setRoute(headphones: true)
+        do {
+            let player = SpeechPlayer()
+            MockAudioUnit.failNextMap = true
+            var threw = false
+            do { _ = try await player.prepare(output: .speaker) }
+            catch { threw = true }
+            player.play(Data([12, 0]))
+            precondition(threw && SpeechPlayer.supportsDirectionalOutput && AVAudioPlayerNode.last!.buffers.isEmpty,
+                         "map failure latched an unusable ordinary fallback")
+            let recovered = try await player.prepare(output: .speaker)
+            precondition(recovered && SpeechPlayer.supportsDirectionalOutput,
+                         "map/ordinary activation failure prevented later directional recovery")
+            player.stop()
+        }
+        precondition(AudioSessionUsers.users.isEmpty)
+
+        // With speaking disabled, previews intentionally request an ordinary
+        // session. This must not turn off directional playback for later use.
+        AudioSessionUsers.activationFailures = 0
+        AudioSessionUsers.directionalSpeechEnabled = false
+        session.currentRoute = AVAudioSessionRouteDescription(outputs: [headphones])
+        do {
+            let player = SpeechPlayer()
+            var previewReady = false
+            do { previewReady = try await player.prepare(output: .headphones) }
+            catch { preconditionFailure("ordinary private preview failed while directional speech was intentionally disabled") }
+            precondition(previewReady && SpeechPlayer.supportsDirectionalOutput && AudioSessionUsers.activationAttempts == [false],
+                         "ordinary preview latched directional capability off or skipped activation")
+            player.play(Data([13, 0]))
+            let node = AVAudioPlayerNode.last!
+            precondition(node.buffers == [[Float(13) / 32768]], "ordinary private preview did not play")
+            node.completeAll()
+            AudioSessionUsers.directionalSpeechEnabled = true
+            setRoute(headphones: true)
+            let directionalReady = try await player.prepare(output: .headphones)
+            precondition(directionalReady && SpeechPlayer.supportsDirectionalOutput && MockAudioUnit.maps.last == [-1, -1, 0],
+                         "enabling spoken translations did not upgrade the existing preview player to dual-route output")
+            player.play(Data([14, 0]))
+            precondition(node.buffers == [[Float(14) / 32768]], "directional speech after preview retained the previous sample")
+            player.stop()
+        }
+        precondition(AudioSessionUsers.users.isEmpty)
+
+        AudioSessionUsers.directionalSpeechEnabled = false
+        AudioSessionUsers.activationFailures = 1
+        session.currentRoute = AVAudioSessionRouteDescription(outputs: [headphones])
+        do {
+            let player = SpeechPlayer()
+            var threw = false
+            do { _ = try await player.prepare(output: .headphones) }
+            catch { threw = true }
+            player.play(Data([15, 0]))
+            precondition(threw && AVAudioPlayerNode.last!.buffers.isEmpty && SpeechPlayer.supportsDirectionalOutput,
+                         "ordinary preview activation failure claimed readiness or disabled directional capability")
+        }
+        precondition(AudioSessionUsers.users.isEmpty)
+
+        AudioSessionUsers.directionalSpeechEnabled = false
+        AudioSessionUsers.activationFailures = 0
+        session.currentRoute = AVAudioSessionRouteDescription(outputs: [headphones])
+        do {
+            let player = SpeechPlayer()
+            let ready = try await player.prepare(output: .headphones)
+            precondition(ready)
+            player.play(Data([17, 0]))
+            AVAudioPlayerNode.last!.completeAll()
+            try await Task.sleep(for: .milliseconds(2_200))
+            precondition(AudioSessionUsers.users.isEmpty, "idle fallback did not release its session")
+            AudioSessionUsers.activationFailures = 1
+            var threw = false
+            do { _ = try await player.prepare(output: .headphones) }
+            catch { threw = true }
+            player.play(Data([18, 0]))
+            precondition(threw && AVAudioPlayerNode.last!.buffers.isEmpty,
+                         "expired fallback skipped activation and claimed readiness after a new activation failure")
+        }
+        precondition(AudioSessionUsers.users.isEmpty)
+
+        AudioSessionUsers.directionalSpeechUnavailable = true
+        AudioSessionUsers.activationFailures = 0
+        session.currentRoute = AVAudioSessionRouteDescription(outputs: [])
+        do {
+            let player = SpeechPlayer()
+            let ready = try await player.prepare(output: .speaker)
+            player.play(Data([16, 0]))
+            precondition(!ready && AVAudioPlayerNode.last!.buffers.isEmpty && AudioSessionUsers.users.isEmpty,
+                         "empty ordinary public route claimed readiness, queued PCM, or held the session")
+        }
+        AudioSessionUsers.directionalSpeechUnavailable = false
+        AudioSessionUsers.directionalSpeechEnabled = true
+        AudioSessionUsers.activationFailures = 0
+        setRoute(headphones: true)
+        print("PASS: transient activation rollback, healthy dual recovery, map/ordinary failure, ordinary previews, later directional upgrade, and verified fallback readiness")
+    }
     #endif
 
     @MainActor static func main() async throws {
@@ -500,6 +672,7 @@ nonisolated enum AudioSessionUsers {
         #if LIVELY_AUDIO_ROUTING_TEST
         try await directionalPlayback()
         try await privateFallbackPlayback()
+        try await activationRecovery()
         #else
         precondition(!SpeechPlayer.supportsDirectionalOutput, "macOS unexpectedly enabled iOS directional routing")
         #endif

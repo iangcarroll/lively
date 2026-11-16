@@ -106,7 +106,9 @@ final class SpeechPlayer {
     /// rather than moving an already queued sentence to the other listener.
     func prepare(output requested: Output) async throws -> Bool {
         try Task.checkCancellation()
-        if requested == output, routeIsPrepared { return true }
+        let wantsDirectional = Self.supportsDirectionalOutput && AudioSessionUsers.directionalSpeechEnabled
+        if requested == output, routeIsPrepared,
+           requested == .automatic || (holdsSession && usesAutomaticFallback != wantsDirectional) { return true }
         let generation = generation
         try await waitForDrain()
         try Task.checkCancellation()
@@ -120,11 +122,13 @@ final class SpeechPlayer {
             routeBinding.withLock { $0 = nil; mixer.outputVolume = 1 }
             return true
         }
-        guard Self.supportsDirectionalOutput else { return automaticFallback(for: requested) }
+        guard wantsDirectional else { return try prepareOrdinaryOutput(for: requested) }
         do {
-            if !holdsSession {
-                try AudioSessionUsers.begin(.speech)
-                holdsSession = true
+            try activateSession()
+            // Settings may have selected the ordinary session while activation
+            // waited on the audio-session queue. That is not a route failure.
+            if !AudioSessionUsers.directionalSpeechEnabled || !Self.supportsDirectionalOutput {
+                return bindOrdinaryOutput(for: requested)
             }
             #if os(iOS)
             if #available(iOS 26.2, *) {
@@ -145,30 +149,53 @@ final class SpeechPlayer {
             routeBinding.withLock { $0 = ports; mixer.outputVolume = 1 }
             return true
         } catch {
-            // The dual-route session or its channel map couldn't be set up.
-            // Keep speaking through the ordinary route instead of failing.
+            // A transient activation failure can affect both configurations.
+            // Keep the fallback only after ordinary activation proves usable.
             preparedPorts = nil
             releaseHeldSession()
-            AudioSessionUsers.markDirectionalSpeechUnavailable()
-            return automaticFallback(for: requested)
+            if !AudioSessionUsers.directionalSpeechEnabled || !Self.supportsDirectionalOutput {
+                return try prepareOrdinaryOutput(for: requested)
+            }
+            guard AudioSessionUsers.retryWithoutDirectionalSpeech({ try activateSession() }) else { throw error }
+            return bindOrdinaryOutput(for: requested)
         }
+    }
+
+    private func activateSession() throws {
+        if holdsSession { try AudioSessionUsers.reactivate() }
+        else {
+            try AudioSessionUsers.begin(.speech)
+            holdsSession = true
+        }
+    }
+
+    private func prepareOrdinaryOutput(for requested: Output) throws -> Bool {
+        do { try activateSession() }
+        catch { releaseHeldSession(); throw error }
+        return bindOrdinaryOutput(for: requested)
     }
 
     /// Without dual-route playback there's one output. The other person's
     /// translation plays through it as before; the listener's own is only
     /// played when that output is private, never over a loudspeaker.
-    private func automaticFallback(for requested: Output) -> Bool {
+    private func bindOrdinaryOutput(for requested: Output) -> Bool {
         output = requested
         usesAutomaticFallback = true
         let ports = Self.routePorts
-        let canPlay = requested == .speaker || Self.routeIsPrivate(ports)
-        preparedPorts = requested == .headphones && canPlay ? ports : nil
-        let binding = preparedPorts
+        let canPlay: Bool
+        #if os(iOS)
+        canPlay = requested == .speaker ? ports.contains { $0.channels > 0 } : Self.routeIsPrivate(ports)
+        #else
+        canPlay = requested == .speaker
+        #endif
+        preparedPorts = canPlay ? ports : nil
+        let binding = requested == .headphones ? preparedPorts : nil
         let mixer = engine.mainMixerNode
         routeBinding.withLock {
             $0 = binding
             mixer.outputVolume = canPlay ? 1 : 0
         }
+        if !canPlay { releaseHeldSession() }
         return canPlay
     }
 
@@ -372,7 +399,14 @@ final class SpeechPlayer {
     }
 
     private var routeIsPrepared: Bool {
-        if output == .automatic || (usesAutomaticFallback && output == .speaker) { return true }
+        if output == .automatic { return true }
+        if usesAutomaticFallback, output == .speaker {
+            #if os(iOS)
+            return preparedPorts != nil && Self.routePorts.contains { $0.channels > 0 }
+            #else
+            return preparedPorts != nil
+            #endif
+        }
         let ports = Self.routePorts
         guard preparedPorts == ports, routeBinding.withLock({ $0 }) == ports else { return false }
         return usesAutomaticFallback ? Self.routeIsPrivate(ports)
