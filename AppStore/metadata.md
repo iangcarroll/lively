@@ -82,14 +82,22 @@ The product IDs must match `Pro.productIDs` in the app and `APP_STORE_PRODUCT_ID
 - Age rating: None for all mature-content categories; no unrestricted web access, user-generated-content feed, remote messaging, advertising, gambling, or health content.
 - Privacy policy: `https://lively.ian.sh/privacy`
 - Account deletion URL: `https://lively.ian.sh/delete-account`
-- Data types:
-  - Email Address — app functionality; linked to the optional account; not used for tracking.
-  - User ID — app functionality; linked to the optional account; not used for tracking.
-  - Product Interaction — app functionality (short-lived translation usage counters); linked when signed in; not used for tracking.
-  - Device ID — app functionality; not linked to identity; not used for tracking.
-  - Audio Data — app functionality; not linked to identity; not used for tracking.
-  - Other User Content — app functionality; not linked to identity; not used for tracking.
-  - Purchase History — app functionality; not linked to identity; not used for tracking.
+- Data types (all declared linked; none used for tracking):
+  - Email Address — app functionality; optional account authentication.
+  - User ID — app functionality; optional account and provider credentials.
+  - Product Interaction — app functionality; translation usage counters.
+  - Device ID — app functionality; installation/network identifiers and abuse prevention.
+  - Audio Data — app functionality and other purposes; provider processing and possible model training.
+  - Other User Content — app functionality and other purposes; translation text and possible model training.
+  - Purchase History — app functionality; persistent subscription transaction identifiers.
+- These answers cover every supported engine. The optional Mistral engine uses
+  the user's own API key, so requests can be associated with that provider
+  account. Mistral's retention and training controls depend on the user's plan
+  and settings. The default Soniox real-time engine processes conversation
+  content transiently; Lively's broker does not retain conversation content.
+- Sources: [Apple's disclosure definitions](https://developer.apple.com/app-store/app-privacy-details/),
+  [Mistral privacy policy](https://legal.mistral.ai/terms/privacy-policy/), and
+  [Mistral training controls](https://help.mistral.ai/en/articles/347617-do-you-use-my-user-data-to-train-your-artificial-intelligence-models).
 - Keep these in step with `Lively/PrivacyInfo.xcprivacy`.
 
 ## Screenshots and creative artwork
