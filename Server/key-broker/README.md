@@ -410,7 +410,9 @@ as the broker's existing code hashes).
 The deployment workflow copies the two same-named GitHub Actions secrets to
 the Worker together after deployment. If both GitHub secrets are absent, it
 leaves existing Worker secrets unchanged; supplying only one fails the job.
-Configure or rotate the address and matching hash together.
+Credentials are trimmed and validated before migrations or deployment; invalid
+or partial input fails before production changes. Configure or rotate the
+address and matching hash together.
 
 Reviewers open Settings → Account, enter the review address, request a code,
 and enter the code in Review Notes. No email is sent for this address. Every
