@@ -71,7 +71,7 @@ export async function verifySignedTransaction(jws: string, env: Env): Promise<Si
   const t = await verifyJWS<SignedTransaction>(jws, env);
   if (!t || typeof t.originalTransactionId !== "string" || typeof t.signedDate !== "number") return undefined;
   if (t.bundleId !== env.APP_BUNDLE_ID) return undefined;
-  if (!list(env.PRO_PRODUCT_IDS).includes(t.productId)) return undefined;
+  if (!list(env.APP_STORE_PRODUCT_IDS).includes(t.productId)) return undefined;
   if (!list(env.APP_STORE_ENVIRONMENTS).includes(t.environment)) return undefined;
   return t;
 }

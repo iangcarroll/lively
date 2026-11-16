@@ -18,7 +18,7 @@
  * access token is kept until a minute before it expires.
  *
  * A purchase is Pro while it's active, in its grace period, or cancelled but
- * paid through, and a line item for one of PRO_PRODUCT_IDS hasn't expired.
+ * paid through, and a line item for one of PLAY_PRODUCT_IDS hasn't expired.
  * Google's answer is kept for a few minutes per token, so a key every few
  * minutes doesn't ask Google every time. If Google can't be reached or errors,
  * the caller just gets the plan it would have without the purchase.
@@ -105,7 +105,7 @@ function entitled(subscription: PlaySubscription | undefined, now: number): Play
 export function proSubscriptionOf(purchase: SubscriptionPurchaseV2, id: string, env: Env, now: number): PlaySubscription | undefined {
   if (!ENTITLED_STATES.has(purchase.subscriptionState ?? "")) return undefined;
   if (purchase.testPurchase && env.PLAY_ALLOW_TEST_PURCHASES !== "true") return undefined;
-  const products = list(env.PRO_PRODUCT_IDS);
+  const products = list(env.PLAY_PRODUCT_IDS);
   for (const item of purchase.lineItems ?? []) {
     const expiryTime = Date.parse(item.expiryTime ?? "");
     if (item.productId && products.includes(item.productId) && expiryTime > now) {

@@ -229,9 +229,10 @@ the group for both targets, and create the `hk.cautela.lively` app in App Store
 Connect. Recreate the monthly/yearly products in [App Store metadata](AppStore/metadata.md)
 under that app and configure its production and sandbox Server Notifications V2
 URL as `https://lively.ian.sh/v1/appstore/notifications`.
-The product IDs intentionally remain `sh.ian.lively.pro.monthly` and
-`sh.ian.lively.pro.yearly`; they are independent of the bundle ID and are shared
-with Android. Android's package remains `sh.ian.lively`.
+Apple uses `hk.cautela.lively.pro.monthly` and `hk.cautela.lively.pro.yearly`,
+validated by the broker's `APP_STORE_PRODUCT_IDS`. Android keeps its
+`sh.ian.lively` package and `sh.ian.lively.pro.*` products, validated separately
+by `PLAY_PRODUCT_IDS`.
 
 Deploy the key broker with `APP_BUNDLE_ID=hk.cautela.lively` before verifying
 Pro in TestFlight. Merging changes under `Server/key-broker/` to `main` runs

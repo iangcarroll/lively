@@ -123,9 +123,10 @@ signed with the debug key so they can be tried locally. The version code is a
 UTC timestamp (`yyMMddHH`), or `-PlivelyBuildNumber=…`.
 
 The Android package remains `sh.ian.lively` when the Apple app moves to
-`hk.cautela.lively`. Both stores still use the product IDs below, which match
-the broker's shared `PRO_PRODUCT_IDS`; Apple's `APP_BUNDLE_ID` setting does
-not change the broker's `PLAY_PACKAGE_NAME`.
+`hk.cautela.lively`. Play keeps the product IDs below, which match the
+broker's `PLAY_PRODUCT_IDS`. Apple uses `hk.cautela.lively.pro.*` products
+and a separate `APP_STORE_PRODUCT_IDS` allowlist; its account migration does
+not change Play products or `PLAY_PACKAGE_NAME`.
 
 Before Pro works on Android:
 

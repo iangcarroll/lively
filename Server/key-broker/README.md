@@ -159,9 +159,10 @@ with `free_pro`.
 The current Apple app is `hk.cautela.lively` (team `JYM7F5DWS2`). Deploy its
 `APP_BUNDLE_ID` setting before validating purchases from the new TestFlight
 app. Transactions and refund notifications for the old `sh.ian.lively`
-development app are ignored. The shared subscription product IDs remain
-`sh.ian.lively.pro.monthly` and `sh.ian.lively.pro.yearly`, as does Android's
-`PLAY_PACKAGE_NAME=sh.ian.lively`.
+development app are ignored. Apple's `APP_STORE_PRODUCT_IDS` are
+`hk.cautela.lively.pro.monthly` and `hk.cautela.lively.pro.yearly`. Android
+retains `sh.ian.lively.pro.monthly` and `sh.ian.lively.pro.yearly` in the
+separate `PLAY_PRODUCT_IDS` allowlist, with `PLAY_PACKAGE_NAME=sh.ian.lively`.
 
 The app sends its current StoreKit 2 transaction (`jwsRepresentation`) as
 `Lively-Subscription` with each key request. `src/appstore.ts` checks it
@@ -175,7 +176,7 @@ without calling Apple:
    Apple's root, like developers' signing certificates, don't pass. Each must
    be valid at the transaction's `signedDate`.
 2. The ES256 signature, with the leaf's key.
-3. `bundleId` is `APP_BUNDLE_ID`, `productId` is in `PRO_PRODUCT_IDS`,
+3. `bundleId` is `APP_BUNDLE_ID`, `productId` is in `APP_STORE_PRODUCT_IDS`,
    `environment` is in `APP_STORE_ENVIRONMENTS`, `expiresDate` is in the
    future, there's no `revocationDate`, and the original transaction isn't in
    `revoked_subscriptions`.
@@ -206,7 +207,7 @@ Version 2, for both Production and Sandbox.
 
 ### Google Play subscriptions
 
-The Android app sells the same products (`PRO_PRODUCT_IDS`) through Play
+The Android app sells its own products (`PLAY_PRODUCT_IDS`) through Play
 Billing and sends its current Pro purchase's token as `Lively-Play-Purchase`
 with each key request. It never sends `Lively-Subscription`. A token isn't
 signed data, so `src/play.ts` asks Google about it, but only when there's no
@@ -220,7 +221,7 @@ valid App Store subscription:
    from the Google Play Developer API.
 3. The purchase counts if `subscriptionState` is `ACTIVE`, `IN_GRACE_PERIOD`
    or `CANCELED` (cancelled but paid through), a line item's `productId` is in
-   `PRO_PRODUCT_IDS` with an `expiryTime` in the future, and it isn't a
+   `PLAY_PRODUCT_IDS` with an `expiryTime` in the future, and it isn't a
    `testPurchase` unless `PLAY_ALLOW_TEST_PURCHASES` is `true`.
 
 Each answer is kept in memory for 5 minutes per token (but never past the

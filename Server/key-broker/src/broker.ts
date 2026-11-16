@@ -69,13 +69,14 @@ export interface Env {
   SESSION_DAYS: string;
   /** Lively Pro. Lists are comma-separated. */
   APP_BUNDLE_ID: string;
-  PRO_PRODUCT_IDS: string;
+  APP_STORE_PRODUCT_IDS: string;
   /** App Store environments whose transactions count: Production, and Sandbox for TestFlight. */
   APP_STORE_ENVIRONMENTS: string;
   /** Tests only: trust this root (base64 DER) instead of Apple's. */
   APP_STORE_TEST_ROOT?: string;
   /** Google Play: the Android app's package name, and the JSON key of a service account that can read its purchases. */
   PLAY_PACKAGE_NAME: string;
+  PLAY_PRODUCT_IDS: string;
   GOOGLE_PLAY_SERVICE_ACCOUNT?: string;
   /** "true" to count Play's test purchases, as license testers and internal testing make. */
   PLAY_ALLOW_TEST_PURCHASES: string;
