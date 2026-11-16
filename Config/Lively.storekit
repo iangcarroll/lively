@@ -42,7 +42,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "sh.ian.lively.pro.monthly",
+          "productID" : "hk.cautela.lively.pro.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Lively Pro Monthly",
           "subscriptionGroupID" : "21880001",
@@ -70,7 +70,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "sh.ian.lively.pro.yearly",
+          "productID" : "hk.cautela.lively.pro.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Lively Pro Yearly",
           "subscriptionGroupID" : "21880001",

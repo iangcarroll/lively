@@ -59,7 +59,7 @@ function transaction(overrides: Partial<SignedTransaction> = {}): SignedTransact
   const now = Date.now();
   return {
     originalTransactionId: String(2_000_000_000_000_000 + Math.floor(Math.random() * 1e12)),
-    productId: "sh.ian.lively.pro.monthly",
+    productId: "hk.cautela.lively.pro.monthly",
     bundleId: env.APP_BUNDLE_ID,
     environment: "Production",
     type: "Auto-Renewable Subscription",
@@ -129,10 +129,17 @@ describe("Pro subscriptions", () => {
   });
 
   it.each(["Production", "Sandbox"])("accepts both configured products in %s for the current app", async (environment) => {
-    for (const productId of env.PRO_PRODUCT_IDS.split(",")) {
+    for (const productId of env.APP_STORE_PRODUCT_IDS.split(",")) {
       const t = transaction({ productId, environment });
       expect(await planOf(await worker.fetch(keyRequest({ subscription: await sign(t) }), local))).toBe("pro");
       expect(sentToSoniox().client_reference_id).toBe(await hash(`subscription:${t.originalTransactionId}`));
+    }
+  });
+
+  it("does not grant Apple Pro for products configured only for Google Play", async () => {
+    for (const productId of env.PLAY_PRODUCT_IDS.split(",")) {
+      const jws = await sign(transaction({ productId, environment: "Sandbox" }));
+      expect(await planOf(await worker.fetch(keyRequest({ subscription: jws }), local))).toBe("free");
     }
   });
 
@@ -161,7 +168,7 @@ describe("Pro subscriptions", () => {
   });
 
   it("accepts an old transaction whose period hasn't ended", async () => {
-    const t = transaction({ productId: "sh.ian.lively.pro.yearly", signedDate: Date.now() - 200 * DAY, expiresDate: Date.now() + 165 * DAY });
+    const t = transaction({ productId: "hk.cautela.lively.pro.yearly", signedDate: Date.now() - 200 * DAY, expiresDate: Date.now() + 165 * DAY });
     expect(await planOf(await worker.fetch(keyRequest({ subscription: await sign(t) }), local))).toBe("pro");
   });
 
@@ -205,6 +212,17 @@ describe("Pro subscriptions", () => {
 });
 
 describe("App Store notifications", () => {
+  it("ignores refunds for replaced products without revoking a current subscription", async () => {
+    const t = transaction({ environment: "Sandbox" });
+    const jws = await sign(t);
+    for (const productId of env.PLAY_PRODUCT_IDS.split(",")) {
+      expect((await notify("REFUND", { ...t, productId })).status).toBe(200);
+    }
+    expect(await planOf(await worker.fetch(keyRequest({ subscription: jws }), local))).toBe("pro");
+    expect((await notify("REFUND", t)).status).toBe(200);
+    expect(await planOf(await worker.fetch(keyRequest({ subscription: jws }), local))).toBe("free");
+  });
+
   it("ignores refunds from the old app even when the transaction ID matches the current app", async () => {
     const t = transaction({ environment: "Sandbox" });
     const jws = await sign(t);

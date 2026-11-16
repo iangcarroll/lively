@@ -226,7 +226,7 @@ class Pro(
     }
 
     companion object {
-        /** The Play subscriptions, monthly first. They must match the broker's `PRO_PRODUCT_IDS`. */
+        /** The Play subscriptions, monthly first. They must match the broker's `PLAY_PRODUCT_IDS`. */
         val PRODUCT_IDS = listOf("sh.ian.lively.pro.monthly", "sh.ian.lively.pro.yearly")
 
         /** `Config/Lively.storekit`'s local test prices, for demo mode. */

@@ -13,9 +13,8 @@ final class Pro {
     static let shared = Pro()
 
     /// The subscription group's products, shortest first. They must match the
-    /// broker's `PRO_PRODUCT_IDS`.
-    /// Product IDs are independent of the app's bundle ID and also used on Android.
-    static let productIDs = ["sh.ian.lively.pro.monthly", "sh.ian.lively.pro.yearly"]
+    /// broker's `APP_STORE_PRODUCT_IDS`.
+    static let productIDs = ["hk.cautela.lively.pro.monthly", "hk.cautela.lively.pro.yearly"]
 
     /// The active subscription, if there is one.
     private(set) var subscription: StoreKit.Transaction?

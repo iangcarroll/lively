@@ -122,6 +122,20 @@ function callsTo(prefix: string): number {
 }
 
 describe("Google Play subscriptions", () => {
+  it("continues granting Pro for each configured Play product", async () => {
+    for (const productId of env.PLAY_PRODUCT_IDS.split(",")) {
+      const t = token(purchase({ lineItems: [{ productId, expiryTime: new Date(Date.now() + DAY).toISOString() }] }));
+      expect(await planOf(await worker.fetch(keyRequest(t), local))).toBe("pro");
+    }
+  });
+
+  it("does not grant Play Pro for products configured only for Apple", async () => {
+    for (const productId of env.APP_STORE_PRODUCT_IDS.split(",")) {
+      const t = token(purchase({ lineItems: [{ productId, expiryTime: new Date(Date.now() + DAY).toISOString() }] }));
+      expect(await planOf(await worker.fetch(keyRequest(t), local))).toBe("free");
+    }
+  });
+
   it("gives an active subscription Pro, charged to the purchase token", async () => {
     const t = token(purchase());
     expect(await planOf(await worker.fetch(keyRequest(t), local))).toBe("pro");

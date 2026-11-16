@@ -1,13 +1,13 @@
 # Lively App Store metadata
 
 Apple team: `JYM7F5DWS2`. App bundle ID: `hk.cautela.lively`.
-Create a new app record for this bundle ID and recreate the subscription group
-and products below. Their product IDs intentionally retain the shared Android
-identifiers; they do not need to match the Apple bundle ID.
+App Store Connect app: `6835590432` (Lively: Live Translator). The Apple
+subscription products below use the Cautela namespace. Android keeps its
+existing Play product IDs in the separate `PLAY_PRODUCT_IDS` allowlist.
 
 ## Product page
 
-- Name: `Lively Translate`
+- Name: `Lively: Live Translator`
 - Subtitle: `Live English–Chinese speech`
 - Promotional text: `Talk naturally across English and Chinese. Lively recognizes both languages, translates each turn live, and gives each person a view they can read.`
 - Keywords: `translator,translation,Chinese,English,conversation,speech,voice,travel,interpreter,Mandarin`
@@ -50,16 +50,17 @@ Privacy Policy: https://lively.ian.sh/privacy
 ## In-app purchases
 
 One subscription group, **Lively Pro**, with two auto-renewable subscriptions.
-The product IDs must match `Pro.productIDs` in the app and `PRO_PRODUCT_IDS` in
+The product IDs must match `Pro.productIDs` in the app and `APP_STORE_PRODUCT_IDS` in
 `Server/key-broker/wrangler.jsonc`.
 
 | Product ID | Reference name | Period | Level |
 |---|---|---|---|
-| `sh.ian.lively.pro.yearly` | Lively Pro Yearly | 1 year | 1 |
-| `sh.ian.lively.pro.monthly` | Lively Pro Monthly | 1 month | 2 |
+| `hk.cautela.lively.pro.yearly` | Lively Pro Yearly (Cautela) | 1 year | 1 |
+| `hk.cautela.lively.pro.monthly` | Lively Pro Monthly (Cautela) | 1 month | 2 |
 
 - Display name: `Lively Pro`. Description: `10 hours of live translation a day`.
-- Prices are set in App Store Connect. `Config/Lively.storekit` uses $4.99 and $39.99 for local testing only.
+- US prices: $4.99/month and $39.99/year, with Apple's regional equivalents.
+  `Config/Lively.storekit` uses the same US prices for local testing.
 - Each product needs a review screenshot of the paywall (Settings › Lively Pro).
 - Submit both with the first version that includes Pro.
 - License agreement: Apple's standard EULA, linked from the description and from `https://lively.ian.sh/terms`.
