@@ -43,6 +43,7 @@ private struct TranscriptFollowingModifier: ViewModifier {
     @State private var followsBottom = true
     @State private var userIsScrolling = false
     @State private var viewportSize = CGSize.zero
+    @State private var viewViewportSize = CGSize.zero
     @State private var contentSize = CGSize.zero
     @State private var pendingTargetID: UUID?
     @State private var reflowRevision = 0
@@ -64,6 +65,7 @@ private struct TranscriptFollowingModifier: ViewModifier {
 
     private struct Reflow: Equatable {
         let viewport: CGSize
+        let viewViewport: CGSize
         let content: CGSize
         let typeSize: DynamicTypeSize
         let newestID: UUID?
@@ -72,7 +74,8 @@ private struct TranscriptFollowingModifier: ViewModifier {
     }
 
     private var reflow: Reflow {
-        Reflow(viewport: viewportSize, content: contentSize, typeSize: dynamicTypeSize, newestID: last?.id,
+        Reflow(viewport: viewportSize, viewViewport: viewViewportSize, content: contentSize,
+               typeSize: dynamicTypeSize, newestID: last?.id,
                source: last?.trimmedSource ?? "", translation: last?.translation ?? "")
     }
 
@@ -100,8 +103,8 @@ private struct TranscriptFollowingModifier: ViewModifier {
             } action: { _, nearBottom in
                 if userIsScrolling { followsBottom = nearBottom }
             }
-            // View geometry can reach its target before the scroll container
-            // finishes resizing. Follow the container's actual layout instead.
+            // Lists and scroll views report view and native bounds at different
+            // times. Both signals are needed when guidance resizes the transcript.
             .onScrollGeometryChange(for: NativeLayout.self) {
                 NativeLayout(viewport: $0.containerSize, content: $0.contentSize)
             } action: { _, metrics in
@@ -120,6 +123,7 @@ private struct TranscriptFollowingModifier: ViewModifier {
                     requestAlignment(for: reflow)
                 }
             }
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { viewViewportSize = $0 }
             .onChange(of: reflow, initial: true) { _, change in requestAlignment(for: change) }
             .onDisappear { cancelAlignment() }
     }
@@ -139,7 +143,9 @@ private struct TranscriptFollowingModifier: ViewModifier {
     private func requestAlignment(for change: Reflow) {
         pendingTargetID = change.newestID
         reflowRevision &+= 1
-        guard viewportSize.width > 0, viewportSize.height > 0,
+        let viewIsLaidOut = viewViewportSize.width > 0 && viewViewportSize.height > 0
+        let nativeIsLaidOut = viewportSize.width > 0 && viewportSize.height > 0
+        guard viewIsLaidOut || nativeIsLaidOut,
               followsBottom, !userIsScrolling, alignmentTask == nil else { return }
         alignmentGeneration &+= 1
         let token = alignmentGeneration

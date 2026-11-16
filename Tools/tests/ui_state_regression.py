@@ -125,13 +125,13 @@ def build_host(work, bundle_id, variant, original):
         path.write_text(replace_once(path.read_text(),
             "            footer.layoutPriority(1)\n        }",
             "        }\n        .overlay(alignment: .bottom) { footer.layoutPriority(1) }"))
-    elif variant == "model-viewport-restored":
+    elif variant == "native-layout-unavailable":
         path = source_dir / "ConversationTranscriptLayout.swift"
         source = replace_once(path.read_text(), "                viewportSize = metrics.viewport\n", "")
-        path.write_text(replace_once(source,
-            ".onChange(of: reflow, initial: true)",
-            ".onGeometryChange(for: CGSize.self) { $0.size } action: { viewportSize = $0 }\n"
-            "            .onChange(of: reflow, initial: true)"))
+        path.write_text(replace_once(source, "                contentSize = metrics.content\n", ""))
+    elif variant == "native-viewport-unobserved":
+        path = source_dir / "ConversationTranscriptLayout.swift"
+        path.write_text(replace_once(path.read_text(), "                viewportSize = metrics.viewport\n", ""))
     elif variant == "manual-scroll-intent-ignored":
         path = source_dir / "ConversationTranscriptLayout.swift"
         path.write_text(replace_once(path.read_text(),
@@ -255,21 +255,22 @@ def main():
     run([*asset_command, "--generate-swift-asset-symbols", str(source_dir / "GeneratedAssetSymbols.swift")],
         work / "asset-symbols.log")
     original = {p.name: p.read_text() for p in source_dir.glob("*.swift")}
-    variants = [("production", None)]
+    variants = [("production", None, False)]
     if args.negative_controls:
-        variants += [("missing-empty-error", "testControlledFaceFailureAndNetwork"),
-                     ("false-partner-wait", "testControlledKnownPartnerLiveAndUnknown"),
-                     ("footer-overlays-transcript", "testPopulatedChatKeepsNewestAboveGuidance"),
-                     ("model-viewport-restored", "testPopulatedFaceKeepsNewestAboveGuidance"),
-                     ("manual-scroll-intent-ignored", "testManualHistoryPositionSurvivesGuidanceAndRevision"),
-                     ("streaming-alignment-removed", "testContinuousSameRowUpdatesKeepNewestBottomVisible")]
+        variants += [("native-layout-unavailable", "testPopulatedChatKeepsNewestAboveGuidance", False),
+                     ("missing-empty-error", "testControlledFaceFailureAndNetwork", True),
+                     ("false-partner-wait", "testControlledKnownPartnerLiveAndUnknown", True),
+                     ("footer-overlays-transcript", "testPopulatedChatKeepsNewestAboveGuidance", True),
+                     ("native-viewport-unobserved", "testPopulatedFaceKeepsNewestAboveGuidance", True),
+                     ("manual-scroll-intent-ignored", "testManualHistoryPositionSurvivesGuidanceAndRevision", True),
+                     ("streaming-alignment-removed", "testContinuousSameRowUpdatesKeepNewestBottomVisible", True)]
     report = {"scope": "Actual view/model sources; controlled Store/settings/unrelated UI boundary only. No speech or hardware proof.",
               "device": selected[0], "source_sha256": hashes, "custom_main_app_qa_arguments": [],
               "asset_catalog_sha256": digest(app / "Assets.car"),
               "instrumented_host_copy": False,
               "selected_production_tests": args.only_testing or test_names, "variants": []}
     try:
-        for variant, test in variants:
+        for variant, test, is_fault in variants:
             app = build_host(work, host_id, variant, original)
             binary_hash = digest(app / "StateFixture")
             run(["xcrun", "simctl", "install", args.device_id, str(app)], work / f"install-{variant}.log")
@@ -286,18 +287,20 @@ def main():
                     command += ["-only-testing:UIStateRegression/UIStateRegression/" + name]
             code = run([*command, "test"], log, check=False, timeout=600)
             text = log.read_text()
-            passed = code == 0 and f"Executed {expected_tests} test" in text and "with 0 failures" in text
+            count = 1 if test else expected_tests
+            passed = code == 0 and f"Executed {count} test" in text and "with 0 failures" in text
             assertion = "XCTAssertTrue failed" if variant in {"missing-empty-error", "false-partner-wait"} else "XCTAssert"
             detected = (code != 0 and "** TEST FAILED **" in text and assertion in text
                         and "with 1 failure (0 unexpected)" in text and "** BUILD FAILED **" not in text)
             record = {"name": variant, "host_binary_sha256": binary_hash, "exit_code": code,
                       "log": str(log), "log_sha256": digest(log), "result": str(result),
-                      "production_cases_passed": passed if not test else None,
-                      "assertion_control_detected": detected if test else None}
+                      "production_cases_passed": passed if not is_fault else None,
+                      "unavailable_native_geometry_boundary": variant == "native-layout-unavailable",
+                      "assertion_control_detected": detected if is_fault else None}
             report["variants"].append(record)
-            if (test and not detected) or (not test and not passed):
+            if (is_fault and not detected) or (not is_fault and not passed):
                 raise RuntimeError(f"Unexpected UI result for {variant}; see {log}")
-            print(f"PASS: {variant}" + (" (assertion control detected)" if test else f" ({expected_tests} cases, transcript states and viewport geometry)"), flush=True)
+            print(f"PASS: {variant}" + (" (assertion control detected)" if is_fault else f" ({count} cases, transcript states and viewport geometry)"), flush=True)
         report["status"] = "passed"
     except Exception as error:
         report["status"] = "failed"
