@@ -60,9 +60,7 @@
     "CODES_PER_EMAIL_PER_DAY": "10",
     "CODES_PER_IP_PER_HOUR": "20",
     "SESSION_DAYS": "365",
-    // A dedicated account for App Review. Its code hash is a Worker secret;
-    // without APP_REVIEW_CODE_HASH, this address cannot sign in.
-    "APP_REVIEW_EMAIL": "app-review@lively.ian.sh",
+    // APP_REVIEW_EMAIL and APP_REVIEW_CODE_HASH are private Worker secrets.
     // Lively Pro. Sandbox is TestFlight's environment, where purchases are free.
     "APP_BUNDLE_ID": "hk.cautela.lively",
     "APP_STORE_PRODUCT_IDS": "hk.cautela.lively.pro.monthly,hk.cautela.lively.pro.yearly",

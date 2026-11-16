@@ -399,14 +399,20 @@ last backstop if the limits above are set too loosely.
 
 ## Store reviewer account
 
-`APP_REVIEW_EMAIL` reserves one dedicated demo address. App Store Connect holds
-its six-digit review code; the app and repository never contain that code.
+`APP_REVIEW_EMAIL` is a Worker secret reserving one dedicated demo address.
+Use a random, unguessable address and share it only through App Store Connect
+along with its six-digit code. Publishing the address lets anyone exhaust its
+normal sign-in limits and deny reviewers access. Neither credential belongs
+in the app, repository, or public review discussion.
 `APP_REVIEW_CODE_HASH` is a Worker secret containing the first 128 bits of
 SHA-256 of `code:<normalized email>:<code>` in lowercase hex (the same format
 as the broker's existing code hashes).
-The deployment workflow copies the GitHub Actions secret of the same name to
-the Worker before deployment; a missing GitHub secret leaves the existing
-Worker secret unchanged. Configure or rotate both together.
+The deployment workflow copies the two same-named GitHub Actions secrets to
+the Worker together after deployment. If both GitHub secrets are absent, it
+leaves existing Worker secrets unchanged; supplying only one fails the job.
+Credentials are trimmed and validated before migrations or deployment; invalid
+or partial input fails before production changes. Configure or rotate the
+address and matching hash together.
 
 Reviewers open Settings → Account, enter the review address, request a code,
 and enter the code in Review Notes. No email is sent for this address. Every
