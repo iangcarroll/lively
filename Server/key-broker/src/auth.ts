@@ -65,13 +65,20 @@ export async function startEmailSignIn(request: Request, env: Env, now: number):
     return error(429, "rate_limited", "Too many codes. Try again later.", Math.max(1, Math.ceil((exceeded.resetsAt - now) / 1000)));
   }
 
+  const isReview = email === normalizeEmail(env.APP_REVIEW_EMAIL);
+  const reviewHash = configuredReviewHash(env);
+  if (isReview && !reviewHash) return error(503, "review_unavailable", "Review sign-in is temporarily unavailable.");
   const code = randomCode();
   await env.DB.prepare(
     "INSERT INTO login_codes (email, code_hash, attempts, expires_at) VALUES (?1, ?2, 0, ?3) " +
       "ON CONFLICT(email) DO UPDATE SET code_hash = excluded.code_hash, attempts = 0, expires_at = excluded.expires_at",
   )
-    .bind(email, await codeHash(email, code), nowSeconds(now) + limits.codeTTLSeconds)
+    .bind(email, isReview ? reviewHash : await codeHash(email, code), nowSeconds(now) + limits.codeTTLSeconds)
     .run();
+
+  // Reviewers use the code supplied in App Store Connect. They still request
+  // a short-lived challenge and share all normal start/guess rate limits.
+  if (isReview) return json(200, { ok: true, expires_in_seconds: limits.codeTTLSeconds });
 
   try {
     await env.EMAIL.send({
@@ -109,19 +116,28 @@ export async function verifyEmailSignIn(request: Request, env: Env, now: number)
   if (!row || row.attempts > limits.codeMaxAttempts) {
     return error(400, "code_expired", "That code has expired. Ask for a new one.");
   }
+  // Rotation or disabling the secret invalidates outstanding review challenges.
+  if (email === normalizeEmail(env.APP_REVIEW_EMAIL) && row.code_hash !== configuredReviewHash(env)) {
+    return error(400, "code_expired", "That code has expired. Ask for a new one.");
+  }
   if (row.code_hash !== (await codeHash(email, code))) {
     return error(400, "wrong_code", "That code isn't right.");
   }
 
+  // Claim the challenge atomically, including the attempt limit. Concurrent
+  // correct submissions must not both turn one challenge into a session.
+  const claimed = await env.DB.prepare(
+    "DELETE FROM login_codes WHERE email = ?1 AND code_hash = ?2 AND expires_at > ?3 AND attempts <= ?4 RETURNING email",
+  ).bind(email, row.code_hash, nowSeconds(now), limits.codeMaxAttempts).first();
+  if (!claimed) return error(400, "code_expired", "That code has expired. Ask for a new one.");
+
   const userID = crypto.randomUUID();
   const token = randomToken();
-  const [, user] = await env.DB.batch<UserRow>([
-    env.DB.prepare("DELETE FROM login_codes WHERE email = ?").bind(email),
-    env.DB.prepare(
+  const user = await env.DB.prepare(
       "INSERT INTO users (id, email) VALUES (?1, ?2) ON CONFLICT(email) DO UPDATE SET email = email RETURNING id, email, free_pro",
-    ).bind(userID, email),
-  ]);
-  const account = userOf(user.results[0]);
+    ).bind(userID, email).first<UserRow>();
+  if (!user) throw new Error("Sign-in did not return an account");
+  const account = userOf(user);
   await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?1, ?2, ?3)")
     .bind(await tokenHash(token), account.id, nowSeconds(now) + limits.sessionDays * 86_400)
     .run();
@@ -194,6 +210,11 @@ function normalizeEmail(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const email = value.trim().toLowerCase();
   return email.length <= 254 && EMAIL.test(email) ? email : undefined;
+}
+
+function configuredReviewHash(env: Env): string | undefined {
+  const value = env.APP_REVIEW_CODE_HASH;
+  return value && /^[a-f0-9]{32}$/.test(value) ? value : undefined;
 }
 
 async function readJSON(request: Request): Promise<Record<string, unknown> | undefined> {

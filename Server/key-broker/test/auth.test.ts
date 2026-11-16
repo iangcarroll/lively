@@ -249,3 +249,97 @@ describe("cleanup", () => {
     expect((await worker.fetch(keyRequest(token), local)).status).toBe(200);
   });
 });
+
+describe("dedicated store review sign-in", () => {
+  async function configured() {
+    const email = randomEmail();
+    const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
+    const reviewEnv = { ...local, APP_REVIEW_EMAIL: email, APP_REVIEW_CODE_HASH: await hash(`code:${email}:${code}`) };
+    return { email, code, reviewEnv };
+  }
+
+  it("uses the supplied review code through the normal session and Pro flows", async () => {
+    const { email, code, reviewEnv } = await configured();
+    const id = crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO users (id, email, free_pro) VALUES (?, ?, 1)").bind(id, email).run();
+    expect((await worker.fetch(post("/v1/auth/email/start", { email: ` ${email.toUpperCase()} ` }), reviewEnv)).status).toBe(200);
+    expect(send).not.toHaveBeenCalled();
+    const verify = await worker.fetch(post("/v1/auth/email/verify", { email, code }), reviewEnv);
+    expect(verify.status).toBe(200);
+    const signed = await verify.json<{ token: string; user: { id: string; free_pro: boolean } }>();
+    expect(signed.user).toMatchObject({ id, free_pro: true });
+    const me = await worker.fetch(new Request("https://broker.test/v1/auth/me", { headers: { Authorization: `Bearer ${signed.token}` } }), reviewEnv);
+    expect(await me.json()).toEqual({ user: signed.user });
+    const key = await worker.fetch(keyRequest(signed.token), reviewEnv);
+    expect(key.status).toBe(200);
+    expect(await key.json()).toMatchObject({ plan: "pro" });
+    expect((await worker.fetch(post("/v1/auth/email/verify", { email, code }), reviewEnv)).status).toBe(400);
+    expect((await worker.fetch(post("/v1/auth/logout", {}, { token: signed.token }), reviewEnv)).status).toBe(200);
+    expect((await worker.fetch(keyRequest(signed.token), reviewEnv)).status).toBe(401);
+    // A new challenge accepts the same reviewer credential after sign-out.
+    expect((await worker.fetch(post("/v1/auth/email/start", { email }), reviewEnv)).status).toBe(200);
+    expect((await worker.fetch(post("/v1/auth/email/verify", { email, code }), reviewEnv)).status).toBe(200);
+  });
+
+  it("never applies the review code or Pro grant to another address", async () => {
+    const { code, reviewEnv } = await configured();
+    const email = randomEmail();
+    await worker.fetch(post("/v1/auth/email/start", { email }), reviewEnv);
+    expect(send).toHaveBeenCalledOnce();
+    // Deliberately configure a different code from the actual email challenge.
+    const wrong = sentCode() === code ? (code === "000000" ? "111111" : "000000") : code;
+    const isolated = { ...reviewEnv, APP_REVIEW_CODE_HASH: await hash(`code:${reviewEnv.APP_REVIEW_EMAIL}:${wrong}`) };
+    expect((await worker.fetch(post("/v1/auth/email/verify", { email, code: wrong }), isolated)).status).toBe(400);
+    const response = await worker.fetch(post("/v1/auth/email/verify", { email, code: sentCode() }), isolated);
+    expect(await response.json()).toMatchObject({ user: { email, free_pro: false } });
+  });
+
+  it("requires a live challenge and enforces expiry and guessing limits", async () => {
+    const { startEmailSignIn, verifyEmailSignIn } = await import("../src/auth");
+    const { email, code, reviewEnv } = await configured();
+    const verify = (value = code, now = NOW) => verifyEmailSignIn(post("/v1/auth/email/verify", { email, code: value }), reviewEnv, now);
+    expect((await verify()).status).toBe(400);
+    await startEmailSignIn(post("/v1/auth/email/start", { email }), reviewEnv, NOW);
+    expect((await verify(code, NOW + 601_000)).status).toBe(400);
+    await startEmailSignIn(post("/v1/auth/email/start", { email }), reviewEnv, NOW);
+    const wrong = code === "000000" ? "111111" : "000000";
+    for (let i = 0; i < Number(reviewEnv.CODE_MAX_ATTEMPTS); i++) expect((await verify(wrong)).status).toBe(400);
+    expect((await verify()).status).toBe(400);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("rate limits repeated requests for the review challenge", async () => {
+    const { email, reviewEnv } = await configured();
+    const limited = { ...reviewEnv, CODES_PER_EMAIL_PER_HOUR: "2" };
+    for (let i = 0; i < 2; i++) expect((await worker.fetch(post("/v1/auth/email/start", { email }), limited)).status).toBe(200);
+    expect((await worker.fetch(post("/v1/auth/email/start", { email }), limited)).status).toBe(429);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "invalid", "0".repeat(64)])("fails closed with missing or invalid review secret %j", async secret => {
+    const { email, code, reviewEnv } = await configured();
+    await worker.fetch(post("/v1/auth/email/start", { email }), reviewEnv);
+    const disabled = { ...reviewEnv, APP_REVIEW_CODE_HASH: secret };
+    expect((await worker.fetch(post("/v1/auth/email/verify", { email, code }), disabled)).status).toBe(400);
+    expect((await worker.fetch(post("/v1/auth/email/start", { email }), disabled)).status).toBe(503);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("invalidates an outstanding challenge after rotation", async () => {
+    const { email, code, reviewEnv } = await configured();
+    await worker.fetch(post("/v1/auth/email/start", { email }), reviewEnv);
+    const replacement = code === "000000" ? "111111" : "000000";
+    const rotated = { ...reviewEnv, APP_REVIEW_CODE_HASH: await hash(`code:${email}:${replacement}`) };
+    expect((await worker.fetch(post("/v1/auth/email/verify", { email, code }), rotated)).status).toBe(400);
+    await worker.fetch(post("/v1/auth/email/start", { email }), rotated);
+    expect((await worker.fetch(post("/v1/auth/email/verify", { email, code: replacement }), rotated)).status).toBe(200);
+  });
+
+  it("allows only one concurrent redemption of a challenge", async () => {
+    const { email, code, reviewEnv } = await configured();
+    await worker.fetch(post("/v1/auth/email/start", { email }), reviewEnv);
+    const responses = await Promise.all(Array.from({ length: 3 }, () => worker.fetch(post("/v1/auth/email/verify", { email, code }), reviewEnv)));
+    expect(responses.filter(r => r.status === 200)).toHaveLength(1);
+    expect(responses.filter(r => r.status === 400)).toHaveLength(2);
+  });
+});

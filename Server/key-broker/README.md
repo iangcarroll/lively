@@ -396,3 +396,29 @@ China hasn't been tested.
 
 In the Soniox console, set a budget on the account that owns the key. It's the
 last backstop if the limits above are set too loosely.
+
+## Store reviewer account
+
+`APP_REVIEW_EMAIL` reserves one dedicated demo address. App Store Connect holds
+its six-digit review code; the app and repository never contain that code.
+`APP_REVIEW_CODE_HASH` is a Worker secret containing the first 128 bits of
+SHA-256 of `code:<normalized email>:<code>` in lowercase hex (the same format
+as the broker's existing code hashes).
+The deployment workflow copies the GitHub Actions secret of the same name to
+the Worker before deployment; a missing GitHub secret leaves the existing
+Worker secret unchanged. Configure or rotate both together.
+
+Reviewers open Settings → Account, enter the review address, request a code,
+and enter the code in Review Notes. No email is sent for this address. Every
+request still creates a ten-minute, single-use challenge with the usual
+per-email, per-IP, and guessing limits. Other accounts always receive random
+email codes. Missing or invalid configuration disables the reserved address.
+Rotating the secret invalidates outstanding challenges; existing sessions
+last until logout, deletion, expiry, or explicit revocation.
+
+Keep the account free of personal data. A normal free account lets Apple test
+the purchase flow; use sandbox purchases for Pro. Do not grant `free_pro` to
+the review account because it would hide the subscription purchase UI.
+To disable review access, remove the hash secret while retaining the reserved
+email, and revoke that account's sessions in D1. Never reuse a personal account
+as the reviewer address.

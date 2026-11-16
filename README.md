@@ -506,3 +506,10 @@ Backgrounding stopped capture and released all session claims; one tap after
 returning restarted the real microphone. No crash occurred during these checks.
 Phone-call interruption and a long-session soak have not yet been verified.
 These audio checks did not cover widget sharing in the separate development app.
+
+## Store review and listing assets
+
+Store review uses a dedicated email account and server-configured code through
+the normal optional sign-in screen on every platform. Ordinary users still get
+random emailed codes. See the [broker setup](Server/key-broker/README.md#store-reviewer-account).
+App Store copy, screenshots, and artwork live in `AppStore/`.

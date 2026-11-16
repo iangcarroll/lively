@@ -49,4 +49,11 @@ jobs:
       - run: npm ci
       # Migrations first, so the new code never runs against an old schema.
       - run: npx wrangler d1 migrations apply lively-key-broker --remote
+      - name: Configure reviewer credential
+        env:
+          APP_REVIEW_CODE_HASH: ${{ secrets.APP_REVIEW_CODE_HASH }}
+        run: |
+          if [ -n "$APP_REVIEW_CODE_HASH" ]; then
+            printf '%s' "$APP_REVIEW_CODE_HASH" | npx wrangler secret put APP_REVIEW_CODE_HASH
+          fi
       - run: npx wrangler deploy
