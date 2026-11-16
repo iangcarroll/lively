@@ -10,7 +10,7 @@ nonisolated struct WidgetLanguages: Codable, Equatable, Sendable {
     var firstTag: String
     var secondTag: String
 
-    static let appGroup = "group.sh.ian.lively"
+    static let appGroup = "group.hk.cautela.lively"
     /// The widget kind, for reloading its timelines when the pair changes.
     static let widgetKind = "LivelyWidget"
 

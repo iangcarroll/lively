@@ -61,7 +61,7 @@
     "CODES_PER_IP_PER_HOUR": "20",
     "SESSION_DAYS": "365",
     // Lively Pro. Sandbox is TestFlight's environment, where purchases are free.
-    "APP_BUNDLE_ID": "sh.ian.lively",
+    "APP_BUNDLE_ID": "hk.cautela.lively",
     "PRO_PRODUCT_IDS": "sh.ian.lively.pro.monthly,sh.ian.lively.pro.yearly",
     "APP_STORE_ENVIRONMENTS": "Production,Sandbox",
     // Google Play. The service account's JSON key is the secret

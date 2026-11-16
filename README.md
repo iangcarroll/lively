@@ -151,7 +151,7 @@ On iPhone and iPad, Lively has home screen and lock screen widgets
 (`LivelyWidgets/`). They show the conversation's two languages, and tapping one
 opens Lively and starts listening. The medium home screen widget also has a
 Type button that opens the text field. They link with `lively://listen` and
-`lively://type`, and read the language pair from the `group.sh.ian.lively` App
+`lively://type`, and read the language pair from the `group.hk.cautela.lively` App
 Group, which the app updates whenever the pair changes
 (`Shared/WidgetLanguages.swift`). The Android app has no widgets yet.
 
@@ -216,6 +216,39 @@ from Xcode, pick `Config/Lively.storekit` under Edit Scheme › Run › Options 
 StoreKit Configuration. The broker doesn't accept those local test
 transactions, so this exercises only the UI. Use a TestFlight build with a
 Sandbox account for the full flow.
+
+### Apple developer account and TestFlight
+
+The iOS/macOS app uses team `JYM7F5DWS2` and bundle ID `hk.cautela.lively`.
+The iOS widget uses `hk.cautela.lively.widgets`; both iOS targets share
+`group.hk.cautela.lively`. Add an Apple ID with access to that team in Xcode
+and enable automatic signing for both targets.
+
+For the new account, register both bundle IDs and the shared App Group, enable
+the group for both targets, and create the `hk.cautela.lively` app in App Store
+Connect. Recreate the monthly/yearly products in [App Store metadata](AppStore/metadata.md)
+under that app and configure its production and sandbox Server Notifications V2
+URL as `https://lively.ian.sh/v1/appstore/notifications`.
+The product IDs intentionally remain `sh.ian.lively.pro.monthly` and
+`sh.ian.lively.pro.yearly`; they are independent of the bundle ID and are shared
+with Android. Android's package remains `sh.ian.lively`.
+
+Deploy the key broker with `APP_BUNDLE_ID=hk.cautela.lively` before verifying
+Pro in TestFlight. Merging changes under `Server/key-broker/` to `main` runs
+the broker tests and deployment workflow. Then run `Tools/release/testflight.sh`
+to archive and upload (`--no-upload` exports only). The script defaults to the
+new team; `LIVELY_TEAM_ID` can override it.
+The archive step uses automatic development signing before App Store export.
+If the new team has no registered devices, register a development device with
+that team so Xcode can create profiles for the app and widget.
+
+This replaces the old development/TestFlight app with a separate app. Testers
+need invitations for the new app, must sign in again, and must set up their
+preferences and downloads again. Old sandbox purchases do not grant Pro in the
+new app. Remove the old build before checking widget links because both apps
+register the `lively://` URL scheme. Validate purchase, restore, refund handling,
+translation, and widget launch/language sharing on the new TestFlight build;
+local StoreKit tests cannot validate the broker's Apple signature checks.
 
 In a Debug build, to try the UI without a key, add the launch argument `-LivelyDemo YES` and tap the
 mic. It plays a scripted conversation through the real turn and translation logic.

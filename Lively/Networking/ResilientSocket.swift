@@ -878,7 +878,7 @@ final class ResilientSocket {
         }
     }
 
-    private static let log = Logger(subsystem: "sh.ian.lively", category: "socket")
+    private static let log = Logger(subsystem: "hk.cautela.lively", category: "socket")
 
     private func debugLog(_ message: @autoclosure () -> String) {
         #if DEBUG

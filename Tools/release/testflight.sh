@@ -1,15 +1,15 @@
 #!/bin/zsh
-# Archives the iOS app, signed by the Certly Inc team, and uploads it to TestFlight.
+# Archives the iOS app, signed by the Lively developer team, and uploads it to TestFlight.
 #
-#   Tools/release/testflight.sh              # archive + upload (Certly Inc, SWA3UUHCJR)
+#   Tools/release/testflight.sh              # archive + upload (team JYM7F5DWS2)
 #   Tools/release/testflight.sh --no-upload  # archive + export only
 #
-# Uses automatic signing with the Apple ID signed into Xcode (apple@ian.sh).
-# The first run registers the sh.ian.lively App ID. The App Store Connect app
+# Uses automatic signing with an Apple ID signed into Xcode that can access the team.
+# The first run registers the hk.cautela.lively App ID. The App Store Connect app
 # record must exist before the upload step.
 set -euo pipefail
 
-LIVELY_TEAM_ID="${LIVELY_TEAM_ID:-SWA3UUHCJR}"  # Certly Inc
+LIVELY_TEAM_ID="${LIVELY_TEAM_ID:-JYM7F5DWS2}"  # Lively
 ROOT="${0:A:h:h:h}"
 OUT="${LIVELY_RELEASE_DIR:-$ROOT/build/release}"
 # Build numbers must increase on every upload; a UTC timestamp always does.

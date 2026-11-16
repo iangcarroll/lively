@@ -59,7 +59,7 @@ final class HybridSpeechEngine: SpeechEngine {
     private var bufferedSeconds: TimeInterval = 0
     private let maxBufferSeconds: TimeInterval = 30
     private let sampleRate: Double = 16_000
-    private let logger = Logger(subsystem: "sh.ian.lively", category: "hybrid")
+    private let logger = Logger(subsystem: "hk.cautela.lively", category: "hybrid")
 
     init(local: SpeechEngine, cloud: SpeechEngine) {
         self.local = local
