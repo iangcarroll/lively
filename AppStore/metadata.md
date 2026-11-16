@@ -11,11 +11,11 @@ existing Play product IDs in the separate `PLAY_PRODUCT_IDS` allowlist.
 - Subtitle: `Speak, type & translate live`
 - Promotional text: `Understand each other with live translation, a shared face-to-face view, and bilingual transcripts. Type, translate photos, or prepare languages for offline use.`
 - Keywords: `voice,conversation,interpreter,travel,Chinese,English,Japanese,Spanish,photo,offline,speech`
-- Support URL: `https://lively.ian.sh/support`
-- Marketing URL: none (the repository is private)
+- Support URL: `https://lively.cautela.hk/support`
+- Marketing URL: `https://lively.cautela.hk`
 - Primary category: Travel
 - Secondary category: Utilities
-- Copyright: `2026 Certly, Inc.`
+- Copyright: `2026 Cautela Limited`
 
 ## Description
 
@@ -48,8 +48,8 @@ Lively Pro is an optional auto-renewing subscription. Payment is charged to your
 
 Online translation sends audio or text to the selected providers. On-device mode processes supported speech and text locally; the spoken-voice setting is separate. See the privacy policy for details.
 
-Terms of Use: https://lively.ian.sh/terms
-Privacy Policy: https://lively.ian.sh/privacy
+Terms of Use: https://lively.cautela.hk/terms
+Privacy Policy: https://lively.cautela.hk/privacy
 
 ## Review information
 
@@ -73,15 +73,15 @@ The product IDs must match `Pro.productIDs` in the app and `APP_STORE_PRODUCT_ID
   `Config/Lively.storekit` uses the same US prices for local testing.
 - Each product needs a review screenshot of the paywall (Settings › Lively Pro).
 - Submit both with the first version that includes Pro.
-- License agreement: Apple's standard EULA, linked from the description and from `https://lively.ian.sh/terms`.
-- App Store Server Notifications V2: `https://lively.ian.sh/v1/appstore/notifications`, for Production and Sandbox.
+- License agreement: Apple's standard EULA, linked from the description and from `https://lively.cautela.hk/terms`.
+- App Store Server Notifications V2: `https://lively.cautela.hk/v1/appstore/notifications`, for Production and Sandbox.
 
 ## Content and privacy declarations
 
 - Content rights: Lively does not contain, show, or access third-party content.
 - Age rating: None for all mature-content categories; no unrestricted web access, user-generated-content feed, remote messaging, advertising, gambling, or health content.
-- Privacy policy: `https://lively.ian.sh/privacy`
-- Account deletion URL: `https://lively.ian.sh/delete-account`
+- Privacy policy: `https://lively.cautela.hk/privacy`
+- Account deletion URL: `https://lively.cautela.hk/delete-account`
 - Data types (all declared linked; none used for tracking):
   - Email Address — app functionality; optional account authentication.
   - User ID — app functionality; optional account and provider credentials.

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyLists/1.0.dtd">
-<!-- Keep in step with AppStore/metadata.md (the App Store privacy label) and https://lively.ian.sh/privacy. -->
+<!-- Keep in step with AppStore/metadata.md (the App Store privacy label) and https://lively.cautela.hk/privacy. -->
 <plist version="1.0">
 <dict>
 	<key>NSPrivacyTracking</key>

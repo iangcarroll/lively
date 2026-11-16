@@ -341,11 +341,29 @@ describe("account deletion", () => {
 });
 
 describe("pages", () => {
+  it.each(["/", "/privacy", "/support", "/terms", "/delete-account"])("redirects legacy %s to a working canonical page", async (path) => {
+    const original = new URL(path, "https://lively.ian.sh");
+    original.searchParams.set("source", crypto.randomUUID());
+    const redirect = await worker.fetch(new Request(original), local);
+    expect(redirect.status).toBe(308);
+    const destination = new URL(redirect.headers.get("Location")!);
+    expect(destination.origin).toBe("https://lively.cautela.hk");
+    expect(destination.pathname).toBe(original.pathname);
+    expect(destination.search).toBe(original.search);
+    const page = await worker.fetch(new Request(destination), local);
+    expect(page.status).toBe(200);
+    expect(page.headers.get("Content-Type")).toContain("text/html");
+    const body = await page.text();
+    for (const match of body.matchAll(/href="(\/[^\"]*)"/g)) {
+      expect((await worker.fetch(new Request(new URL(match[1], destination)), local)).status).toBe(200);
+    }
+  });
+
   it.each(["/privacy", "/support", "/terms", "/delete-account"])("serves %s with the support email", async (path) => {
     const response = await worker.fetch(new Request(`https://broker.test${path}`), local);
     expect(response.status).toBe(200);
     const body = await response.text();
-    expect(body).toContain("support@lively.ian.sh");
+    expect(body).toContain("support@lively.cautela.hk");
     expect(body).not.toContain("github.com");
   });
 

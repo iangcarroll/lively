@@ -202,7 +202,7 @@ The payload and its `signedTransactionInfo` are checked the same way. `REFUND`
 and `REVOKE` add the original transaction ID to `revoked_subscriptions`;
 `REFUND_REVERSED` removes it. Anything else, or another app's notification, is
 acknowledged and ignored. In App Store Connect, set **App Information › App
-Store Server Notifications** to `https://lively.ian.sh/v1/appstore/notifications`,
+Store Server Notifications** to `https://lively.cautela.hk/v1/appstore/notifications`,
 Version 2, for both Production and Sandbox.
 
 ### Google Play subscriptions
@@ -292,7 +292,7 @@ working.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `EMAIL_FROM` | `login@x.ian.sh` | sender address |
+| `EMAIL_FROM` | `login@lively.cautela.hk` | sender address |
 | `CODE_TTL_SECONDS` | 600 | how long a code works |
 | `CODE_MAX_ATTEMPTS` | 5 | guesses per code |
 | `CODES_PER_EMAIL_PER_HOUR` | 5 | codes sent to one address per hour |
@@ -309,7 +309,7 @@ so a copy of the database can't sign anyone in.
 Mail goes out through [Cloudflare Email
 Service](https://developers.cloudflare.com/email-service/) via the
 `send_email` binding `EMAIL`. Sending to any address needs the Workers Paid
-plan, and `EMAIL_FROM`'s domain (`x.ian.sh`) must be onboarded under Email Service ›
+plan, and `EMAIL_FROM`'s domain (`lively.cautela.hk`) must be onboarded under Email Service ›
 Sending in the dashboard, which adds its SPF and DKIM records. `wrangler dev`
 doesn't send: it logs each message and saves its text under `.wrangler/tmp/email/`.
 
@@ -319,10 +319,11 @@ are refunded. A cron job at :17 every hour deletes expired counters, codes and s
 
 ## Pages
 
-The Worker also serves the App Store's required pages: `/privacy`, `/support`
-and `/terms`. Each gives `support@lively.ian.sh` as the contact. Mail to it
-needs Cloudflare Email Routing on the `ian.sh` zone (Email › Email Routing ›
-Routing rules), forwarding `support@lively.ian.sh` to a real inbox.
+The Worker also serves `/` and the App Store's required pages: `/privacy`,
+`/support`, `/terms`, and `/delete-account`. Each gives `support@lively.cautela.hk` as the contact. Mail to it
+needs Cloudflare Email Routing on the `cautela.hk` zone (Email › Email Routing ›
+Routing rules), with the `lively.cautela.hk` subdomain onboarded and
+`support@lively.cautela.hk` forwarded to the existing verified support inbox.
 
 ## Develop
 
@@ -345,11 +346,16 @@ Cloudflare's bot check turns away some generic clients, such as Python's
 
 ## Deploy
 
-The broker runs at **https://lively.ian.sh**, a Workers custom domain on the
-`ian.sh` zone, on the Cloudflare account for ian@cautela.us (account
+The broker runs at **https://lively.cautela.hk**, a Workers custom domain on the
+`cautela.hk` zone, on the Cloudflare account for ian@cautela.us (account
 `1020dc9a8bd7a82cd0801975a100d3ee`). The D1 database `lively-key-broker` is in
 WNAM. Smart Placement runs the Worker near D1 and Soniox's API, so a caller in
 Asia makes one long round trip instead of one per upstream call.
+
+The previous `lively.ian.sh` custom domain remains attached to the same Worker
+and database for installed TestFlight builds. Its public document pages redirect
+to `lively.cautela.hk`; API calls stay on their original host so authenticated
+requests preserve their headers. New builds use only the Cautela endpoint.
 
 ### Automatic
 
@@ -391,7 +397,7 @@ The app reads the URL from `LIVELY_KEY_BROKER_URL` in `Lively.xcodeproj`
 
 `*.workers.dev` is often blocked or slow in mainland China, so the app uses the
 custom domain (`routes` in `wrangler.jsonc`). Once a route is set, the
-`workers.dev` URL is turned off. Whether `ian.sh` is reachable from mainland
+`workers.dev` URL is turned off. Whether `lively.cautela.hk` is reachable from mainland
 China hasn't been tested.
 
 In the Soniox console, set a budget on the account that owns the key. It's the

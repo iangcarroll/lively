@@ -27,5 +27,5 @@ Lively Pro is an optional auto-renewing subscription. Payment is charged to your
 
 Online translation sends audio or text to the selected providers. On-device mode processes supported speech and text locally; the spoken-voice setting is separate. See the privacy policy for details.
 
-Terms of Use: https://lively.ian.sh/terms
-Privacy Policy: https://lively.ian.sh/privacy
+Terms of Use: https://lively.cautela.hk/terms
+Privacy Policy: https://lively.cautela.hk/privacy

@@ -73,7 +73,7 @@ Open `android/` in Android Studio, or:
 cd android && ./gradlew :app:installDebug
 ```
 
-The key broker URL is `https://lively.ian.sh`; override it with
+The key broker URL is `https://lively.cautela.hk`; override it with
 `-PlivelyKeyBrokerUrl=…` (empty means Soniox needs a key in Settings).
 
 ### Launch options

@@ -13,7 +13,11 @@
   "placement": { "mode": "smart" },
   // The app uses this rather than *.workers.dev, which is often blocked in
   // mainland China.
-  "routes": [{ "pattern": "lively.ian.sh", "custom_domain": true }],
+  "routes": [
+    { "pattern": "lively.cautela.hk", "custom_domain": true },
+    // Keep installed TestFlight builds working during the domain migration.
+    { "pattern": "lively.ian.sh", "custom_domain": true }
+  ],
   // Deletes expired rate-limit counters.
   "triggers": { "crons": ["17 * * * *"] },
   "d1_databases": [
@@ -53,7 +57,7 @@
     // Comma-separated hashed install IDs. The D1 `denylist` table works too.
     "DENYLIST": "",
     // Email sign-in.
-    "EMAIL_FROM": "login@x.ian.sh",
+    "EMAIL_FROM": "login@lively.cautela.hk",
     "CODE_TTL_SECONDS": "600",
     "CODE_MAX_ATTEMPTS": "5",
     "CODES_PER_EMAIL_PER_HOUR": "5",
