@@ -535,6 +535,64 @@ nonisolated enum AudioSessionUsers {
         print("PASS: private fallback rejects public/mixed routes, mutes queued audio off-main, drops disconnected PCM, revalidates reconnects and activation, and preserves ordinary public playback")
     }
 
+    @MainActor static func concurrentMicFallback() async throws {
+        let session = AVAudioSession.sharedInstance()
+        let headphones = AVAudioSessionPortDescription(uid: "fallback-headphones", type: .bluetoothA2DP, channels: 2)
+        for output: SpeechPlayer.Output in [.headphones, .speaker] {
+            AudioSessionUsers.directionalSpeechEnabled = true
+            AudioSessionUsers.directionalSpeechUnavailable = false
+            AudioSessionUsers.activationFailures = 0
+            setRoute(headphones: true)
+            let activations = OSAllocatedUnfairLock(initialState: 0)
+            let fallbackEntered = DispatchSemaphore(value: 0)
+            let finishMicActivation = DispatchSemaphore(value: 0)
+            let micFinished = DispatchSemaphore(value: 0)
+            let micRecovered = OSAllocatedUnfairLock(initialState: false)
+            AudioSessionUsers.onBegin = {
+                let first = activations.withLock { count in count += 1; return count == 1 }
+                if first {
+                    // MicCapture can retry from its lifecycle queue after a
+                    // failed reactivation. Use the actual retry implementation
+                    // and pause its closure after it latches the ordinary mode,
+                    // before the mic's activation reaches the session queue.
+                    DispatchQueue.global().async {
+                        let recovered = AudioSessionUsers.retryWithoutDirectionalSpeech {
+                            fallbackEntered.signal()
+                            finishMicActivation.wait()
+                            try AudioSessionUsers.reactivate()
+                        }
+                        micRecovered.withLock { $0 = recovered }
+                        micFinished.signal()
+                    }
+                    precondition(fallbackEntered.wait(timeout: .now() + 1) == .success,
+                                 "mic fallback did not reach the controlled activation boundary")
+                } else if session.category == .playAndRecord {
+                    session.currentRoute = AVAudioSessionRouteDescription(outputs: [headphones])
+                }
+            }
+            do {
+                let player = SpeechPlayer()
+                let ready = try await player.prepare(output: output)
+                precondition(ready && session.category == .playAndRecord && session.mode == .default,
+                             "concurrent mic fallback bound speech before ordinary session activation")
+                precondition(AudioSessionUsers.activationAttempts == [true, false],
+                             "concurrent mic fallback did not verify ordinary activation exactly once")
+                player.play(Data([17, 0]))
+                precondition(AVAudioPlayerNode.last!.buffers == [[Float(17) / 32768]],
+                             "concurrent mic fallback did not play the new sentence")
+                finishMicActivation.signal()
+                precondition(micFinished.wait(timeout: .now() + 1) == .success && micRecovered.withLock { $0 },
+                             "concurrent mic fallback did not finish its independent activation")
+                AudioSessionUsers.onBegin = nil
+                player.stop()
+            }
+            precondition(AudioSessionUsers.users.isEmpty)
+        }
+        AudioSessionUsers.directionalSpeechUnavailable = false
+        setRoute(headphones: true)
+        print("PASS: background mic fallback reactivates ordinary speech before readiness and playback")
+    }
+
     @MainActor static func activationRecovery() async throws {
         let session = AVAudioSession.sharedInstance()
         let headphones = AVAudioSessionPortDescription(uid: "preview-headphones", type: .bluetoothA2DP, channels: 2)
@@ -673,6 +731,7 @@ nonisolated enum AudioSessionUsers {
         try await directionalPlayback()
         try await privateFallbackPlayback()
         try await activationRecovery()
+        try await concurrentMicFallback()
         #else
         precondition(!SpeechPlayer.supportsDirectionalOutput, "macOS unexpectedly enabled iOS directional routing")
         #endif

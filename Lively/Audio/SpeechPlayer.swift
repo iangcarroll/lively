@@ -126,9 +126,10 @@ final class SpeechPlayer {
         do {
             try activateSession()
             // Settings may have selected the ordinary session while activation
-            // waited on the audio-session queue. That is not a route failure.
+            // waited on the audio-session queue, or the mic may have begun its
+            // fallback on another queue. Verify the new session before binding.
             if !AudioSessionUsers.directionalSpeechEnabled || !Self.supportsDirectionalOutput {
-                return bindOrdinaryOutput(for: requested)
+                return try prepareOrdinaryOutput(for: requested)
             }
             #if os(iOS)
             if #available(iOS 26.2, *) {

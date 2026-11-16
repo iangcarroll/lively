@@ -80,6 +80,12 @@ def main():
                 ("expired-fallback-skips-activation", "holdsSession && usesAutomaticFallback != wantsDirectional",
                  "usesAutomaticFallback != wantsDirectional",
                  "expired fallback skipped activation and claimed readiness after a new activation failure"),
+                ("concurrent-mic-fallback-skips-activation",
+                 "if !AudioSessionUsers.directionalSpeechEnabled || !Self.supportsDirectionalOutput {\n"
+                 "                return try prepareOrdinaryOutput(for: requested)\n            }\n            #if os(iOS)",
+                 "if !AudioSessionUsers.directionalSpeechEnabled || !Self.supportsDirectionalOutput {\n"
+                 "                return bindOrdinaryOutput(for: requested)\n            }\n            #if os(iOS)",
+                 "concurrent mic fallback bound speech before ordinary session activation"),
             ]
             for name, old, new, expected in controls:
                 if source.count(old) != 1:
