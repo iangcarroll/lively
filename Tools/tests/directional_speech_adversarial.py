@@ -28,11 +28,16 @@ def method(source, name):
 
 def settings_source(root, disable_routing_change=False):
     shared = Path(__file__).with_name("DirectionalSpeechRegression.swift").read_text()
-    mocks = shared.split("final class Utterance", 1)[0]
+    boundary = "// END_SHARED_DIRECTIONAL_DEPENDENCIES"
+    if shared.count(boundary) != 1:
+        raise RuntimeError("Expected one shared directional dependency boundary")
+    mocks = shared.split(boundary, 1)[0]
     settings = (root / "Lively/Model/AppSettings.swift").read_text()
     settings = settings.replace("UserDefaults.standard", "TestDefaults.standard").replace("private init()", "init()")
     for marker, source in [
         ("// INSERT_ACTUAL_LANGUAGE", (root / "Lively/Model/Language.swift").read_text()),
+        ("// INSERT_ACTUAL_FILLER", (root / "Lively/Model/Filler.swift").read_text()),
+        ("// INSERT_ACTUAL_UTTERANCE", (root / "Lively/Model/Utterance.swift").read_text()),
         ("// INSERT_ACTUAL_SETTINGS", settings),
         ("// INSERT_ACTUAL_SPEAKER", (root / "Lively/Networking/SonioxSpeaker.swift").read_text()),
         ("// INSERT_ACTUAL_TRANSLATION_SPEAKER", (root / "Lively/Networking/TranslationSpeaker.swift").read_text()),
@@ -43,7 +48,7 @@ def settings_source(root, disable_routing_change=False):
     store = (root / "Lively/Model/ConversationStore.swift").read_text()
     methods = "\n".join(method(store, name) for name in [
         "setSpeaksTranslations", "speechSettingChanged", "speechRoutingDidChange",
-        "speak", "activeSpeaker", "completeSentences",
+        "speak", "activeSpeaker", "completeSentences", "canUseAutomaticTurn",
     ])
     if disable_routing_change:
         methods = methods.replace(method(store, "speechRoutingDidChange"), "    func speechRoutingDidChange() {}")

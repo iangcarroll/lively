@@ -7,8 +7,10 @@ struct SpeechProvider {
 }
 enum ProviderCredential { case mistral }
 enum SpeechSource { case original, downloaded }
+enum ConversationMode { case automatic, pair }
 final class AppSettings {
     var provider = SpeechProvider(id: "cloud")
+    var conversationMode = ConversationMode.pair
     var languages = LanguagePair(first: .english, second: Language("fr"))
     var chineseScript = ChineseScript.simplified
     var translationModel = "test"
@@ -122,6 +124,13 @@ final class ConversationStore {
     var utterances: [Utterance] = []
     var isOnline = true
     var isUsingOnDevice = false
+    // This suite retains its explicit offline pair contract. Automatic mode
+    // uses the separate actual-method automatic conversation regression.
+    let isAutomaticLanguageMode = false
+    var listenerLanguage = Language.english
+    var detectedPartnerLanguage: Language?
+    var automaticSessionID = UUID()
+    var automaticLastActivity = Date()
     var demo: String?
     var translator: (any TranslationService)?
     var translations: [UUID: Task<Void, Never>] = [:]
@@ -137,6 +146,8 @@ final class ConversationStore {
     func speak(_ utterance: Utterance, stable: String, complete: Bool) { speechCompletions += 1 }
     func setSpeaksTranslations(_ on: Bool) { settings.speaksTranslations = on }
     func refreshStatus() {}
+    func expireAutomaticContext(at now: Date) {}
+    func canUseAutomaticTurn(_ utterance: Utterance) -> Bool { false }
     func chooseSpeaker() -> (any TranslationSpeaker)? { activeSpeaker() }
     func changeNetwork(_ online: Bool) { setPath(online: online, interface: .wifi) }
     func translateSpeech(_ text: String) -> Utterance {

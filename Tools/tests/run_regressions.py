@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run audio, offline language, and translation regressions with Xcode on macOS."""
+"""Run audio, address, offline language, and translation regressions on macOS."""
 
 import argparse
 from pathlib import Path
@@ -16,9 +16,20 @@ def main():
     root = Path(__file__).resolve().parents[2]
 
     suites = [
+        ("address_lookup_regression.py", ["--negative-controls"]),
+        ("address_verification_regression.py", ["--negative-controls"]),
         ("conversation_startup_regression.py", ["--negative-controls"]),
+        ("listening_prompt_regression.py", ["--negative-controls"]),
+        ("automatic_settings_regression.py", ["--negative-controls"]),
+        ("online_conversation_regression.py", ["--negative-controls"]),
+        ("soniox_language_regression.py", ["--negative-controls"]),
+        ("automatic_soniox_regression.py", ["--negative-controls"]),
+        ("automatic_conversation_regression.py", ["--negative-controls"]),
+        ("online_protocol_regression.py", ["--negative-controls"]),
+        ("socket_lifecycle_regression.py", ["--negative-controls"]),
+        ("socket_replay_regression.py", ["--negative-controls"]),
         ("directional_speech_regression.py", ["--negative-controls"]),
-        ("test_speech_player.py", []),
+        ("test_speech_player.py", ["--negative-controls"]),
         ("directional_speech_adversarial.py", ["--negative-controls"]),
         ("audio_session_regression.py", ["--negative-controls"]),
         ("hybrid_offline_regression.py", ["--negative-controls"]),
@@ -31,11 +42,15 @@ def main():
         ("voice_preview_lifecycle_regression.py", ["--negative-controls"]),
     ]
     for name, options in suites:
-        if args.thread_sanitizer and name in {"neural_voice_packs_regression.py", "neural_speaker_regression.py", "voice_preview_lifecycle_regression.py"}:
+        if args.thread_sanitizer and name in {"test_speech_player.py", "neural_voice_packs_regression.py", "neural_speaker_regression.py", "voice_preview_lifecycle_regression.py"}:
             options = [*options, "--thread-sanitizer"]
         print(f"Running {name}", flush=True)
+        # Speech fault controls exercise real drain and playback deadlines.
+        timed_suites = {"socket_lifecycle_regression.py", "socket_replay_regression.py", "online_conversation_regression.py",
+                        "online_protocol_regression.py", "automatic_conversation_regression.py"}
+        suite_timeout = 420 if name in timed_suites else 180
         subprocess.run([sys.executable, str(root / "Tools/tests" / name), *options],
-                       cwd=root, check=True, timeout=180)
+                       cwd=root, check=True, timeout=suite_timeout)
 
     with tempfile.TemporaryDirectory(prefix="lively-audio-lifecycle-") as directory:
         work = Path(directory)

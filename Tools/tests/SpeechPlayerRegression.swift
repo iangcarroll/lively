@@ -169,7 +169,8 @@ nonisolated func AudioUnitSetProperty(_ unit: AudioUnit, _ property: UInt32, _ s
 nonisolated enum AudioSessionUsers {
     enum User: Hashable { case speech }
     nonisolated(unsafe) static var users: Set<User> = []
-    static func begin(_ user: User) throws { users.insert(user) }
+    nonisolated(unsafe) static var onBegin: (@Sendable () -> Void)?
+    static func begin(_ user: User) throws { users.insert(user); onBegin?() }
     nonisolated(unsafe) static var directionalSpeechUnavailable = false
     static func markDirectionalSpeechUnavailable() { directionalSpeechUnavailable = true }
     static func end(_ user: User) {
@@ -356,12 +357,149 @@ nonisolated enum AudioSessionUsers {
         precondition(AudioSessionUsers.users.isEmpty)
         print("PASS: private route availability, directional maps, playback drain, cancellation, stop invalidation, immediate disconnect muting, reconnection, map failure fallback")
     }
+
+    @MainActor static func privateFallbackPlayback() async throws {
+        let session = AVAudioSession.sharedInstance()
+        let headphones = AVAudioSessionPortDescription(uid: "ordinary-airpods", type: .bluetoothA2DP, channels: 2)
+        let speaker = AVAudioSessionPortDescription(uid: "phone", type: .builtInSpeaker, channels: 2)
+        let invalidRoutes: [[AVAudioSessionPortDescription]] = [
+            [], [speaker], [speaker, headphones],
+            [AVAudioSessionPortDescription(uid: "empty-headset", type: .headphones, channels: 0)],
+            [headphones, AVAudioSessionPortDescription(uid: "unknown", type: .builtInMic, channels: 1)],
+        ]
+        AudioSessionUsers.directionalSpeechUnavailable = true
+        session.category = .playAndRecord
+        session.mode = .default
+        for route in invalidRoutes {
+            session.currentRoute = AVAudioSessionRouteDescription(outputs: route)
+            let player = SpeechPlayer()
+            let accepted = try await player.prepare(output: .headphones)
+            precondition(!accepted, "ordinary private fallback accepted an empty, public, mixed, or unverified output")
+            player.play(Data([1, 0]))
+            precondition(AVAudioPlayerNode.last!.buffers.isEmpty, "rejected private fallback scheduled PCM")
+        }
+        precondition(AudioSessionUsers.users.isEmpty)
+
+        for failedMap in [false, true] {
+            AudioSessionUsers.directionalSpeechUnavailable = !failedMap
+            session.category = failedMap ? .multiRoute : .playAndRecord
+            session.mode = failedMap ? .dualRoute : .default
+            session.currentRoute = AVAudioSessionRouteDescription(outputs: [headphones])
+            MockAudioUnit.failNextMap = failedMap
+            do {
+                let player = SpeechPlayer()
+                let accepted = try await player.prepare(output: .headphones)
+                precondition(accepted && !SpeechPlayer.supportsDirectionalOutput,
+                             "private ordinary playback was not prepared after dual-route unavailability")
+                let node = AVAudioPlayerNode.last!
+                let mixer = AVAudioEngine.last!.mainMixerNode
+                player.play(Data([1, 0])); player.play(Data([2, 0]))
+                precondition(node.buffers.count == 2 && !player.mutesMic,
+                             "verified A2DP fallback did not queue private audio without muting the mic")
+                session.currentRoute = AVAudioSessionRouteDescription(outputs: [speaker])
+                var preparing = false, prepareFinished = false, prepareCancelled = false
+                let waitingPreparation = Task { @MainActor in
+                    preparing = true
+                    do { _ = try await player.prepare(output: .headphones) }
+                    catch is CancellationError { prepareCancelled = true }
+                    prepareFinished = true
+                }
+                for _ in 0..<100 {
+                    if preparing { break }
+                    await Task.yield()
+                }
+                precondition(preparing && !prepareFinished,
+                             "reprepare did not wait for the already queued private PCM")
+                let postReturned = DispatchSemaphore(value: 0)
+                DispatchQueue.global().async {
+                    NotificationCenter.default.post(name: AVAudioSession.routeChangeNotification, object: session)
+                    postReturned.signal()
+                }
+                precondition(postReturned.wait(timeout: .now() + 1) == .success,
+                             "fallback disconnect notification waited for blocked main actor")
+                precondition(mixer.outputVolume == 0,
+                             "ordinary fallback left queued private PCM audible before the main actor handled disconnect")
+                for _ in 0..<100 {
+                    if prepareFinished { break }
+                    try await Task.sleep(for: .milliseconds(10))
+                }
+                precondition(prepareFinished && prepareCancelled,
+                             "muted private PCM left reprepare waiting indefinitely for a drain")
+                _ = await waitingPreparation.result
+                player.play(Data([3, 0]))
+                precondition(node.buffers.isEmpty,
+                             "ordinary fallback scheduled or retained private PCM on the phone speaker")
+                for _ in 0..<10 { await Task.yield() }
+                session.currentRoute = AVAudioSessionRouteDescription(outputs: [headphones])
+                player.play(Data([4, 0]))
+                precondition(node.buffers.isEmpty && mixer.outputVolume == 0,
+                             "an unverified reconnect resumed private PCM automatically")
+                let reconnected = try await player.prepare(output: .headphones)
+                precondition(reconnected && mixer.outputVolume == 1,
+                             "verified ordinary headphone reconnection did not restore playback")
+                player.play(Data([5, 0]))
+                precondition(node.buffers == [[Float(5) / 32768]],
+                             "reconnected fallback retained old private PCM or failed to play new speech")
+                // A replacement private device still needs its own verified
+                // binding, even if a route-change notification was delayed.
+                session.currentRoute = AVAudioSessionRouteDescription(outputs: [
+                    AVAudioSessionPortDescription(uid: "replacement", type: .bluetoothA2DP, channels: 2),
+                ])
+                player.play(Data([6, 0]))
+                precondition(node.buffers.isEmpty, "a changed private port bypassed route revalidation")
+                player.stop()
+            }
+            precondition(AudioSessionUsers.users.isEmpty)
+        }
+
+        // Ordinary session activation may change the route without first
+        // delivering a notification. Validate again after begin/start.
+        AudioSessionUsers.directionalSpeechUnavailable = true
+        session.currentRoute = AVAudioSessionRouteDescription(outputs: [headphones])
+        do {
+            let player = SpeechPlayer()
+            let ready = try await player.prepare(output: .headphones)
+            precondition(ready)
+            AudioSessionUsers.onBegin = {
+                session.currentRoute = AVAudioSessionRouteDescription(outputs: [speaker])
+            }
+            player.play(Data([7, 0]))
+            AudioSessionUsers.onBegin = nil
+            precondition(AVAudioPlayerNode.last!.buffers.isEmpty,
+                         "session activation moved private fallback PCM onto a public route")
+        }
+        precondition(AudioSessionUsers.users.isEmpty)
+
+        // Public replies retain the ordinary route fallback. Microphone echo
+        // suppression follows that actual route rather than the requested one.
+        session.currentRoute = AVAudioSessionRouteDescription(outputs: [headphones])
+        do {
+            let player = SpeechPlayer()
+            let ready = try await player.prepare(output: .speaker)
+            precondition(ready, "ordinary public fallback was rejected")
+            player.play(Data([8, 0]))
+            precondition(!player.mutesMic, "ordinary headphone output unnecessarily muted the mic")
+            session.currentRoute = AVAudioSessionRouteDescription(outputs: [speaker])
+            NotificationCenter.default.post(name: AVAudioSession.routeChangeNotification, object: session)
+            player.play(Data([9, 0]))
+            precondition(AVAudioPlayerNode.last!.buffers.count == 2 && player.mutesMic,
+                         "ordinary public replies lost fallback playback or microphone echo suppression")
+            player.stop()
+        }
+        precondition(AudioSessionUsers.users.isEmpty)
+        AudioSessionUsers.directionalSpeechUnavailable = false
+        session.category = .multiRoute
+        session.mode = .dualRoute
+        setRoute(headphones: true)
+        print("PASS: private fallback rejects public/mixed routes, mutes queued audio off-main, drops disconnected PCM, revalidates reconnects and activation, and preserves ordinary public playback")
+    }
     #endif
 
     @MainActor static func main() async throws {
         channelMaps()
         #if LIVELY_AUDIO_ROUTING_TEST
         try await directionalPlayback()
+        try await privateFallbackPlayback()
         #else
         precondition(!SpeechPlayer.supportsDirectionalOutput, "macOS unexpectedly enabled iOS directional routing")
         #endif
