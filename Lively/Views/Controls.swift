@@ -166,12 +166,12 @@ struct StatusPill: View {
     }
 }
 
-/// Stays beside the transcript controls after the empty-state guidance is gone.
-/// Both readers can see that they can speak without touching the microphone.
+/// A bilingual reminder beside the transcript controls, briefly shown when
+/// listening starts or the phone is handed to another reader.
 struct TranscriptListeningStatus: View {
-    let status: ConversationStore.ConnectionStatus
-    let isListening: Bool
-    let languages: LanguagePair
+    let store: ConversationStore
+    private var status: ConversationStore.ConnectionStatus { store.status }
+    private var isListening: Bool { store.isListening }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -180,10 +180,21 @@ struct TranscriptListeningStatus: View {
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(prompt(in: languages.first))
+                Text(prompt(in: store.isAutomaticLanguageMode ? store.listenerLanguage : AppSettings.shared.languages.first))
                     .foregroundStyle(.primary)
-                Text(prompt(in: languages.second))
-                    .foregroundStyle(languages.second.ink)
+                if store.isAutomaticLanguageMode {
+                    if !store.isOnline {
+                        Text("Automatic detection needs internet").foregroundStyle(.secondary)
+                    } else if let partner = store.detectedPartnerLanguage {
+                        Text(prompt(in: partner)).foregroundStyle(partner.ink)
+                    } else {
+                        Text(isListening ? "Listening for another language" : "Other language · Automatic")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(prompt(in: AppSettings.shared.languages.second))
+                        .foregroundStyle(AppSettings.shared.languages.second.ink)
+                }
             }
             .font(.headline)
             .fixedSize(horizontal: false, vertical: true)
@@ -287,7 +298,7 @@ struct SpeakAloudButton: View {
 /// text in a photo, such as a sign or a menu, and translates it the same way.
 struct TypeToTranslateBar: View {
     let store: ConversationStore
-    let languages: LanguagePair
+    let languages: LanguagePair?
     /// The typist's language, for text that could be either.
     let language: Language
     var script: ChineseScript = AppSettings.shared.chineseScript
@@ -298,7 +309,7 @@ struct TypeToTranslateBar: View {
     var onClose: () -> Void
 
     init(
-        store: ConversationStore, languages: LanguagePair, language: Language,
+        store: ConversationStore, languages: LanguagePair?, language: Language,
         editing: Binding<Utterance?> = .constant(nil), focused: FocusState<Bool>.Binding,
         onClose: @escaping () -> Void
     ) {

@@ -9,7 +9,7 @@ struct LivelyWidgets: WidgetBundle {
 }
 
 /// Starts a conversation from the home or lock screen: tapping opens Lively
-/// and starts listening. It shows the language pair chosen in the app.
+/// and starts listening. It shows the saved language mode chosen in the app.
 struct LivelyWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: WidgetLanguages.widgetKind, provider: LanguagesProvider()) { entry in
@@ -108,18 +108,18 @@ struct LivelyWidgetView: View {
             Text(languages.firstName)
                 .foregroundStyle(Color(.firstLanguageInk))
             HStack(spacing: 4) {
-                Image(systemName: "arrow.left.arrow.right")
+                Image(systemName: languages.isAutomatic ? "globe" : "arrow.left.arrow.right")
                     .imageScale(.small)
                     .foregroundStyle(.secondary)
                 Text(languages.secondName)
-                    .foregroundStyle(Color(.secondLanguageInk))
+                    .foregroundStyle(languages.isAutomatic ? Color.secondary : Color(.secondLanguageInk))
             }
         }
         .font(font)
         .lineLimit(1)
         .minimumScaleFactor(0.7)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(languages.firstName) and \(languages.secondName)")
+        .accessibilityLabel(languageDescription)
     }
 
     // MARK: - Lock screen
@@ -131,7 +131,7 @@ struct LivelyWidgetView: View {
                 Image(systemName: "mic.fill")
                     .font(.title3.weight(.semibold))
                     .widgetAccentable()
-                Text("\(languages.firstTag)⇄\(languages.secondTag)")
+                Text(shortDescription)
                     .font(.system(size: 10, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -139,7 +139,7 @@ struct LivelyWidgetView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Translate \(languages.firstName) and \(languages.secondName)")
+        .accessibilityLabel(languageDescription)
     }
 
     private var rectangular: some View {
@@ -147,7 +147,7 @@ struct LivelyWidgetView: View {
             Label("Lively", systemImage: "mic.fill")
                 .font(.headline)
                 .widgetAccentable()
-            Text("\(languages.firstName) ⇄ \(languages.secondName)")
+            Text("\(languages.firstName) \(languages.isAutomatic ? "·" : "⇄") \(languages.secondName)")
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text("Tap to translate")
@@ -157,7 +157,17 @@ struct LivelyWidgetView: View {
     }
 
     private var inline: some View {
-        Label("\(languages.firstTag) ⇄ \(languages.secondTag)", systemImage: "mic.fill")
+        Label(shortDescription, systemImage: "mic.fill")
+    }
+
+    private var shortDescription: String {
+        "\(languages.firstTag) \(languages.isAutomatic ? "·" : "⇄") \(languages.secondTag)"
+    }
+
+    private var languageDescription: String {
+        languages.isAutomatic
+            ? "Automatic language detection. Your language: \(languages.firstName)"
+            : "Translate \(languages.firstName) and \(languages.secondName)"
     }
 }
 

@@ -15,6 +15,16 @@ struct OfflineLanguagesView: View {
         let requestID = packs.translationRequestID
         Form {
             Section {
+                Picker("Input language", selection: $settings.offlineSpokenLanguage) {
+                    ForEach(settings.languages.all) { language in
+                        Text(language.pickerName).tag(language)
+                    }
+                }
+            } footer: {
+                Text("Online speech detects both conversation languages automatically. On-device speech listens for the input language selected here, including during an internet outage.")
+            }
+
+            Section {
                 ForEach(packs.components) { component in
                     LabeledContent(component.title, value: component.state.rawValue)
                 }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// First launch: a short, mostly visual tour. It shows Lively working
-/// instead of describing it, picks the two languages, and offers sign-in.
+/// instead of describing it, saves language preferences, and offers sign-in.
 struct OnboardingView: View {
     @Bindable var settings: AppSettings
     var onFinish: () -> Void
@@ -222,24 +222,47 @@ private struct TablePage: View {
 private struct LanguagesPage: View {
     @Bindable var settings: AppSettings
     @State private var choosing: LanguageSide?
+    @State private var choosingOwn = false
 
     var body: some View {
         OnboardingPage(
-            title: "Pick your languages",
-            message: "Lively listens for both and translates each into the other. You can change them any time."
+            title: settings.usesAutomaticLanguageDetection ? "Choose your language" : "Pick your languages",
+            message: settings.usesAutomaticLanguageDetection
+                ? "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection uses internet."
+                : "Lively listens for both and translates each into the other. You can change them any time."
         ) {
-            VStack(spacing: -14) {
-                LanguageCard(caption: "You speak", language: settings.languages.first, ink: Color(.firstLanguageInk)) {
-                    choosing = .first
-                }
-                swapButton.zIndex(1)
-                LanguageCard(caption: "They speak", language: settings.languages.second, ink: Color(.secondLanguageInk)) {
-                    choosing = .second
+            VStack(spacing: settings.usesAutomaticLanguageDetection ? 14 : -14) {
+                if settings.usesAutomaticLanguageDetection {
+                    LanguageCard(caption: "Your language", language: settings.speechListenerLanguage, ink: Color(.firstLanguageInk)) {
+                        choosingOwn = true
+                    }
+                    HStack(spacing: 14) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Other language").font(.subheadline.weight(.medium))
+                            Text("Automatic")
+                                .font(.system(.title, design: .rounded, weight: .bold))
+                            Text("Detected when they speak").font(.subheadline)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "globe").font(.title2)
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 22)
+                    .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+                    .background(Color(.card), in: .rect(cornerRadius: 28, style: .continuous))
+                } else {
+                    LanguageCard(caption: "You speak", language: settings.languages.first, ink: Color(.firstLanguageInk)) {
+                        choosing = .first
+                    }
+                    swapButton.zIndex(1)
+                    LanguageCard(caption: "They speak", language: settings.languages.second, ink: Color(.secondLanguageInk)) {
+                        choosing = .second
+                    }
                 }
             }
             .padding(.horizontal, 24)
             .overlay(alignment: .bottom) {
-                if settings.languages.contains(.chinese) {
+                if !settings.usesAutomaticLanguageDetection && settings.languages.contains(.chinese) {
                     Picker("Chinese script", selection: $settings.chineseScript) {
                         ForEach(ChineseScript.allCases) { Text($0.label).tag($0) }
                     }
@@ -257,6 +280,17 @@ private struct LanguagesPage: View {
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel", systemImage: "xmark") { choosing = nil }
+                        }
+                    }
+            }
+            .presentationDetents([.large])
+        }
+        .sheet(isPresented: $choosingOwn) {
+            NavigationStack {
+                OwnLanguageList(settings: settings)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel", systemImage: "xmark") { choosingOwn = false }
                         }
                     }
             }

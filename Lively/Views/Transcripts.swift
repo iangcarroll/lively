@@ -34,13 +34,17 @@ struct ChatTranscript: View {
 struct ParallelTranscript: View {
     let store: ConversationStore
     var onEdit: (Utterance) -> Void = { _ in }
-    var languages: LanguagePair { AppSettings.shared.languages }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                header(languages.first)
-                header(languages.second)
+                if store.isAutomaticLanguageMode {
+                    header(store.listenerLanguage, role: "Your language")
+                    header(store.detectedPartnerLanguage, role: "Other language")
+                } else {
+                    header(AppSettings.shared.languages.first)
+                    header(AppSettings.shared.languages.second)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
@@ -66,12 +70,15 @@ struct ParallelTranscript: View {
         }
     }
 
-    private func header(_ language: Language) -> some View {
+    private func header(_ language: Language?, role: String? = nil) -> some View {
         HStack(spacing: 8) {
-            Capsule().fill(language.ink).frame(width: 18, height: 4)
-            Text(language.nativeName)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(language.ink)
+            Capsule().fill(language?.ink ?? .secondary).frame(width: 18, height: 4)
+            VStack(alignment: .leading, spacing: 2) {
+                if let role { Text(role).font(.caption).foregroundStyle(.secondary) }
+                Text(language?.nativeName ?? "Automatic")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(language?.ink ?? .secondary)
+            }
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -128,56 +135,81 @@ private struct ParallelRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            cell(utterance.languages.first)
-            cell(utterance.languages.second)
+            if utterance.isAutomatic {
+                if utterance.isSourceOnly {
+                    Color.clear.frame(height: 1).frame(maxWidth: .infinity).accessibilityHidden(true)
+                    cell(utterance.sourceLanguage, role: .partner)
+                } else if utterance.sourceLanguage == nil && utterance.target == nil {
+                    neutralCaption
+                } else {
+                    cell(TranscriptRole.listener.language(in: utterance), role: .listener)
+                    cell(TranscriptRole.partner.language(in: utterance), role: .partner)
+                }
+            } else {
+                cell(utterance.languages.first)
+                cell(utterance.languages.second)
+            }
         }
         .padding(.vertical, 14)
         .animation(.snappy(duration: 0.25), value: utterance.translation)
     }
 
-    private func cell(_ language: Language) -> some View {
-        let spoken = utterance.language == language
-        let text = utterance.text(in: language)
+    private func cell(_ language: Language?, role: TranscriptRole? = nil) -> some View {
+        let spoken = role?.isSource(in: utterance) ?? (utterance.sourceLanguage == language)
+        let text = role?.text(in: utterance) ?? language.map { utterance.text(in: $0) } ?? ""
+        let ink = language?.ink ?? Color.secondary
         return VStack(alignment: .leading, spacing: 6) {
-            LanguageTag(language: language, spoken: spoken)
+            OptionalLanguageTag(language: language, spoken: spoken)
             if text.isEmpty {
-                failureOrDots(language)
+                if utterance.isFinal && !utterance.showsLanguagePrompt && ((spoken && utterance.source.isEmpty) || language == nil) {
+                    Text("—")
+                        .foregroundStyle(.tertiary)
+                        .accessibilityLabel("Original transcript unavailable")
+                } else {
+                    failureOrDots(ink)
+                }
             } else {
                 HStack(alignment: .lastTextBaseline, spacing: 6) {
                     Text(text)
                         .font(.title3.weight(spoken ? .regular : .medium))
-                        .foregroundStyle(spoken ? AnyShapeStyle(.primary) : AnyShapeStyle(language.ink))
+                        .foregroundStyle(spoken ? AnyShapeStyle(.primary) : AnyShapeStyle(ink))
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
-                    if spoken && !utterance.isFinal { TypingDots(color: language.ink) }
+                    if spoken && !utterance.isFinal { TypingDots(color: ink) }
                 }
                 if !spoken { failureOrNothing }
             }
         }
-        .environment(\.locale, language.locale)
+        .environment(\.locale, language?.locale ?? .current)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 2)
         .background {
             if spoken {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(language.ink.opacity(0.06))
+                    .fill(ink.opacity(0.06))
                     .padding(.vertical, -8)
             }
         }
     }
 
     @ViewBuilder
-    private func failureOrDots(_ language: Language) -> some View {
-        switch utterance.translationState {
-        case .failed, .waitingForNetwork: failureOrNothing
-        default: TypingDots(color: language.ink).padding(.top, 6)
+    private func failureOrDots(_ ink: Color) -> some View {
+        if utterance.showsLanguagePrompt {
+            PendingLanguageLabel(utterance: utterance, onTranslate: onRetry)
+        } else {
+            switch utterance.translationState {
+            case .failed, .waitingForNetwork: failureOrNothing
+            default: TypingDots(color: ink).padding(.top, 6)
+            }
         }
     }
 
     @ViewBuilder
     private var failureOrNothing: some View {
         switch utterance.translationState {
+        case .awaitingPartner:
+            PendingLanguageLabel(utterance: utterance, onTranslate: onRetry)
         case .waitingForNetwork:
             Label("Waiting for connection", systemImage: "wifi.slash")
                 .font(.caption).foregroundStyle(.secondary)
@@ -191,35 +223,77 @@ private struct ParallelRow: View {
             EmptyView()
         }
     }
+
+    private var neutralCaption: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            OptionalLanguageTag(language: nil, unknownTitle: utterance.unidentifiedLanguageTitle)
+            Text(utterance.trimmedSource).font(.title3).textSelection(.enabled)
+            PendingLanguageLabel(utterance: utterance, onTranslate: onRetry)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+    }
 }
 
 struct EmptyConversation: View {
-    var isListening: Bool
-    var isConnecting: Bool
-    var languages: LanguagePair { AppSettings.shared.languages }
+    let store: ConversationStore
+    var showsListeningPrompt = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var isListening: Bool { store.isListening }
+    private var isConnecting: Bool { store.isConnecting }
 
     var body: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "bubble.left.and.text.bubble.right")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(.tertiary)
-            VStack(spacing: 6) {
-                Text(prompt(in: languages.first))
-                    .font(.title3.weight(.semibold))
-                Text(prompt(in: languages.second))
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(languages.second.ink)
-            }
-            .contentTransition(.opacity)
-            .animation(.snappy, value: isListening)
-            .animation(.snappy, value: isConnecting)
-            Text("Lively hears \(languages.first.englishName) and \(languages.second.englishName) and translates both ways. No need to say who's speaking.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: 18) {
+                Image(systemName: "bubble.left.and.text.bubble.right")
+                    .font(.system(size: 44, weight: .light))
+                    .foregroundStyle(.tertiary)
+                VStack(spacing: 6) {
+                    Text(prompt(in: store.isAutomaticLanguageMode ? store.listenerLanguage : AppSettings.shared.languages.first))
+                        .font(.title3.weight(.semibold))
+                    if store.isAutomaticLanguageMode {
+                        if let partner = store.detectedPartnerLanguage {
+                            Text(prompt(in: partner)).font(.title3.weight(.semibold)).foregroundStyle(partner.ink)
+                        } else {
+                            Text(isListening ? "Listening for another language" : "Other language · Automatic")
+                                .font(.title3.weight(.semibold)).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text(prompt(in: AppSettings.shared.languages.second))
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(AppSettings.shared.languages.second.ink)
+                    }
+                }
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 320)
+                .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.opacity)
+                .animation(.snappy, value: isListening)
+                .animation(.snappy, value: isConnecting)
+                Text(explanation)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 320)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(32)
+            .frame(maxWidth: .infinity)
+            .opacity(showsListeningPrompt ? 1 : 0)
+            .accessibilityHidden(!showsListeningPrompt)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: showsListeningPrompt)
         }
-        .padding(32)
+        .defaultScrollAnchor(.center, for: .alignment)
+        .scrollIndicators(.hidden)
+    }
+
+    private var explanation: String {
+        if store.isAutomaticLanguageMode {
+            return store.isOnline
+                ? "Just talk. Lively detects the other language and translates both ways. Your side stays in \(store.listenerLanguage.englishName)."
+                : "Automatic detection needs internet. Choose a language pair and the On-device engine in Settings to translate offline."
+        }
+        let languages = AppSettings.shared.languages
+        return "Lively hears \(languages.first.englishName) and \(languages.second.englishName) and translates both ways. No need to say who's speaking."
     }
 
     private func prompt(in language: Language) -> String {

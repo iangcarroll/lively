@@ -2,10 +2,119 @@ import SwiftUI
 
 extension Language {
     /// Every piece of text in this language uses this color, whoever said it,
-    /// so each reader can find their language at a glance. The color follows
-    /// the language's place in the chosen pair.
+    /// so each reader can find their side at a glance. Automatic conversations
+    /// keep the listener's ink fixed while partner languages can change.
     var ink: Color {
-        self == AppSettings.shared.languages.second ? Color(.secondLanguageInk) : Color(.firstLanguageInk)
+        if AppSettings.shared.usesAutomaticLanguageDetection {
+            return self == AppSettings.shared.speechListenerLanguage
+                ? Color(.firstLanguageInk) : Color(.secondLanguageInk)
+        }
+        return self == AppSettings.shared.languages.second ? Color(.secondLanguageInk) : Color(.firstLanguageInk)
+    }
+}
+
+/// Screen orientation follows readers, while every historical turn keeps its
+/// own language. A newly detected partner must not relabel older text.
+enum TranscriptRole: Equatable {
+    case listener, partner
+
+    func language(in utterance: Utterance) -> Language? {
+        guard utterance.sourceLanguage != nil || utterance.target != nil else { return nil }
+        return self == .listener ? utterance.listenerLanguage : utterance.otherLanguage
+    }
+
+    func text(in utterance: Utterance) -> String {
+        if utterance.sourceLanguage == nil && utterance.target == nil { return utterance.trimmedSource }
+        return self == .listener ? utterance.listenerText : utterance.partnerText
+    }
+
+    func isSource(in utterance: Utterance) -> Bool {
+        guard let source = utterance.sourceLanguage else { return false }
+        return self == .listener ? source == utterance.listenerLanguage : source != utterance.listenerLanguage
+    }
+}
+
+extension Utterance {
+    var unidentifiedLanguageTitle: String {
+        isFinal ? "Language not identified" : "Identifying language"
+    }
+
+    var showsLanguagePrompt: Bool {
+        guard !isSourceOnly else { return false }
+        return isAwaitingLanguage || translationState == .awaitingPartner
+            || (isFinal && target != nil && translation.isEmpty && translationState == .idle)
+    }
+
+    var hasTranslationProblem: Bool {
+        switch translationState {
+        case .failed, .waitingForNetwork: true
+        default: false
+        }
+    }
+}
+
+struct OptionalLanguageTag: View {
+    let language: Language?
+    var spoken = false
+    var showsIcon = true
+    var unknownTitle = "Automatic"
+
+    var body: some View {
+        if let language {
+            LanguageTag(language: language, spoken: spoken, showsIcon: showsIcon)
+        } else {
+            Label(unknownTitle, systemImage: "globe")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Color.secondary.opacity(0.08), in: .capsule)
+        }
+    }
+}
+
+/// Waiting for a destination is separate from translating or a network error.
+struct PendingLanguageLabel: View {
+    let utterance: Utterance
+    var onTranslate: (() -> Void)?
+
+    var body: some View {
+        if utterance.isSourceOnly {
+            EmptyView()
+        } else if case .failed = utterance.translationState {
+            if let onTranslate {
+                Button("Retry translation", systemImage: "arrow.clockwise", action: onTranslate)
+                    .font(.caption)
+                    .buttonStyle(.borderless)
+                    .tint(.orange)
+            } else {
+                Label("Translation failed", systemImage: "exclamationmark.circle")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+        } else if utterance.translationState == .waitingForNetwork {
+            Label("Waiting for connection", systemImage: "wifi.slash")
+                .font(.caption).foregroundStyle(.secondary)
+        } else if utterance.sourceLanguage == nil {
+            Label(utterance.unidentifiedLanguageTitle, systemImage: "globe")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if utterance.waitsForAutomaticPartner {
+            Label("Waiting for other language", systemImage: "globe")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if utterance.target == nil {
+            Label(utterance.isFinal ? "Finishing transcript" : "Listening", systemImage: "waveform")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if let onTranslate {
+            Button("Translate", systemImage: "translate", action: onTranslate)
+                .font(.caption)
+                .buttonStyle(.borderless)
+        } else {
+            Text("Ready to translate")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
