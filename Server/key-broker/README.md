@@ -404,6 +404,9 @@ its six-digit review code; the app and repository never contain that code.
 `APP_REVIEW_CODE_HASH` is a Worker secret containing the first 128 bits of
 SHA-256 of `code:<normalized email>:<code>` in lowercase hex (the same format
 as the broker's existing code hashes).
+The deployment workflow copies the GitHub Actions secret of the same name to
+the Worker before deployment; a missing GitHub secret leaves the existing
+Worker secret unchanged. Configure or rotate both together.
 
 Reviewers open Settings → Account, enter the review address, request a code,
 and enter the code in Review Notes. No email is sent for this address. Every
