@@ -23,6 +23,7 @@ def main():
         ("listening_guidance_regression.py", ["--negative-controls"]),
         ("automatic_settings_regression.py", ["--negative-controls"]),
         ("online_conversation_regression.py", ["--negative-controls"]),
+        ("native_translation_ownership_regression.py", ["--negative-controls"]),
         ("soniox_language_regression.py", ["--negative-controls"]),
         ("automatic_soniox_regression.py", ["--negative-controls"]),
         ("automatic_conversation_regression.py", ["--negative-controls"]),

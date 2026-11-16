@@ -609,9 +609,8 @@ final class ConversationStore {
         guard utterance.isFinal, !text.isEmpty, text != utterance.trimmedSource else { return }
         translations.removeValue(forKey: utterance.id)?.cancel()
         debounces.removeValue(forKey: utterance.id)?.cancel()
-        // A translating engine's late update to the segment must not undo the edit.
-        segmentUtterances = segmentUtterances.filter { $0.value !== utterance }
-        catchUpUtterances = catchUpUtterances.filter { $0.value !== utterance }
+        // Keep the native binding so late updates are ignored instead of
+        // creating a second row for the reader's corrected turn.
         utterance.setSource(text, language: utterance.isAutomatic ? utterance.sourceLanguage : nil)
         // The correction belongs to the reader even when retry must wait for
         // an unidentified source language. Late native results cannot undo it.
@@ -734,8 +733,6 @@ final class ConversationStore {
         // A native session may end before its translation arrives. Retry
         // through text translation without allowing a late native overwrite.
         utterance.isTyped = true
-        segmentUtterances = segmentUtterances.filter { $0.value !== utterance }
-        catchUpUtterances = catchUpUtterances.filter { $0.value !== utterance }
         utterance.translatedSource = nil
         utterance.translatedLanguage = nil
         translate(utterance)
@@ -1027,6 +1024,7 @@ final class ConversationStore {
         }
         let utterance: Utterance
         if let existing = segmentUtterances[segment.id] {
+            guard utterances.contains(where: { $0 === existing }), !existing.isTyped else { return }
             utterance = existing
         } else {
             guard !segment.source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -1035,13 +1033,14 @@ final class ConversationStore {
             else { return }
             finalizeCurrent()
             // Earlier segments' translations are complete once a new one starts.
-            // Keep the last one: its translation can still arrive. Catch-up
-            // segments share the id sequence, so ids can skip.
+            // Keep the last one: its translation can still arrive. Edited or
+            // retried turns keep their IDs until the engine retires so late
+            // native updates cannot recreate them. Catch-up IDs can skip.
             let last = segmentUtterances.keys.max()
-            for (id, older) in segmentUtterances where id != last && older.translationState == .working {
+            for (id, older) in segmentUtterances where id != last && older.translationState == .working && !older.isTyped {
                 finishAbandonedTranslation(older)
             }
-            segmentUtterances = segmentUtterances.filter { $0.key == last }
+            segmentUtterances = segmentUtterances.filter { $0.key == last || $0.value.isTyped }
             utterance = Utterance(languages: languages)
             utterances.append(utterance)
             segmentUtterances[segment.id] = utterance
@@ -1063,6 +1062,7 @@ final class ConversationStore {
     private func applyCatchUp(_ segment: SpeechSegment) {
         let utterance: Utterance
         if let existing = catchUpUtterances[segment.id] {
+            guard utterances.contains(where: { $0 === existing }), !existing.isTyped else { return }
             utterance = existing
         } else {
             guard !segment.source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -1070,10 +1070,10 @@ final class ConversationStore {
                     && !segment.translation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             else { return }
             let last = catchUpUtterances.keys.max()
-            for (id, older) in catchUpUtterances where id != last && older.translationState == .working {
+            for (id, older) in catchUpUtterances where id != last && older.translationState == .working && !older.isTyped {
                 finishAbandonedTranslation(older)
             }
-            catchUpUtterances = catchUpUtterances.filter { $0.key == last }
+            catchUpUtterances = catchUpUtterances.filter { $0.key == last || $0.value.isTyped }
             utterance = Utterance(languages: languages)
             utterance.isLate = true
             let index = min(dropoutIndex ?? utterances.count, utterances.count)
@@ -1088,6 +1088,7 @@ final class ConversationStore {
     }
 
     private func show(_ segment: SpeechSegment, in utterance: Utterance) {
+        utterance.usesNativeTranslation = true
         // Detect first, so only Chinese text gets the chosen script; Japanese kanji must not.
         let source = segment.source.trimmingLeadingWhitespace()
         let language = segment.language.flatMap { languages.contains($0) ? $0 : nil }
@@ -1222,7 +1223,8 @@ final class ConversationStore {
         if utterance.needsTranslation {
             debounces.removeValue(forKey: utterance.id)?.cancel()
             translate(utterance)
-        } else if translator != nil, utterance.translationState == .current {
+        } else if translator != nil, utterance.translationState == .current,
+                  !utterance.usesNativeTranslation || utterance.isTyped {
             // Translated while it was spoken. A translating engine's turns
             // are read out as their segments arrive instead.
             speak(utterance, stable: utterance.translation, complete: true)
@@ -1257,6 +1259,9 @@ final class ConversationStore {
     }
 
     private func translate(_ utterance: Utterance) {
+        // Network fallback changes the active text service, not ownership of
+        // retained native segments. Their provider may still finish on replay.
+        guard !utterance.usesNativeTranslation || utterance.isTyped else { return }
         let text = utterance.trimmedSource
         if utterance.isAutomatic, !text.unicodeScalars.contains(where: {
             CharacterSet.letters.contains($0) || CharacterSet.decimalDigits.contains($0)

@@ -53,6 +53,10 @@ final class Utterance: Identifiable {
     /// native translation.
     var isTyped = false
 
+    /// Paired speech segments keep their provider-owned translation until an
+    /// explicit retry or edit selects text translation through `isTyped`.
+    var usesNativeTranslation = false
+
     /// A native event confirmed translated speech before resolving its source.
     var isTranslationOnly = false
 
