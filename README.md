@@ -116,8 +116,16 @@ the pin: before each download the app asks it for the current manifest (the
 revision and every file's size and SHA-256), so the pack can move to a new
 revision without an app release. The manifest a pack was installed from is saved
 beside it, and that is what its files are checked against at startup, so an
-installed pack keeps working offline after the pin moves. A newer pin reaches an
-installed pack when it is removed and downloaded again. The app only accepts a
+installed pack keeps working offline after the pin moves.
+
+When Settings or the voice library opens with a pack installed, the app asks the
+broker for its manifest and compares every file's size and SHA-256 with the
+installed ones. If they differ, Settings shows **Update** on the
+Offline Voice Library row and the library offers **Update voices**. Nothing
+downloads until the user taps it, and the check does nothing offline. The
+installed voices keep working while the update downloads; once the new files are
+verified the model is unloaded and the replaced files are removed. A failed or
+cancelled update leaves the installed pack as it was. The app only accepts a
 manifest with the file layout its runtime loads, and the manifest bundled in the
 app is used for a build without a broker, which downloads from Hugging Face. See
 [Server/key-broker/README.md](Server/key-broker/README.md#offline-voice-packs).

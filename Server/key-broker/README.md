@@ -342,9 +342,10 @@ every file against it, so to move the voices to another revision, replace
 new revision keeps the layout the app's runtime loads (`schemaVersion` 1: the
 same model, G2P and dictionary file names, and a `voices/<id>.json` for each of
 the 54 presets). The app refuses anything else. Installed packs keep the
-manifest they were downloaded with and aren't replaced until the user removes
-and downloads them again. Objects for old revisions stay in the bucket until
-you delete them.
+manifest they were downloaded with. The app compares its checksums with this
+manifest when Settings opens and, if any file differs, offers the user an
+update; it never downloads one unasked. Objects for old revisions stay in the
+bucket until you delete them.
 
 After changing the pin, fill the bucket before users do, so nobody waits on the
 copy of the 82 MB model file:

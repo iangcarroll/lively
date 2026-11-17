@@ -62,6 +62,14 @@ nonisolated struct NeuralVoiceManifest: Codable, Sendable {
         return file.path.split(separator: "/").reduce(root) { $0.appendingPathComponent(String($1)) }
     }
 
+    /// Whether both list the same files with the same sizes and checksums.
+    /// The commit alone doesn't decide it: a new commit can leave them alone.
+    func hasSameFiles(as other: NeuralVoiceManifest) -> Bool {
+        let mine = Dictionary(files.map { ($0.path, "\($0.sha256):\($0.size)") }, uniquingKeysWith: { first, _ in first })
+        let theirs = Dictionary(other.files.map { ($0.path, "\($0.sha256):\($0.size)") }, uniquingKeysWith: { first, _ in first })
+        return mine == theirs
+    }
+
     /// The same `LivelyKeyBrokerURL` that `SonioxKeyProvider` reads.
     static var brokerURL: URL? {
         guard let string = Bundle.main.object(forInfoDictionaryKey: "LivelyKeyBrokerURL") as? String,
@@ -152,6 +160,8 @@ final class NeuralVoicePacks {
     private let bundled: NeuralVoiceManifest?
     /// The pin of the download in progress.
     private var pending: NeuralVoiceManifest?
+    /// The key service's pin, when its checksums differ from the installed files.
+    private var offered: NeuralVoiceManifest?
     private let pin: NeuralVoicePinSource
     private let directory: URL
     private let defaults: UserDefaults
@@ -191,12 +201,15 @@ final class NeuralVoicePacks {
     var isBusy: Bool { status == .checking || status == .downloading || status == .deleting }
     var totalBytes: Int64 { (pending ?? manifest)?.totalBytes ?? 0 }
     var canDownload: Bool { manifest != nil && !isBusy }
+    /// The key service offers different files from the ones installed.
+    var isUpdateAvailable: Bool { offered != nil && isReady }
+    var updateBytes: Int64 { offered?.totalBytes ?? 0 }
     var statusText: String {
         switch status {
         case .notInstalled: "Download needed"
         case .checking: "Checking downloaded files…"
         case .downloading: "Downloading…"
-        case .ready: "All 54 voices available offline"
+        case .ready: isUpdateAvailable ? "Update available" : "All 54 voices available offline"
         case .deleting: "Deleting voice files…"
         case .failed: "Download needs attention"
         }
@@ -233,6 +246,17 @@ final class NeuralVoicePacks {
         // The shared job publishes its own result once. A late cancelled
         // caller must never overwrite the state of a newer verification.
         _ = try? await verifiedInstallation()
+    }
+
+    /// Compares the installed files' checksums with the ones the key service
+    /// offers now. It never downloads: the user chooses to update. Offline,
+    /// or with nothing installed, it changes nothing.
+    func checkForUpdate() async {
+        guard !isDownloading, status != .deleting,
+              let directory = try? await requireInstalledDirectory(), let installed = manifest,
+              let current = try? await pin(), (try? current.validate()) != nil,
+              !isDownloading, installedDirectory == directory else { return }
+        offered = current.hasSameFiles(as: installed) ? nil : current
     }
 
     /// Playback can ask for verified local files, but cannot trigger a download.
@@ -312,7 +336,10 @@ final class NeuralVoicePacks {
         installedDirectory = installed
     }
 
-    func download() {
+    /// Also the update: the installed pack keeps working until the new one
+    /// has been verified, then `beforeRemovingPrevious` unloads the model
+    /// and the replaced files are removed.
+    func download(beforeRemovingPrevious: @escaping @MainActor () async -> Void = {}) {
         guard canDownload else { return }
         let token = UUID()
         operation = token
@@ -321,7 +348,7 @@ final class NeuralVoicePacks {
         error = nil
         progress = 0
         downloadedBytes = 0
-        worker = Task { [weak self] in await self?.runDownload(token) }
+        worker = Task { [weak self] in await self?.runDownload(token, beforeRemovingPrevious: beforeRemovingPrevious) }
     }
 
     func cancel() {
@@ -350,6 +377,7 @@ final class NeuralVoicePacks {
             try await NeuralVoicePackIO.remove(directory)
             guard operation == token else { return }
             manifest = bundled
+            offered = nil
             status = .notInstalled
             error = nil
         } catch is CancellationError {
@@ -366,7 +394,7 @@ final class NeuralVoicePacks {
         }
     }
 
-    private func runDownload(_ token: UUID) async {
+    private func runDownload(_ token: UUID, beforeRemovingPrevious: @MainActor () async -> Void) async {
         let stage = directory.appendingPathComponent(".download-\(token.uuidString)", isDirectory: true)
         defer {
             try? FileManager.default.removeItem(at: stage)
@@ -424,10 +452,17 @@ final class NeuralVoicePacks {
                 throw error
             }
             self.manifest = manifest
+            offered = nil
+            let replaced = installedDirectory != nil
             installedDirectory = final
             installationRevision &+= 1
             status = .ready
             progress = 1
+            if replaced {
+                // Nothing reads the old generation once the model is unloaded.
+                await beforeRemovingPrevious()
+                await NeuralVoicePackIO.removeGenerations(in: directory, except: name)
+            }
         } catch is CancellationError {
             if operation == token { status = installedDirectory == nil ? .notInstalled : .ready }
         } catch {
@@ -457,6 +492,17 @@ final class NeuralVoicePacks {
 nonisolated private enum NeuralVoicePackIO {
     static func manifestURL(in root: URL, generation: String) -> URL {
         root.appendingPathComponent(generation + ".manifest.json")
+    }
+    /// Removes replaced packs and their manifests, unless the pointer moved on.
+    static func removeGenerations(in root: URL, except name: String) async {
+        _ = try? await background {
+            guard let pointer = try? Data(contentsOf: root.appendingPathComponent("installed.json")),
+                  (try? JSONDecoder().decode(String.self, from: pointer)) == name else { return }
+            for item in (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+            where item.hasPrefix("installed-") && item != name && item != name + ".manifest.json" {
+                try? FileManager.default.removeItem(at: root.appendingPathComponent(item))
+            }
+        }
     }
     /// The manifest saved beside the installed generation, if both are there.
     /// It only says which hashes to check; the files are still verified.

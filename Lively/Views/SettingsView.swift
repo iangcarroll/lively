@@ -131,7 +131,10 @@ struct SettingsView: View {
                         .onDisappear { closeVoicePreview() }
                     } label: {
                         Label { Text("Offline Voice Library") } icon: { SettingsIcon(systemImage: "waveform.circle.fill", color: .indigo) }
+                            .badge(NeuralVoicePacks.shared.isUpdateAvailable ? Text("Update") : nil)
                     }
+                    // One small request to the key service, and only with a pack installed.
+                    .task { await NeuralVoicePacks.shared.checkForUpdate() }
                     if SpeechPlayer.supportsDirectionalOutput {
                         Picker("Your language", selection: $settings.speechListenerLanguage) {
                             ForEach(settings.languages.all) { language in

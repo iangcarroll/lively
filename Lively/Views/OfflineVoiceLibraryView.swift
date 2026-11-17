@@ -46,8 +46,19 @@ struct OfflineVoiceLibraryView: View {
                 } else if packs.status == .checking || packs.status == .deleting {
                     ProgressView(packs.statusText)
                 } else if !packs.isReady || packs.status == .failed {
-                    Button(packs.status == .failed ? "Retry voice download" : "Download voice pack") { packs.download() }
+                    Button(packs.status == .failed ? "Retry voice download" : "Download voice pack") {
+                        // A failed update still has the previous pack to replace.
+                        packs.download(beforeRemovingPrevious: onBeforeDelete)
+                    }
                         .disabled(!packs.canDownload)
+                }
+                if packs.isUpdateAvailable, !packs.isBusy, packs.status != .failed {
+                    Button("Update voices (\(bytes(packs.updateBytes)))") {
+                        stopPreview()
+                        packs.download(beforeRemovingPrevious: onBeforeDelete)
+                    }
+                    Text("Newer voice files are available. Your current voices keep working until the update finishes.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 if let error = packs.error { Text(error).foregroundStyle(.red) }
                 if let previewError { Text(previewError).foregroundStyle(.red) }
@@ -98,7 +109,10 @@ struct OfflineVoiceLibraryView: View {
         } message: {
             Text("Your voice selections stay saved. Download the voice pack again to hear them offline.")
         }
-        .task { await packs.refresh() }
+        .task {
+            await packs.refresh()
+            await packs.checkForUpdate()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await packs.refresh() } }
             else { stopPreview() }

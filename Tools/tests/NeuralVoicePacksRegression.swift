@@ -338,6 +338,61 @@ extension NeuralVoicePacks {
         await tampered.delete()
         check(tampered.status == .notInstalled && tampered.totalBytes == manifest.totalBytes, "removing the pack returns to the bundled pin")
 
+        // Updates: the installed checksums are compared with the key service's.
+        let updateRoot = temporary.appendingPathComponent("update", isDirectory: true)
+        let original = NeuralVoicePacks(manifest: manifest, directory: updateRoot, defaults: defaults,
+                                        downloader: VoiceDownloadStub(files: payloads, temporary: temporary), pin: { manifest })
+        await original.checkForUpdate()
+        check(!original.isUpdateAvailable && original.status == .notInstalled, "nothing installed means nothing to update")
+        original.download(); await until { !original.isDownloading }
+        let originalDirectory = original.installedDirectory!
+        await original.checkForUpdate()
+        check(!original.isUpdateAvailable, "matching checksums offer no update")
+        let recommitted = NeuralVoicePacks(manifest: manifest, directory: updateRoot, defaults: defaults, downloader: movedClient,
+                                           pin: { .init(schemaVersion: 1, repository: actual.repository, revision: movedRevision, files: files) })
+        await recommitted.checkForUpdate()
+        check(!recommitted.isUpdateAvailable, "a new commit with the same files offers no update")
+        let offline2 = NeuralVoicePacks(manifest: manifest, directory: updateRoot, defaults: defaults, downloader: movedClient,
+                                        pin: { throw URLError(.notConnectedToInternet) })
+        await offline2.checkForUpdate()
+        check(!offline2.isUpdateAvailable && offline2.isReady && offline2.error == nil, "an unreachable key service changes nothing")
+        let invalidOffer = NeuralVoicePacks(manifest: manifest, directory: updateRoot, defaults: defaults, downloader: movedClient,
+                                            pin: { .init(schemaVersion: 1, repository: actual.repository, revision: movedRevision, files: movedFiles + [traversing]) })
+        await invalidOffer.checkForUpdate()
+        check(!invalidOffer.isUpdateAvailable, "an invalid pin is never offered as an update")
+
+        let updateClient = VoiceDownloadStub(files: movedPayloads, temporary: temporary)
+        let updating = NeuralVoicePacks(manifest: manifest, directory: updateRoot, defaults: defaults, downloader: updateClient, pin: { moved })
+        await updating.checkForUpdate()
+        check(updating.isUpdateAvailable && updating.updateBytes == moved.totalBytes, "different checksums offer an update")
+        check(updating.statusText == "Update available" && updating.installedDirectory == originalDirectory, "the offer leaves the installed pack in use")
+        await noNetwork(updateClient, 0, "checking for an update downloads no voice file")
+        await updateClient.configure(fail: 3)
+        updating.download(); await until { !updating.isDownloading }
+        check(updating.isReady && updating.installedDirectory == originalDirectory, "a failed update keeps the installed pack")
+        await updating.refresh()
+        check(updating.status == .ready && updating.isUpdateAvailable, "a failed update is still offered")
+        await updateClient.configure(hold: true)
+        var unloads = 0
+        var filesAtUnload = false
+        updating.download(beforeRemovingPrevious: {
+            unloads += 1
+            filesAtUnload = FileManager.default.fileExists(atPath: originalDirectory.appendingPathComponent(files[0].path).path)
+        })
+        while !(await updateClient.isWaiting()) { await Task.yield() }
+        check(updating.isReady && updating.installedDirectory == originalDirectory, "the installed pack stays usable while an update downloads")
+        await updateClient.release(); await until { !updating.isDownloading }
+        await until { !FileManager.default.fileExists(atPath: originalDirectory.path) }
+        check(updating.isReady && !updating.isUpdateAvailable, "an installed update clears the offer")
+        check(updating.installedDirectory?.lastPathComponent.hasPrefix("installed-\(movedRevision)-") == true, "the update installs the offered commit")
+        check(unloads == 1 && filesAtUnload, "the model is unloaded before the replaced files are removed")
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: updateRoot.path).filter { $0.hasPrefix("installed-") }.sorted()
+        let kept = updating.installedDirectory!.lastPathComponent
+        check(leftovers == [kept, kept + ".manifest.json"].sorted(), "the replaced pack and its manifest are removed")
+        let afterUpdate = NeuralVoicePacks(manifest: manifest, directory: updateRoot, defaults: defaults, downloader: updateClient, pin: { moved })
+        await afterUpdate.checkForUpdate()
+        check(afterUpdate.isReady && !afterUpdate.isUpdateAvailable, "an updated pack matches the key service on the next launch")
+
         let unreachable = NeuralVoicePacks(manifest: manifest, directory: temporary.appendingPathComponent("unreachable"), defaults: defaults,
                                            downloader: movedClient, pin: { throw URLError(.notConnectedToInternet) })
         let beforeUnreachable = await movedClient.requests
