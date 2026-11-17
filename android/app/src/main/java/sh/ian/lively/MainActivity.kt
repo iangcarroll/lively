@@ -52,6 +52,7 @@ import sh.ian.lively.ui.AccountScreen
 import sh.ian.lively.ui.ConversationScreen
 import sh.ian.lively.ui.LanguageListScreen
 import sh.ian.lively.ui.LivelyTheme
+import sh.ian.lively.ui.LocationOfferCard
 import sh.ian.lively.ui.OnboardingScreen
 import sh.ian.lively.ui.ProScreen
 import sh.ian.lively.ui.SettingsScreen
@@ -183,6 +184,12 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
         }
     }
 
+    // The card offering "Set from location", shown once on an open after the
+    // welcome tour: not on the launch that shows the tour, which has its own button.
+    var offersLocation by remember {
+        mutableStateOf(start == Routes.CONVERSATION && !DebugFlags.demo && !prefs.bool("locationOfferDone") && !settings.usesLocationLanguages)
+    }
+
     ForegroundEffects(graph, store)
 
     NavHost(
@@ -229,6 +236,14 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
                 onShowSettings = { nav.navigateSingle(Routes.SETTINGS) },
                 onShowPro = { nav.navigateSingle(Routes.PRO) },
             )
+            if (offersLocation) {
+                LocationOfferCard(graph.locationLanguages) { changed ->
+                    // Either answer counts; it isn't shown again.
+                    prefs.putBool("locationOfferDone", true)
+                    offersLocation = false
+                    if (changed) store.settingsDidClose()
+                }
+            }
         }
         composable(Routes.ONBOARDING) {
             OnboardingScreen(settings, graph.account, graph.locationLanguages) {

@@ -24,7 +24,8 @@ broker, account and Pro allowance:
   muting the mic while it speaks unless headphones are connected.
   Separate incoming-headphone / outgoing-speaker playback is currently an
   iOS 26.2+ feature; Android uses its normal audio output.
-- Optional **Set from location** in Settings and the welcome tour: asks for
+- Optional **Set from location** in Settings and the welcome tour, and offered
+  once by a card on the next open after the tour (a Material dialog here): asks for
   approximate location, then sets your system language (or English) and the
   language of the country you're in, as on iOS; see
   [../README.md](../README.md#languages-from-your-location). It uses the

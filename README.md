@@ -47,7 +47,9 @@ own Mistral translator for them.
 ## Languages from your location
 
 Optional and off by default: **Settings › Set from location**, or **Use my
-location** on the welcome tour's language page. Turning it on is when Lively
+location** on the welcome tour's language page. Anyone who hasn't turned it on
+is also asked once, by a card over the conversation on the next open that
+isn't the welcome tour; either answer closes it for good. Turning it on is when Lively
 asks for location access (approximate only on Android). It looks up the country
 you're in and sets the pair: your side is the system language when the engine
 supports it, otherwise English; the other side is that country's most widely

@@ -9,6 +9,9 @@ struct ConversationScreen: View {
     @State private var showOnboarding = false
     @State private var showPro = false
     @AppStorage("onboardingDone") private var onboardingDone = false
+    /// The card offering "Set from location", shown once on an open after the welcome tour.
+    @State private var showLocationOffer = false
+    @AppStorage("locationOfferDone") private var locationOfferDone = false
     #if DEBUG
     @State private var didStartDemoAutomatically = false
     #endif
@@ -188,6 +191,19 @@ struct ConversationScreen: View {
         } message: {
             Text(store.alert ?? "")
         }
+        .overlay {
+            if showLocationOffer {
+                ZStack {
+                    Color.black.opacity(0.35).ignoresSafeArea()
+                        .onTapGesture { closeLocationOffer(changed: false) }
+                    LocationOfferCard(onDone: closeLocationOffer)
+                        .frame(maxWidth: 380)
+                        .padding(24)
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.smooth(duration: 0.3), value: showLocationOffer)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 store.didBecomeActive()
@@ -222,6 +238,8 @@ struct ConversationScreen: View {
             } else {
                 store.prewarm()
             }
+            // Not on the launch that shows the welcome tour, which has its own button.
+            if onboardingDone, !locationOfferDone, !settings.usesLocationLanguages { showLocationOffer = true }
             // scenePhase is already active at launch, so onChange doesn't run.
             followLocation()
         }
@@ -235,6 +253,13 @@ struct ConversationScreen: View {
             let idle = store.utterances.isEmpty && !store.isListening
             if await LocationLanguages.shared.update(canChange: idle) { store.settingsDidClose() }
         }
+    }
+
+    /// Either answer on the card counts; it isn't shown again.
+    private func closeLocationOffer(changed: Bool) {
+        locationOfferDone = true
+        showLocationOffer = false
+        if changed { store.settingsDidClose() }
     }
 
     /// Links from the home and lock screen widgets: `lively://listen` starts
@@ -432,5 +457,77 @@ private struct KeyboardButtonBounds: PreferenceKey {
     static let defaultValue: Anchor<CGRect>? = nil
     static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
         value = value ?? nextValue()
+    }
+}
+
+/// Asks whether to turn on "Set from location". Saying yes shows the system's
+/// location prompt; if the pair can't be set, the card says why before closing.
+struct LocationOfferCard: View {
+    /// Called with true when the languages were set.
+    var onDone: (_ changed: Bool) -> Void
+    @State private var asked = false
+    private var location: LocationLanguages { .shared }
+
+    private var isWorking: Bool { location.isEnabling || location.status == .locating }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "location.fill")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(Color.accentColor.gradient, in: .circle)
+            Text("Set languages from your location?")
+                .font(.system(.title3, design: .rounded, weight: .bold))
+                .multilineTextAlignment(.center)
+            Text(asked ? location.status.message ?? "Finding where you are…"
+                 : "Lively can choose your language and the local one for the country you're in, "
+                 + "and again when you travel. You can change this in Settings.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if !asked {
+                VStack(spacing: 4) {
+                    Button(action: enable) {
+                        Text("Use My Location")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .contentShape(.capsule)
+                    }
+                    .buttonStyle(PressableCapsule())
+                    Button("Not Now") { onDone(false) }
+                        .font(.body.weight(.semibold))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(.rect)
+                }
+                .padding(.top, 6)
+            } else if isWorking {
+                ProgressView().frame(minHeight: 44)
+            } else {
+                Button("OK") { onDone(false) }
+                    .font(.body.weight(.semibold))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(.rect)
+            }
+        }
+        .padding(24)
+        .background(Color(.card), in: .rect(cornerRadius: 28, style: .continuous))
+        .shadow(color: .black.opacity(0.2), radius: 24, y: 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+    }
+
+    private func enable() {
+        asked = true
+        Task {
+            await location.enable()
+            if case .applied = location.status { onDone(true) }
+        }
     }
 }

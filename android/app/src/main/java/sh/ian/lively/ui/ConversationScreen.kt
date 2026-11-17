@@ -27,9 +27,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.KeyboardHide
+import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Splitscreen
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.window.Dialog
+import sh.ian.lively.model.LocationLanguages
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -289,4 +297,60 @@ fun TextInputToggle(showsTextInput: Boolean, onChange: (Boolean) -> Unit, size: 
 private fun scrim(color: Color, fadeAtBottom: Boolean): Brush {
     val stops = arrayOf(0f to color, 0.7f to color, 1f to color.copy(alpha = 0f))
     return if (fadeAtBottom) Brush.verticalGradient(*stops) else Brush.verticalGradient(*stops.map { (1f - it.first) to it.second }.reversed().toTypedArray())
+}
+
+/**
+ * Asks whether to turn on "Set from location". Saying yes shows the system's
+ * location prompt; if the pair can't be set, the card says why before closing.
+ * A Material dialog here, where iOS draws the card over the conversation.
+ */
+@Composable
+fun LocationOfferCard(location: LocationLanguages, onDone: (changed: Boolean) -> Unit) {
+    var asked by rememberSaveable { mutableStateOf(false) }
+    val setUsesLocation = rememberLocationSwitch(location)
+    val status = location.status
+    val isWorking = status == LocationLanguages.Status.Idle || status == LocationLanguages.Status.Locating
+    LaunchedEffect(asked, status) {
+        if (asked && status is LocationLanguages.Status.Applied) onDone(true)
+    }
+    Dialog(onDismissRequest = { onDone(false) }) {
+        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(
+                Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                SettingsIcon(Icons.Rounded.LocationOn, MaterialTheme.colorScheme.primary, size = 56.dp)
+                Text(
+                    "Set languages from your location?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    if (asked) status.message ?: "Finding where you are…"
+                    else "Lively can choose your language and the local one for the country you're in, " +
+                        "and again when you travel. You can change this in Settings.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                when {
+                    !asked -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        PillButton("Use my location", onClick = {
+                            asked = true
+                            setUsesLocation(true)
+                        })
+                        TextButton(onClick = { onDone(false) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Not now", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    isWorking -> CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.5.dp)
+                    else -> TextButton(onClick = { onDone(false) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        Text("OK", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+    }
 }
