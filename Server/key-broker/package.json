@@ -7,6 +7,7 @@
     "test": "vitest run && node --test scripts/test-review-credentials.mjs",
     "typecheck": "tsc",
     "deploy": "wrangler deploy",
+    "voices:warm": "node scripts/warm-voice-packs.mjs",
     "db:migrate:local": "wrangler d1 migrations apply lively-key-broker --local",
     "db:migrate": "wrangler d1 migrations apply lively-key-broker --remote"
   },

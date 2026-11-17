@@ -1,0 +1,385 @@
+{
+  "schemaVersion": 1,
+  "id": "kokoro-v1-coreml-int8",
+  "repository": "aufklarer/Kokoro-82M-CoreML-INT8",
+  "revision": "4ef656f55554ceb242ed11febbdbbffd60dd5938",
+  "license": "Apache-2.0",
+  "totalBytes": 92022138,
+  "files": [
+    {
+      "path": "G2PDecoder.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "sha256": "dbf1767747fdc188222d467a45b04608b396c76c71db3abb18a5fb3680ef9827"
+    },
+    {
+      "path": "G2PDecoder.mlmodelc/coremldata.bin",
+      "size": 545,
+      "sha256": "607e960f19b4d9a30317a5a11869fcce84b300a909fcab2cc756c0d98e2dacd9"
+    },
+    {
+      "path": "G2PDecoder.mlmodelc/metadata.json",
+      "size": 3064,
+      "sha256": "e54e98484fd60d26f22fd3c4e7fe87b0d92a5d2de1f958cc3c4bb36d4ae06a44"
+    },
+    {
+      "path": "G2PDecoder.mlmodelc/model.mil",
+      "size": 19737,
+      "sha256": "fe647c598e0d9454d360b8ee49a59ae57ca147fc5330863ba84ccb90dce482ad"
+    },
+    {
+      "path": "G2PDecoder.mlmodelc/weights/weight.bin",
+      "size": 828030,
+      "sha256": "cbaeb4e743359f607ab161af0c6d8a817462fdaec622ee788ef8ef952c5f8214"
+    },
+    {
+      "path": "G2PEncoder.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "sha256": "cf7fbd7e7a65529b2d2bf3941e458a0ab6dff7a298bf48e205a1727c81c26a99"
+    },
+    {
+      "path": "G2PEncoder.mlmodelc/coremldata.bin",
+      "size": 398,
+      "sha256": "0f14d46ca9fd06c68b4717294575b2b99449e67d40b7a2c56f926bf05cd90b11"
+    },
+    {
+      "path": "G2PEncoder.mlmodelc/metadata.json",
+      "size": 2034,
+      "sha256": "c8e0cfd7f494ac1b3662ff8f1914b2b45f79ffb2791724cdc0576981996732e1"
+    },
+    {
+      "path": "G2PEncoder.mlmodelc/model.mil",
+      "size": 20392,
+      "sha256": "8c617e569f37286b056dad800d862dc145be9a95fa9ed43857bb646ba199d7da"
+    },
+    {
+      "path": "G2PEncoder.mlmodelc/weights/weight.bin",
+      "size": 694592,
+      "sha256": "6926bcd2827d21fec82839487b987e06f85fd8a6a5bb896bc4f6062461d014ec"
+    },
+    {
+      "path": "README.md",
+      "size": 3424,
+      "sha256": "08d6b645ab15d20a9a2acbbb4c175d2e7c58d3091df6964c05780887b1d0428a"
+    },
+    {
+      "path": "config.json",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "g2p_vocab.json",
+      "size": 1665,
+      "sha256": "295ed64b86c2820cd665b0602ae50c6947c0e82ac643082873e0be87dca282ce"
+    },
+    {
+      "path": "kokoro_5s.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "sha256": "7c16110918bf9d258405db8df5dbe87a5b3f2b457976a286b1d54ba8edae93ec"
+    },
+    {
+      "path": "kokoro_5s.mlmodelc/coremldata.bin",
+      "size": 478,
+      "sha256": "0b4c112a5df1467e20d7aa185f4a39dbc622126c5373eac047d571ee9afb6d3b"
+    },
+    {
+      "path": "kokoro_5s.mlmodelc/model.mil",
+      "size": 2263183,
+      "sha256": "7107c20e7e3fc651b041571a1fad02531540f2f2e9c58229c261df3822ebb463"
+    },
+    {
+      "path": "kokoro_5s.mlmodelc/weights/weight.bin",
+      "size": 81778176,
+      "sha256": "2dfc4610bdac87159e33e6f3d3c011c110928f89916d9a59621eff48e7523c6a"
+    },
+    {
+      "path": "pipeline_config.json",
+      "size": 317,
+      "sha256": "129f048bb8d670c9659f276f689f75c2da9e89b408b8161bfceb558b63c86072"
+    },
+    {
+      "path": "us_gold.json",
+      "size": 3001196,
+      "sha256": "8507f89840f0813b10cf584740942f58e9cc9ad3660e24088b442ab0a6b126be"
+    },
+    {
+      "path": "us_silver.json",
+      "size": 3105352,
+      "sha256": "ea0e1abca0c9b18fb0d3402034633a337154a3153e9a9f49f97d668c908e140c"
+    },
+    {
+      "path": "vocab_index.json",
+      "size": 2034,
+      "sha256": "433690ab1da1256639c00179e7961a9e9f50ec91077a9c0877107c14e04fb989"
+    },
+    {
+      "path": "voices/af_alloy.json",
+      "size": 5494,
+      "sha256": "8376694f70d17b611be5d3359e0e8a6903de97862178fb78b19bdea7ed9851e0"
+    },
+    {
+      "path": "voices/af_aoede.json",
+      "size": 5507,
+      "sha256": "33c9bab709b20f42c2693dabfb89ab5801e44ac80cafcc545ca1a81091bb14c2"
+    },
+    {
+      "path": "voices/af_bella.json",
+      "size": 5505,
+      "sha256": "3fee6c5728f669f8b3bbca31cca30ebfee6fb00723f5fce3f2c7d47bcaa14a36"
+    },
+    {
+      "path": "voices/af_heart.json",
+      "size": 5517,
+      "sha256": "c00984469c315ee8709bebb8ea0bd8321eae2d952f6db7c6214d660028d01ed2"
+    },
+    {
+      "path": "voices/af_jessica.json",
+      "size": 5484,
+      "sha256": "3e517aaa90d3fde9b3ece12fcc7b0fcbe814d32f4e7a010f6a71e2ea95115244"
+    },
+    {
+      "path": "voices/af_kore.json",
+      "size": 5516,
+      "sha256": "e0c5e319824ae5429b2103c08711f803b6ebd387bca54f0b03bf012eb63825f2"
+    },
+    {
+      "path": "voices/af_nicole.json",
+      "size": 5515,
+      "sha256": "04a2662bd077ce4676f6d755fce9abaac6667e0f656924fa18b59701c60a47ab"
+    },
+    {
+      "path": "voices/af_nova.json",
+      "size": 5503,
+      "sha256": "ee64f57a913ec0989d1a2c98c38e835e63b38088176bb6818263f1bcb500d73d"
+    },
+    {
+      "path": "voices/af_river.json",
+      "size": 5486,
+      "sha256": "db75347212a79d092ab1b1f8d8605c5a184fc2ffe3d61cd77e475a1359df05bf"
+    },
+    {
+      "path": "voices/af_sarah.json",
+      "size": 5504,
+      "sha256": "35cc117b08d1550806b9760f916ed1bbf64a31c5791e35111a9914e40899845c"
+    },
+    {
+      "path": "voices/af_sky.json",
+      "size": 5500,
+      "sha256": "f638ac5280fa5d394ad787ba6039d39b3371705230a24b1514171d81d2646304"
+    },
+    {
+      "path": "voices/am_adam.json",
+      "size": 5501,
+      "sha256": "8ca01f0a2fc23c963034d287981af3e975ebb1d26e6f57a1498405c53b1e5e2c"
+    },
+    {
+      "path": "voices/am_echo.json",
+      "size": 5478,
+      "sha256": "3496730716cfcf95b456d3772ec2064b1dd959da790eed10040e964fa3f3cfb9"
+    },
+    {
+      "path": "voices/am_eric.json",
+      "size": 5466,
+      "sha256": "965f5c1b490459f616989393a04db832c39098b93be0da6a9a98af0b657c685c"
+    },
+    {
+      "path": "voices/am_fenrir.json",
+      "size": 5515,
+      "sha256": "b2f6cc029ed9bbfd227e5bb3ebb242adbf1c09ed291a8d831922db9e0669d9f6"
+    },
+    {
+      "path": "voices/am_liam.json",
+      "size": 5481,
+      "sha256": "ce9c3b532f41d13ef9541a1537771dfee821a94525efe7a8e453d068be187474"
+    },
+    {
+      "path": "voices/am_michael.json",
+      "size": 5477,
+      "sha256": "df8ba32be906749caee1be1d26ad5f913bae14fdaefbda03da17fe50da3f4827"
+    },
+    {
+      "path": "voices/am_onyx.json",
+      "size": 5503,
+      "sha256": "3d73666b4b7f21d7714932c7099aaeaa4ff3c9fb46b9f4483dfbf9f683fb59ce"
+    },
+    {
+      "path": "voices/am_puck.json",
+      "size": 5505,
+      "sha256": "11c60b69722445e9490bc55449f66cd189f7969656ef3ca7ca6ed1a75c8587df"
+    },
+    {
+      "path": "voices/am_santa.json",
+      "size": 5508,
+      "sha256": "23a4ac56915e92e236ab23d561ec0fdac66fdc64ad351f088dfc708eecd2fbc0"
+    },
+    {
+      "path": "voices/bf_alice.json",
+      "size": 5477,
+      "sha256": "a7e17e383f720a0497046121f72b6503630d56a508d2538243463c95a11dd94f"
+    },
+    {
+      "path": "voices/bf_emma.json",
+      "size": 5507,
+      "sha256": "170694d56013cafeea73f547d671152033e5e5e7efef861d6c9be0ea0b5f4549"
+    },
+    {
+      "path": "voices/bf_isabella.json",
+      "size": 5502,
+      "sha256": "82496256eb3a72b3f0b54d2408f1c85a35bf67a1c2a55c5c26ef1f1a63aed635"
+    },
+    {
+      "path": "voices/bf_lily.json",
+      "size": 5472,
+      "sha256": "0df56d0d8c70a17aab24cf734cbc0132f0b1552d74bf5c708aab3c2dc0938003"
+    },
+    {
+      "path": "voices/bm_daniel.json",
+      "size": 5475,
+      "sha256": "810ec61eb7742466c0b1bf90d03798d0f7a68156511396c6e3d4ce13ba6a6e03"
+    },
+    {
+      "path": "voices/bm_fable.json",
+      "size": 5458,
+      "sha256": "e811d47125e1165430e7b7cd5f61fe68835c04f42a3da384dcc796a2b47e17e2"
+    },
+    {
+      "path": "voices/bm_george.json",
+      "size": 5492,
+      "sha256": "e540f0cd8bc1f08fe1705307d9782c5ca75caff690088b848fc5122faa403729"
+    },
+    {
+      "path": "voices/bm_lewis.json",
+      "size": 5481,
+      "sha256": "b7a375a3e7cfb9f459e74a2c1d5b56aae8ced84aa95ab61b8df3089e20e752cf"
+    },
+    {
+      "path": "voices/ef_dora.json",
+      "size": 5523,
+      "sha256": "1447aadcde20431870fa7ddcdbbc9b64057c3a034675ecc92e6d7aa09df5ea87"
+    },
+    {
+      "path": "voices/em_alex.json",
+      "size": 5513,
+      "sha256": "bf29099062af9ccc4f889793bc9439c4e8c6cc27698a21b17e9bc8e6f377b345"
+    },
+    {
+      "path": "voices/em_santa.json",
+      "size": 5515,
+      "sha256": "b5b1a9c347fc5da7fefb97a542ba79d297cd111b9fd2571fa28d510c171f8b4e"
+    },
+    {
+      "path": "voices/ff_siwis.json",
+      "size": 5490,
+      "sha256": "cbbc9dc248d246bf79fb5bc305780ff6e894394f44f881af7dc02e90fc2ba090"
+    },
+    {
+      "path": "voices/hf_alpha.json",
+      "size": 5499,
+      "sha256": "25c4aeeb7ef7dc7281fc1cff87fb5866036dcddff6f154b126350d948635dc73"
+    },
+    {
+      "path": "voices/hf_beta.json",
+      "size": 5497,
+      "sha256": "baf401a5cfde20846a3a61e129b4743c501d5ca1081d0cdfd81a9a2f60731afc"
+    },
+    {
+      "path": "voices/hm_omega.json",
+      "size": 5509,
+      "sha256": "d56bbe7c1e04ce931e77236df825f5ccb9313a6a3b52d3525457909adfe19c54"
+    },
+    {
+      "path": "voices/hm_psi.json",
+      "size": 5483,
+      "sha256": "cc380ba2e596d257d37d7321e1b9eb8d78cd7f466c87277eb25da8c5359f9b5a"
+    },
+    {
+      "path": "voices/if_sara.json",
+      "size": 5495,
+      "sha256": "29bd8cdc438619f70f014e515af923c4ab76364b8e9acbd965301807d0736a54"
+    },
+    {
+      "path": "voices/im_nicola.json",
+      "size": 5459,
+      "sha256": "4075918555e4c98809baabc71133e6c20b43462d63681c1ebc235679d1b12efb"
+    },
+    {
+      "path": "voices/jf_alpha.json",
+      "size": 5493,
+      "sha256": "fde92e7b2f1e5c880c89d6ce2ce5ed1b3ae25979fb32aa4f4609cd3364c7b621"
+    },
+    {
+      "path": "voices/jf_gongitsune.json",
+      "size": 5490,
+      "sha256": "05305d8d1f2789623c383d117680bb61140e6ce61122069bbc864c3a233ad870"
+    },
+    {
+      "path": "voices/jf_nezumi.json",
+      "size": 5483,
+      "sha256": "f541618b73dcf93b47abc8ddefb75a4c446e29e71a8541103f8e8be32cfab3c0"
+    },
+    {
+      "path": "voices/jf_tebukuro.json",
+      "size": 5450,
+      "sha256": "6e50ec54db655d8045d1a90820b0e07ac015fd87f354bfbd334f25e0a1a7c551"
+    },
+    {
+      "path": "voices/jm_kumo.json",
+      "size": 5512,
+      "sha256": "80925a57a5b6ecee8247b7cb814d06f1ce44809170c3d66dce37dcff13244f52"
+    },
+    {
+      "path": "voices/pf_dora.json",
+      "size": 5525,
+      "sha256": "12c3d09639e601781115530f93aa1c12caba3fd9e22d8a67e88a639b334858ee"
+    },
+    {
+      "path": "voices/pm_alex.json",
+      "size": 5513,
+      "sha256": "7f9eb8ab9be8e5c534fa3809c7bd5622eba5622d3fe30be5bac0306ab9ae907f"
+    },
+    {
+      "path": "voices/pm_santa.json",
+      "size": 5524,
+      "sha256": "926f02d81007834c95536dc92a911d08ab5f60fb3af8784a9c80fe96b0ee8869"
+    },
+    {
+      "path": "voices/zf_xiaobei.json",
+      "size": 5496,
+      "sha256": "a4bd82ccfb5ff17cbac389e7875ba1d728ee82a2f30c7b3dc10a22d604b29973"
+    },
+    {
+      "path": "voices/zf_xiaoni.json",
+      "size": 5500,
+      "sha256": "ff868f40d369e709ee0af9a33622286285d409deaed4ad4bad1e63c16db74715"
+    },
+    {
+      "path": "voices/zf_xiaoxiao.json",
+      "size": 5493,
+      "sha256": "2dda0fdc1580040c4aa45bf63fbfa5c65f1a553f11304301d63404143d8d03c4"
+    },
+    {
+      "path": "voices/zf_xiaoyi.json",
+      "size": 5516,
+      "sha256": "cdfe73a5e1ded595a18cb76b7c4d7a888d60b10053bf6a815843fe22f93f7ee1"
+    },
+    {
+      "path": "voices/zm_yunjian.json",
+      "size": 5490,
+      "sha256": "19390902e6170519b7c8af0b225e3923a41acdf85fe8d503742a26a8d45d0a54"
+    },
+    {
+      "path": "voices/zm_yunxi.json",
+      "size": 5513,
+      "sha256": "520cba96dbff34a37a721d3f0d5be4effac1d6b88ce14d2e45de8060e48e2e08"
+    },
+    {
+      "path": "voices/zm_yunxia.json",
+      "size": 5497,
+      "sha256": "c383a3ea5c68cf461c5f0adc1c3c0e4c9bf26383aa72afb9f3f35229f40a8fc2"
+    },
+    {
+      "path": "voices/zm_yunyang.json",
+      "size": 5485,
+      "sha256": "18281d33145a1b04d70a97fdc8d1041ba2a15a63568c1c91c63d4fbe476f8508"
+    }
+  ]
+}

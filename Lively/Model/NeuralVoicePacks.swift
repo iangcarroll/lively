@@ -21,8 +21,14 @@ nonisolated struct NeuralVoiceManifest: Codable, Sendable {
     }
 
     func validate() throws {
-        guard schemaVersion == 1, repository == NeuralVoiceCatalog.repository,
-              revision == NeuralVoiceCatalog.revision, !files.isEmpty, files.count <= 256,
+        // The key service chooses the revision, so any full commit hash is
+        // accepted. Both values become URL and directory names.
+        let owner = repository.split(separator: "/", omittingEmptySubsequences: false)
+        guard schemaVersion == 1, owner.count == 2, repository.utf8.count <= 128,
+              owner.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".."
+                  && $0.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "-_.".contains($0)) } }),
+              revision.count == 40, revision.allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
+              !files.isEmpty, files.count <= 256,
               Set(files.map(\.path)).count == files.count else { throw NeuralVoicePackError.manifest }
         for file in files {
             let pieces = file.path.split(separator: "/", omittingEmptySubsequences: false)
@@ -43,12 +49,47 @@ nonisolated struct NeuralVoiceManifest: Codable, Sendable {
         guard required.isSubset(of: Set(files.map(\.path))) else { throw NeuralVoicePackError.manifest }
     }
 
-    func url(for file: File) -> URL {
-        let root = URL(string: "https://huggingface.co")!
-            .appendingPathComponent(repository).appendingPathComponent("resolve").appendingPathComponent(revision)
+    /// Files come from Lively's key service, which keeps its own copy of the
+    /// pinned revision. A build without a key service uses Hugging Face.
+    func url(for file: File, broker: URL? = NeuralVoiceManifest.brokerURL) -> URL {
+        let root = if let broker {
+            broker.appendingPathComponent("v1").appendingPathComponent("voices")
+                .appendingPathComponent("files").appendingPathComponent(revision)
+        } else {
+            URL(string: "https://huggingface.co")!
+                .appendingPathComponent(repository).appendingPathComponent("resolve").appendingPathComponent(revision)
+        }
         return file.path.split(separator: "/").reduce(root) { $0.appendingPathComponent(String($1)) }
     }
+
+    /// The same `LivelyKeyBrokerURL` that `SonioxKeyProvider` reads.
+    static var brokerURL: URL? {
+        guard let string = Bundle.main.object(forInfoDictionaryKey: "LivelyKeyBrokerURL") as? String,
+              !string.isEmpty else { return nil }
+        return URL(string: string)
+    }
+
+    /// The key service's current pin, so the voice pack can move to a new
+    /// revision without an app update. Nil in a build without a key service.
+    static func current(broker: URL? = NeuralVoiceManifest.brokerURL) async throws -> NeuralVoiceManifest? {
+        guard let broker else { return nil }
+        var request = URLRequest(url: broker.appendingPathComponent("v1").appendingPathComponent("voices")
+            .appendingPathComponent("manifest"))
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 20
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NeuralVoicePackError.server((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        guard data.count <= 1_000_000, let manifest = try? JSONDecoder().decode(NeuralVoiceManifest.self, from: data) else {
+            throw NeuralVoicePackError.manifest
+        }
+        return manifest
+    }
 }
+
+/// Asked once per download. Nil keeps the manifest bundled with the app.
+typealias NeuralVoicePinSource = @Sendable () async throws -> NeuralVoiceManifest?
 
 nonisolated protocol NeuralVoiceDownloading: Sendable {
     /// Returns an owned temporary file. The caller removes or moves it.
@@ -104,7 +145,14 @@ final class NeuralVoicePacks {
     private(set) var selectionRevision = 0
     private(set) var installationRevision = 0
     private var selections: [String: String] = [:]
-    private let manifest: NeuralVoiceManifest?
+    /// What the installed files are checked against: the manifest saved with
+    /// them, so they still verify offline after the key service's pin moves.
+    private var manifest: NeuralVoiceManifest?
+    /// The manifest shipped in the app, used until a download saves its own.
+    private let bundled: NeuralVoiceManifest?
+    /// The pin of the download in progress.
+    private var pending: NeuralVoiceManifest?
+    private let pin: NeuralVoicePinSource
     private let directory: URL
     private let defaults: UserDefaults
     private let downloader: any NeuralVoiceDownloading
@@ -121,8 +169,11 @@ final class NeuralVoicePacks {
     init(manifest: NeuralVoiceManifest? = NeuralVoicePacks.bundledManifest(),
          directory: URL = NeuralVoicePacks.defaultDirectory(), defaults: UserDefaults = .standard,
          downloader: any NeuralVoiceDownloading = URLSessionNeuralVoiceDownloader(),
+         pin: @escaping NeuralVoicePinSource = { try await NeuralVoiceManifest.current() },
          installedVerifier: @escaping NeuralVoiceInstalledVerifier = { try await NeuralVoicePackIO.installed(in: $0, manifest: $1) }) {
-        self.manifest = manifest
+        self.manifest = NeuralVoicePackIO.savedManifest(in: directory) ?? manifest
+        self.bundled = manifest
+        self.pin = pin
         self.directory = directory
         self.defaults = defaults
         self.downloader = downloader
@@ -138,7 +189,7 @@ final class NeuralVoicePacks {
     var isReady: Bool { installedDirectory != nil }
     var isDownloading: Bool { status == .downloading }
     var isBusy: Bool { status == .checking || status == .downloading || status == .deleting }
-    var totalBytes: Int64 { manifest?.totalBytes ?? 0 }
+    var totalBytes: Int64 { (pending ?? manifest)?.totalBytes ?? 0 }
     var canDownload: Bool { manifest != nil && !isBusy }
     var statusText: String {
         switch status {
@@ -298,6 +349,7 @@ final class NeuralVoicePacks {
             try check(token)
             try await NeuralVoicePackIO.remove(directory)
             guard operation == token else { return }
+            manifest = bundled
             status = .notInstalled
             error = nil
         } catch is CancellationError {
@@ -318,12 +370,16 @@ final class NeuralVoicePacks {
         let stage = directory.appendingPathComponent(".download-\(token.uuidString)", isDirectory: true)
         defer {
             try? FileManager.default.removeItem(at: stage)
-            if operation == token { worker = nil }
+            if operation == token {
+                worker = nil
+                pending = nil
+            }
         }
         do {
-            guard let manifest else { throw NeuralVoicePackError.notConfigured }
-            try manifest.validate()
+            guard let manifest = try await pin() ?? bundled else { throw NeuralVoicePackError.notConfigured }
             try check(token)
+            try manifest.validate()
+            pending = manifest
             try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
             var storage = directory
             var values = URLResourceValues()
@@ -358,12 +414,16 @@ final class NeuralVoicePacks {
             let name = "installed-\(manifest.revision)-\(token.uuidString)"
             let final = directory.appendingPathComponent(name, isDirectory: true)
             try FileManager.default.moveItem(at: stage, to: final)
+            let saved = NeuralVoicePackIO.manifestURL(in: directory, generation: name)
             do {
+                try JSONEncoder().encode(manifest).write(to: saved, options: .atomic)
                 try JSONEncoder().encode(name).write(to: directory.appendingPathComponent("installed.json"), options: .atomic)
             } catch {
+                try? FileManager.default.removeItem(at: saved)
                 try? FileManager.default.removeItem(at: final)
                 throw error
             }
+            self.manifest = manifest
             installedDirectory = final
             installationRevision &+= 1
             status = .ready
@@ -395,6 +455,18 @@ final class NeuralVoicePacks {
 }
 
 nonisolated private enum NeuralVoicePackIO {
+    static func manifestURL(in root: URL, generation: String) -> URL {
+        root.appendingPathComponent(generation + ".manifest.json")
+    }
+    /// The manifest saved beside the installed generation, if both are there.
+    /// It only says which hashes to check; the files are still verified.
+    static func savedManifest(in root: URL) -> NeuralVoiceManifest? {
+        guard let pointer = try? Data(contentsOf: root.appendingPathComponent("installed.json")),
+              let name = try? JSONDecoder().decode(String.self, from: pointer),
+              name.hasPrefix("installed-"), !name.contains("/"), !name.contains("\\"), !name.contains(".."),
+              let data = try? Data(contentsOf: manifestURL(in: root, generation: name)) else { return nil }
+        return try? JSONDecoder().decode(NeuralVoiceManifest.self, from: data)
+    }
     static func installed(in root: URL, manifest: NeuralVoiceManifest) async throws -> URL? {
         try await background {
             let pointer = root.appendingPathComponent("installed.json")

@@ -20,7 +20,10 @@ actor VoiceDownloadStub: NeuralVoiceDownloading {
     func fetch(_ url: URL, expectedBytes: Int64, progress: @escaping @Sendable (Int64) -> Void) async throws -> URL {
         requests += 1
         if let failAfter, requests >= failAfter { throw URLError(.networkConnectionLost) }
-        let path = url.path.components(separatedBy: "/\(NeuralVoiceCatalog.revision)/").last!
+        // Everything after the revision, whichever host and pin it came from.
+        let pieces = url.path.split(separator: "/")
+        let revision = pieces.firstIndex { $0.count == 40 && $0.allSatisfy(\.isHexDigit) }!
+        let path = pieces[(revision + 1)...].joined(separator: "/")
         guard var data = files[path] else { throw URLError(.fileDoesNotExist) }
         callbacks.append(progress); progress(0)
         if holdNext {
@@ -109,6 +112,13 @@ extension NeuralVoicePacks {
         check(NeuralVoiceCatalog.language(with: "ko") == nil, "unsupported language isn't advertised")
         check(actual.totalBytes == 92_022_138, "bundled size matches pinned manifest")
         check(actual.url(for: actual.files[0]).absoluteString.contains(NeuralVoiceCatalog.revision), "download URL pins a commit")
+        let weights = actual.files.first { $0.path == "kokoro_5s.mlmodelc/weights/weight.bin" }!
+        check(actual.url(for: weights, broker: URL(string: "https://broker.test")!).absoluteString
+            == "https://broker.test/v1/voices/files/\(actual.revision)/kokoro_5s.mlmodelc/weights/weight.bin", "files come from the key service")
+        check(actual.url(for: weights, broker: nil).absoluteString
+            == "https://huggingface.co/\(actual.repository)/resolve/\(actual.revision)/kokoro_5s.mlmodelc/weights/weight.bin", "a build without a key service uses the pinned source")
+        let brokerless = try await NeuralVoiceManifest.current(broker: nil)
+        check(brokerless == nil, "a build without a key service keeps the bundled pin")
 
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("lively-neural-pack-tests-\(UUID())")
         try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
@@ -290,7 +300,59 @@ extension NeuralVoicePacks {
         let traversing = NeuralVoiceManifest.File(path: "../outside", size: 1, sha256: String(repeating: "a", count: 64))
         expectManifestError(.init(schemaVersion: 1, repository: actual.repository, revision: actual.revision, files: files + [traversing]), "manifest can't escape storage")
         expectManifestError(.init(schemaVersion: 1, repository: actual.repository, revision: actual.revision, files: files + [files[0]]), "manifest can't duplicate destinations")
-        expectManifestError(.init(schemaVersion: 1, repository: actual.repository, revision: String(repeating: "0", count: 40), files: files), "manifest can't change pinned revision")
+        check((try? NeuralVoiceManifest(schemaVersion: 1, repository: actual.repository, revision: String(repeating: "0", count: 40), files: files).validate()) != nil, "the key service can pin another commit")
+        expectManifestError(.init(schemaVersion: 1, repository: actual.repository, revision: "main", files: files), "manifest can't pin a moving branch")
+        expectManifestError(.init(schemaVersion: 1, repository: actual.repository, revision: String(repeating: "A", count: 40), files: files), "manifest revision is a lowercase commit hash")
+        expectManifestError(.init(schemaVersion: 1, repository: "../" + actual.repository, revision: actual.revision, files: files), "manifest repository can't traverse")
+        expectManifestError(.init(schemaVersion: 1, repository: "owner/name?x=1", revision: actual.revision, files: files), "manifest repository can't carry a query")
+        expectManifestError(.init(schemaVersion: 2, repository: actual.repository, revision: actual.revision, files: files), "an unknown manifest layout is refused")
+
+        // The key service moves the pin: one file changes under a new commit.
+        let movedRevision = String(repeating: "5", count: 40)
+        var movedPayloads = payloads
+        movedPayloads[files[0].path] = Data("moved:\(files[0].path)".utf8)
+        let movedFiles = files.map { file in
+            let data = movedPayloads[file.path]!
+            return NeuralVoiceManifest.File(path: file.path, size: Int64(data.count), sha256: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined())
+        }
+        let moved = NeuralVoiceManifest(schemaVersion: 1, repository: actual.repository, revision: movedRevision, files: movedFiles)
+        let movedClient = VoiceDownloadStub(files: movedPayloads, temporary: temporary)
+        let movedRoot = temporary.appendingPathComponent("moved", isDirectory: true)
+        let pinned = NeuralVoicePacks(manifest: manifest, directory: movedRoot, defaults: defaults, downloader: movedClient, pin: { moved })
+        await pinned.refresh()
+        await noNetwork(movedClient, 0, "checking installed files never asks for the pin")
+        pinned.download(); await until { !pinned.isDownloading }
+        check(pinned.isReady && pinned.status == .ready, "a download follows the key service's pin")
+        check(pinned.installedDirectory?.lastPathComponent.hasPrefix("installed-\(movedRevision)-") == true, "the installed pack records the pinned commit")
+        check(pinned.totalBytes == moved.totalBytes, "the size shown matches the installed pin")
+        let movedInstalled = pinned.installedDirectory
+        // A later launch, offline, with only the app's older bundled manifest.
+        let offline = NeuralVoicePacks(manifest: manifest, directory: movedRoot, defaults: defaults, downloader: movedClient,
+                                       pin: { throw URLError(.notConnectedToInternet) })
+        await offline.refresh()
+        check(offline.isReady && offline.installedDirectory == movedInstalled, "an updated pack verifies offline against its saved pin")
+        try Data("tampered".utf8).write(to: movedInstalled!.appendingPathComponent(files[0].path))
+        let tampered = NeuralVoicePacks(manifest: manifest, directory: movedRoot, defaults: defaults, downloader: movedClient, pin: { moved })
+        await tampered.refresh()
+        check(!tampered.isReady && tampered.status == .failed, "a saved pin still checks every file")
+        await tampered.delete()
+        check(tampered.status == .notInstalled && tampered.totalBytes == manifest.totalBytes, "removing the pack returns to the bundled pin")
+
+        let unreachable = NeuralVoicePacks(manifest: manifest, directory: temporary.appendingPathComponent("unreachable"), defaults: defaults,
+                                           downloader: movedClient, pin: { throw URLError(.notConnectedToInternet) })
+        let beforeUnreachable = await movedClient.requests
+        unreachable.download(); await until { !unreachable.isDownloading }
+        check(!unreachable.isReady && unreachable.status == .failed, "a download doesn't start without the current pin")
+        await noNetwork(movedClient, beforeUnreachable, "no file is fetched before the pin is known")
+        let unsafe = NeuralVoicePacks(manifest: manifest, directory: temporary.appendingPathComponent("unsafe"), defaults: defaults, downloader: movedClient,
+                                      pin: { .init(schemaVersion: 1, repository: actual.repository, revision: movedRevision, files: movedFiles + [traversing]) })
+        unsafe.download(); await until { !unsafe.isDownloading }
+        check(!unsafe.isReady && unsafe.status == .failed, "an invalid pin from the key service is refused")
+        await noNetwork(movedClient, beforeUnreachable, "an invalid pin fetches nothing")
+        let unpinned = NeuralVoicePacks(manifest: manifest, directory: temporary.appendingPathComponent("unpinned"), defaults: defaults,
+                                        downloader: VoiceDownloadStub(files: payloads, temporary: temporary), pin: { nil })
+        unpinned.download(); await until { !unpinned.isDownloading }
+        check(unpinned.isReady && unpinned.installedDirectory?.lastPathComponent.hasPrefix("installed-\(actual.revision)-") == true, "without a key service the bundled pin installs")
         let excessive = NeuralVoiceManifest.File(path: "oversize", size: Int64.max, sha256: String(repeating: "a", count: 64))
         expectManifestError(.init(schemaVersion: 1, repository: actual.repository, revision: actual.revision, files: files + [excessive]), "oversized manifest can't overflow progress")
 

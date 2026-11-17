@@ -40,6 +40,8 @@ import { proPlayPurchase } from "./play";
 
 export interface Env {
   DB: D1Database;
+  /** Offline voice pack files (voices.ts), copied from Hugging Face on first request. */
+  VOICES: R2Bucket;
   /** Cloudflare Email Service, for sign-in codes. */
   EMAIL: SendEmail;
   EMAIL_FROM: string;

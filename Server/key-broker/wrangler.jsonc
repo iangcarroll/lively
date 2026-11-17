@@ -28,6 +28,9 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Offline voice pack files, served by /v1/voices/files. Create the bucket
+  // once with `npx wrangler r2 bucket create lively-voice-packs`.
+  "r2_buckets": [{ "binding": "VOICES", "bucket_name": "lively-voice-packs" }],
   // Sign-in codes. The sender's domain must be onboarded under Email Service
   // › Sending in the dashboard.
   "send_email": [{ "name": "EMAIL" }],

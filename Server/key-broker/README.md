@@ -317,6 +317,42 @@ Counters live in D1. Each request makes one batched, transactional upsert, so
 concurrent requests can't both slip under a limit. Rejected and failed requests
 are refunded. A cron job at :17 every hour deletes expired counters, codes and sessions.
 
+## Offline voice packs
+
+The iOS/macOS app's offline voices (Kokoro, CoreML; about 92 MB) download from
+the broker instead of Hugging Face, so the download works wherever the broker
+does and no third party sees the request.
+
+- `GET /v1/voices/manifest` returns `src/voice-manifest.json`: the Hugging Face
+  repository, a full commit hash, and every file's path, size and SHA-256.
+- `GET /v1/voices/files/<revision>/<path>` serves one of those files from the R2
+  bucket `lively-voice-packs` (binding `VOICES`), under the key
+  `<id>/<revision>/<path>`.
+
+A file that isn't in the bucket yet is copied from Hugging Face on its first
+request, and R2 refuses the copy unless it has the manifest's length and
+SHA-256. After that Hugging Face is never contacted for it. Only the pinned
+revision's listed files are served, so the route can't be used as a proxy.
+Neither route takes an install ID or a session, and neither is rate limited: R2
+doesn't charge for egress, and the copy happens once per file.
+
+The manifest is the pin. The app asks for it before each download and checks
+every file against it, so to move the voices to another revision, replace
+`src/voice-manifest.json` and deploy. No app release is needed, as long as the
+new revision keeps the layout the app's runtime loads (`schemaVersion` 1: the
+same model, G2P and dictionary file names, and a `voices/<id>.json` for each of
+the 54 presets). The app refuses anything else. Installed packs keep the
+manifest they were downloaded with and aren't replaced until the user removes
+and downloads them again. Objects for old revisions stay in the bucket until
+you delete them.
+
+After changing the pin, fill the bucket before users do, so nobody waits on the
+copy of the 82 MB model file:
+
+```bash
+npm run voices:warm                   # requests every pinned file once
+```
+
 ## Pages
 
 The Worker also serves `/` and the App Store's required pages: `/privacy`,
@@ -348,7 +384,10 @@ Cloudflare's bot check turns away some generic clients, such as Python's
 
 The broker runs at **https://lively.cautela.hk**, a Workers custom domain on the
 `cautela.hk` zone, on the Cloudflare account for ian@cautela.us (account
-`1020dc9a8bd7a82cd0801975a100d3ee`). The D1 database `lively-key-broker` is in
+`1020dc9a8bd7a82cd0801975a100d3ee`). The R2 bucket `lively-voice-packs` must
+exist before the first deploy that binds it (`npx wrangler r2 bucket create
+lively-voice-packs`), and the deploy token needs **Account › Workers R2 Storage
+› Edit**. The D1 database `lively-key-broker` is in
 WNAM. Smart Placement runs the Worker near D1 and Soniox's API, so a caller in
 Asia makes one long round trip instead of one per upstream call.
 

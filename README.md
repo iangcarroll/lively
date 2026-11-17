@@ -110,6 +110,18 @@ to hear Japanese translations in that voice. Speech recognition and text
 translation models still need their own downloads in **Offline Languages**;
 the voice pack supplies spoken output only.
 
+The files download from Lively's key broker, which keeps its own copy of them in
+Cloudflare R2, so the app never contacts Hugging Face. The broker also defines
+the pin: before each download the app asks it for the current manifest (the
+revision and every file's size and SHA-256), so the pack can move to a new
+revision without an app release. The manifest a pack was installed from is saved
+beside it, and that is what its files are checked against at startup, so an
+installed pack keeps working offline after the pin moves. A newer pin reaches an
+installed pack when it is removed and downloaded again. The app only accepts a
+manifest with the file layout its runtime loads, and the manifest bundled in the
+app is used for a build without a broker, which downloads from Hugging Face. See
+[Server/key-broker/README.md](Server/key-broker/README.md#offline-voice-packs).
+
 Downloads show progress, support cancellation and retry, and verify every file's
 size and SHA-256 before making the shared pack available. A partial download
 can't be used for playback. **Remove download** removes all downloaded
@@ -125,7 +137,7 @@ based on [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M).
 The local runtime adapts
 [speech-swift at revision 31d676c](https://github.com/soniqo/speech-swift/tree/31d676c6a7f1a3f9e3004c06914de54e61f0f987).
 The model and runtime are Apache-2.0; pronunciation resources include MIT
-attributions. The bundled manifest pins every downloaded file. See the
+attributions. The broker's manifest pins every downloaded file. See the
 [runtime documentation](Packages/NeuralVoices/README.md) and
 [notices](Packages/NeuralVoices/NOTICE) for the source, modifications, and licenses.
 

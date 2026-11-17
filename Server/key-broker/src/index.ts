@@ -2,6 +2,7 @@ import { appStoreNotification } from "./appstore";
 import { deleteAccount, deleteExpiredAuth, logout, me, startEmailSignIn, verifyEmailSignIn } from "./auth";
 import { error, issueSonioxKey, issueSonioxSpeechKey, json, nowSeconds, type Env } from "./broker";
 import { translate } from "./translate";
+import { isVoiceRoute, voices } from "./voices";
 
 const SUPPORT_EMAIL = "support@lively.cautela.hk";
 const PUBLIC_ORIGIN = "https://lively.cautela.hk";
@@ -15,6 +16,7 @@ const privacy = page(
   <p>When you start listening, Lively sends microphone audio to the speech provider selected in Settings so it can transcribe and translate the conversation in real time. The default provider is Soniox. Soniox says its real-time API processes audio, transcripts, and translations transiently, does not store that content, and does not use it to train models.</p>
   <p>If you choose the optional Voxtral + Mistral engine, Lively sends audio and transcript text directly to Mistral using the API key you provide. Mistral's terms and privacy practices apply to that processing.</p>
   <p>When you type a line to translate, Lively sends that text and the last few turns of the conversation to Lively's key service, which has DeepSeek translate it through Cloudflare AI Gateway and returns the translation. Neither Lively's key service nor its gateway logs keep that text; DeepSeek's terms and privacy practices apply to its processing. If the key service can't be reached, the app translates on your device with Apple's Translation framework instead.</p>
+  <p>If you download the offline voice library, the app fetches the voice files from Lively's key service, which keeps a copy of them in Cloudflare storage. That request carries no installation identifier, account, or conversation content.</p>
   <p>The conversation shown in Lively remains on your device for the current app session. Lively does not store it on its own servers.</p>
   <h2>Temporary keys and abuse prevention</h2>
   <p>To use the default provider without creating an account, the app creates a random installation identifier and stores it in your device Keychain (on Android, in app storage encrypted with a key held by the Android Keystore). Lively's key service receives that identifier and your network address to enforce usage limits and prevent abuse. It stores one-way hashes and short-lived counters, not your raw identifier, raw network address, audio, or transcript.</p>
@@ -114,6 +116,7 @@ export default {
         },
       });
     }
+    if (isVoiceRoute(url.pathname)) return voices(request, env);
     const route = Object.hasOwn(ROUTES, url.pathname) ? ROUTES[url.pathname] : undefined;
     if (!route) return error(404, "not_found", "No such endpoint.");
     if (request.method !== route.method) return error(405, "method_not_allowed", `Use ${route.method}.`);
