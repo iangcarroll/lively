@@ -288,7 +288,8 @@ repository secrets `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8`; Actions › T
 Run workflow uploads without a push. Once Apple has processed the build, the
 workflow adds it to the public tester group (the only group with a public link,
 or the one named by the repository variable `TESTFLIGHT_GROUP`), sets "What to
-Test" to the commit's first line, and submits it for beta review. It doesn't run the regression suites, so
+Test" to "Bug fixes and improvements." (or the repository variable
+`TESTFLIGHT_NOTES`), and submits it for beta review. It doesn't run the regression suites, so
 run them before pushing. Android has the matching Play upload; see
 [android/README.md](android/README.md#release).
 

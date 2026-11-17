@@ -87,8 +87,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           TESTFLIGHT_GROUP: ${{ vars.TESTFLIGHT_GROUP }}
-          # What testers are told to test: the commit's first line.
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-        run: |
-          TESTFLIGHT_NOTES="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)" \
-            node Tools/release/testflight-distribute.mjs "${{ needs.upload.outputs.build }}"
+          # What testers are told to test. Generic unless the repository
+          # variable TESTFLIGHT_NOTES says otherwise; never the commit message.
+          TESTFLIGHT_NOTES: ${{ vars.TESTFLIGHT_NOTES }}
+        run: node Tools/release/testflight-distribute.mjs "${{ needs.upload.outputs.build }}"

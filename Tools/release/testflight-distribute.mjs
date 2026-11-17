@@ -18,7 +18,7 @@ if (!buildNumber || !ASC_KEY_ID || !ASC_ISSUER_ID || !ASC_KEY_P8) {
   process.exit(2);
 }
 const groupName = process.env.TESTFLIGHT_GROUP || "";
-const notes = (process.env.TESTFLIGHT_NOTES || "Latest changes.").slice(0, 4000);
+const notes = (process.env.TESTFLIGHT_NOTES || "Bug fixes and improvements.").slice(0, 4000);
 const WAIT_MINUTES = Number(process.env.TESTFLIGHT_WAIT_MINUTES || 40);
 const API = "https://api.appstoreconnect.apple.com";
 
