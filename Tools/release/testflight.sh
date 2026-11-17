@@ -5,6 +5,8 @@
 #   Tools/release/testflight.sh --no-upload  # archive + export only
 #
 # Uses automatic signing with an Apple ID signed into Xcode that can access the team.
+# Without one (CI), set ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID to an App Store
+# Connect API key with the Admin role, which Xcode needs to manage signing.
 # The first run registers the hk.cautela.lively App ID. The App Store Connect app
 # record must exist before the upload step.
 set -euo pipefail
@@ -18,6 +20,11 @@ ARCHIVE="$OUT/Lively-$BUILD_NUMBER.xcarchive"
 UPLOAD=1
 [[ "${1:-}" == "--no-upload" ]] && UPLOAD=0
 
+AUTH=()
+if [[ -n "${ASC_KEY_PATH:-}" ]]; then
+  AUTH=(-authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "${ASC_KEY_ID:?}" -authenticationKeyIssuerID "${ASC_ISSUER_ID:?}")
+fi
+
 mkdir -p "$OUT"
 echo "Archiving build $BUILD_NUMBER for team $LIVELY_TEAM_ID…"
 xcodebuild archive \
@@ -26,7 +33,7 @@ xcodebuild archive \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   -archivePath "$ARCHIVE" \
-  -allowProvisioningUpdates \
+  -allowProvisioningUpdates "${AUTH[@]}" \
   DEVELOPMENT_TEAM="$LIVELY_TEAM_ID" \
   CODE_SIGN_STYLE=Automatic \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
@@ -56,7 +63,7 @@ xcodebuild -exportArchive \
   -archivePath "$ARCHIVE" \
   -exportOptionsPlist "$OUT/ExportOptions.plist" \
   -exportPath "$OUT/export-$BUILD_NUMBER" \
-  -allowProvisioningUpdates
+  -allowProvisioningUpdates "${AUTH[@]}"
 
 if (( UPLOAD )); then
   echo "Uploaded build $BUILD_NUMBER. It appears in App Store Connect › TestFlight after processing (usually 5–15 min)."

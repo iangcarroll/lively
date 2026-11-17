@@ -278,9 +278,22 @@ by `PLAY_PRODUCT_IDS`.
 
 Deploy the key broker with `APP_BUNDLE_ID=hk.cautela.lively` before verifying
 Pro in TestFlight. Merging changes under `Server/key-broker/` to `main` runs
-the broker tests and deployment workflow. Then run `Tools/release/testflight.sh`
-to archive and upload (`--no-upload` exports only). The script defaults to the
-new team; `LIVELY_TEAM_ID` can override it.
+the broker tests and deployment workflow.
+
+A push to `main` that changes the app (`Lively/`, `LivelyWidgets/`, `Packages/`,
+`Config/` or the Xcode project) runs `.github/workflows/testflight.yml`, which
+archives a Release build on GitHub's `xcode-27` runner and uploads it to
+TestFlight. It signs with an App Store Connect API key (Admin role) held in the
+repository secrets `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8`; Actions › TestFlight ›
+Run workflow uploads without a push. Once Apple has processed the build, the
+workflow adds it to the public tester group (the only group with a public link,
+or the one named by the repository variable `TESTFLIGHT_GROUP`), sets "What to
+Test" to the commit's first line, and submits it for beta review. It doesn't run the regression suites, so
+run them before pushing. Android has the matching Play upload; see
+[android/README.md](android/README.md#release).
+
+To upload by hand, run `Tools/release/testflight.sh` (`--no-upload` exports
+only). The script defaults to the new team; `LIVELY_TEAM_ID` can override it.
 The archive step uses automatic development signing before App Store export.
 If the new team has no registered devices, register a development device with
 that team so Xcode can create profiles for the app and widget.

@@ -1,0 +1,94 @@
+name: TestFlight
+
+# Archives the iOS app and uploads it to TestFlight on every change to the app
+# on main, then gives the build to the public tester group. The group is the
+# app's only one with a public link, or the one named by the repository
+# variable TESTFLIGHT_GROUP. Needs three repository secrets, from an App Store Connect API key
+# with the Admin role (Users and Access › Integrations › App Store Connect API):
+#   ASC_KEY_ID      the key's ID
+#   ASC_ISSUER_ID   the issuer ID shown above the key list
+#   ASC_KEY_P8      the contents of the downloaded AuthKey_<id>.p8
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Lively/**"
+      - "LivelyWidgets/**"
+      - "Packages/**"
+      - "Config/**"
+      - "Lively.xcodeproj/**"
+      - "Tools/release/testflight.sh"
+      - "Tools/release/testflight-distribute.mjs"
+      - ".github/workflows/testflight.yml"
+  workflow_dispatch:
+
+# One upload at a time. A newer push replaces a build that is still waiting,
+# but never interrupts one that is already uploading.
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    # The app needs the iOS 27 SDK.
+    runs-on: xcode-27
+    timeout-minutes: 45
+    outputs:
+      build: ${{ steps.number.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+      # A UTC timestamp, shared with the job that hands the build to testers.
+      - name: Choose the build number
+        id: number
+        run: echo "build=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_OUTPUT"
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_27.2.app
+      - name: Archive and upload
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          LIVELY_RELEASE_DIR: ${{ runner.temp }}/release
+          LIVELY_BUILD_NUMBER: ${{ steps.number.outputs.build }}
+        run: |
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_KEY_P8" ]; then
+            echo "::error::Set the ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 repository secrets."
+            exit 1
+          fi
+          export ASC_KEY_PATH="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$ASC_KEY_PATH"
+          chmod 600 "$ASC_KEY_PATH"
+          trap 'rm -f "$ASC_KEY_PATH"' EXIT
+          Tools/release/testflight.sh
+      - name: Keep the build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-logs
+          path: ${{ runner.temp }}/release/*.log
+
+  # Waits for Apple to process the build, then adds it to the public group and
+  # submits it for beta review. On Linux, so the wait doesn't hold a Mac.
+  distribute:
+    needs: upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Give the build to the public group
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          TESTFLIGHT_GROUP: ${{ vars.TESTFLIGHT_GROUP }}
+          # What testers are told to test: the commit's first line.
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          TESTFLIGHT_NOTES="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)" \
+            node Tools/release/testflight-distribute.mjs "${{ needs.upload.outputs.build }}"

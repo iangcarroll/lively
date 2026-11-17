@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - "android/**"
+      - "Tools/release/play-upload.mjs"
       - ".github/workflows/android.yml"
   pull_request:
     paths:
       - "android/**"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 defaults:
   run:
@@ -33,3 +37,74 @@ jobs:
         with:
           name: reports
           path: android/app/build/reports
+
+  # Builds the signed bundle and uploads it to Play's internal testing track
+  # on every change to the app on main. Needs these repository secrets:
+  #   ANDROID_KEYSTORE_BASE64     the upload keystore, `base64 -i upload.jks`
+  #   ANDROID_KEYSTORE_PASSWORD   its store password
+  #   ANDROID_KEY_ALIAS           the upload key's alias
+  #   ANDROID_KEY_PASSWORD        the upload key's password
+  #   PLAY_SERVICE_ACCOUNT        a service account's JSON key, with "Release
+  #                               to testing tracks" on the app in Play Console
+  play:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # One upload at a time, so version codes reach Play in order.
+    concurrency:
+      group: play-upload
+      cancel-in-progress: false
+    steps:
+      # Until the secrets exist this job passes without uploading.
+      - name: Check for the release secrets
+        id: secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
+        working-directory: .
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ] && [ -n "$PLAY_SERVICE_ACCOUNT" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Not uploaded to Play: set the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD and PLAY_SERVICE_ACCOUNT repository secrets."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+      - uses: actions/setup-java@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.secrets.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: 22
+      - name: Build the signed bundle
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          trap 'rm -f "$RUNNER_TEMP/upload.jks"' EXIT
+          # Gradle reads ORG_GRADLE_PROJECT_* as project properties, which
+          # keeps the passwords off the command line.
+          ORG_GRADLE_PROJECT_livelyKeystore="$RUNNER_TEMP/upload.jks" \
+          ORG_GRADLE_PROJECT_livelyKeystorePassword="$ANDROID_KEYSTORE_PASSWORD" \
+          ORG_GRADLE_PROJECT_livelyKeyAlias="$ANDROID_KEY_ALIAS" \
+          ORG_GRADLE_PROJECT_livelyKeyPassword="$ANDROID_KEY_PASSWORD" \
+          ./gradlew :app:bundleRelease
+      - name: Upload to Play internal testing
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
+          PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS }}
+        run: |
+          node ../Tools/release/play-upload.mjs app/build/outputs/bundle/release/app-release.aab

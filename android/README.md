@@ -130,6 +130,17 @@ every change under `android/`.
 signed with the debug key so they can be tried locally. The version code is a
 UTC timestamp (`yyMMddHH`), or `-PlivelyBuildNumber=…`.
 
+A push to `main` that changes `android/` uploads automatically: after the tests
+pass, `.github/workflows/android.yml` builds the signed bundle and
+`Tools/release/play-upload.mjs` sends it to Play's internal testing track (the
+counterpart of the iOS TestFlight workflow). It needs the repository secrets
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+`ANDROID_KEY_PASSWORD` and `PLAY_SERVICE_ACCOUNT` (a service account's JSON key
+with "Release to testing tracks" on the app). The app must already exist in Play
+with one bundle uploaded by hand. Until its first release has been reviewed, set
+the repository variable `PLAY_RELEASE_STATUS` to `draft`. Two pushes within the
+same UTC hour get the same version code, and Play rejects the second.
+
 The Android package remains `sh.ian.lively` when the Apple app moves to
 `hk.cautela.lively`. Play keeps the product IDs below, which match the
 broker's `PLAY_PRODUCT_IDS`. Apple uses `hk.cautela.lively.pro.*` products
