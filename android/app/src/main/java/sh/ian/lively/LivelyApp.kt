@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import sh.ian.lively.model.Account
 import sh.ian.lively.model.AppSettings
 import sh.ian.lively.model.LanguageDetector
+import sh.ian.lively.model.LocationLanguages
 import sh.ian.lively.model.Pro
 import sh.ian.lively.model.ScriptConverter
 import sh.ian.lively.model.SpeechProviders
@@ -24,6 +25,7 @@ import sh.ian.lively.net.RegionProber
 import sh.ian.lively.net.SonioxKeyProvider
 import sh.ian.lively.support.DebugFlags
 import sh.ian.lively.support.KeystoreSecretStore
+import sh.ian.lively.support.RegionLocator
 import sh.ian.lively.support.SharedPreferencesStore
 import java.util.UUID
 
@@ -77,6 +79,9 @@ class LivelyApp : Application() {
         val brokerTranslator: BrokerTranslator? = brokerURL?.let { BrokerTranslator(it, installID, identity) }
 
         val settings = AppSettings(prefs, secrets, SpeechProviders.all(scope, keyProvider))
+
+        /** Optional "Set from location"; off until turned on. */
+        val locationLanguages = LocationLanguages(settings, RegionLocator(context), scope, RegionLocator::systemLanguage)
 
         val network = NetworkWatcher(context)
 

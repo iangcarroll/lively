@@ -189,7 +189,10 @@ struct ConversationScreen: View {
             Text(store.alert ?? "")
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { store.didBecomeActive() }
+            if phase == .active {
+                store.didBecomeActive()
+                followLocation()
+            }
             #if os(iOS)
             // iOS takes the mic away in the background anyway; stop cleanly.
             if phase == .background { store.didEnterBackground() }
@@ -219,6 +222,18 @@ struct ConversationScreen: View {
             } else {
                 store.prewarm()
             }
+            // scenePhase is already active at launch, so onChange doesn't run.
+            followLocation()
+        }
+    }
+
+    /// With "Set from location" on, sets the pair on arriving in another
+    /// country. Not over a conversation: changing the pair clears it.
+    private func followLocation() {
+        guard settings.usesLocationLanguages, !isDemo else { return }
+        Task {
+            let idle = store.utterances.isEmpty && !store.isListening
+            if await LocationLanguages.shared.update(canChange: idle) { store.settingsDidClose() }
         }
     }
 

@@ -62,6 +62,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle(isOn: usesLocation) {
+                        Label { Text("Set from location") } icon: { SettingsIcon(systemImage: "location.fill", color: .blue) }
+                    }
+                } footer: {
+                    Text([LocationLanguages.summary, LocationLanguages.shared.status.message].compactMap(\.self).joined(separator: " "))
+                }
+
+                Section {
                     NavigationLink {
                         OfflineLanguagesView(settings: settings)
                             .id("\(settings.languages.first.rawValue)-\(settings.languages.second.rawValue)-\(settings.chineseScript.rawValue)")
@@ -236,6 +244,16 @@ struct SettingsView: View {
     }
 
     private var provider: SpeechProvider { settings.provider }
+
+    /// Turning it on asks for location access first; see `LocationLanguages`.
+    private var usesLocation: Binding<Bool> {
+        Binding(
+            get: { settings.usesLocationLanguages || LocationLanguages.shared.isEnabling },
+            set: { on in
+                if on { Task { await LocationLanguages.shared.enable() } } else { LocationLanguages.shared.disable() }
+            }
+        )
+    }
 
     private var proStatus: String {
         if Pro.shared.isSubscribed { return "Active" }

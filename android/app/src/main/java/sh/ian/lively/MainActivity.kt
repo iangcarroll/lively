@@ -231,7 +231,7 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
             )
         }
         composable(Routes.ONBOARDING) {
-            OnboardingScreen(settings, graph.account) {
+            OnboardingScreen(settings, graph.account, graph.locationLanguages) {
                 prefs.putBool("onboardingDone", true)
                 nearLanguage = settings.languages.first
                 prefs.putString("nearLanguage", nearLanguage.code)
@@ -247,6 +247,7 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
                 settings = settings,
                 account = graph.account,
                 pro = graph.pro,
+                location = graph.locationLanguages,
                 hasBroker = graph.keyProvider != null,
                 onBack = { nav.popBackStack() },
                 onAccount = { nav.navigateSingle(Routes.ACCOUNT) },
@@ -294,6 +295,14 @@ private fun ForegroundEffects(graph: LivelyApp.Graph, store: ConversationStore) 
                     store.didBecomeActive()
                     graph.pro.start()
                     graph.scope.launch { graph.account?.refresh() }
+                    // With "Set from location" on, sets the pair on arriving in
+                    // another country. Not over a conversation: changing the pair clears it.
+                    if (graph.settings.usesLocationLanguages && !DebugFlags.demo) {
+                        graph.scope.launch {
+                            val idle = store.utterances.isEmpty() && !store.isListening
+                            if (graph.locationLanguages.update(canChange = idle)) store.settingsDidClose()
+                        }
+                    }
                 }
                 Lifecycle.Event.ON_STOP -> store.didEnterBackground()
                 else -> {}

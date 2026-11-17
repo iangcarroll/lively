@@ -90,6 +90,11 @@ The product IDs must match `Pro.productIDs` in the app and `APP_STORE_PRODUCT_ID
   - Audio Data — app functionality and other purposes; provider processing and possible model training.
   - Other User Content — app functionality and other purposes; translation text and possible model training.
   - Purchase History — app functionality; persistent subscription transaction identifiers.
+- Location is not declared: the optional "Set from location" setting passes an
+  approximate location to Apple's reverse geocoder on the device's behalf and
+  keeps only the country code on the device. Nothing is sent to Lively or its
+  providers. On Google Play, review the Data safety form for the new
+  `ACCESS_COARSE_LOCATION` permission before the next release.
 - These answers cover every supported engine. The optional Mistral engine uses
   the user's own API key, so requests can be associated with that provider
   account. Mistral's retention and training controls depend on the user's plan

@@ -19,6 +19,7 @@ import sh.ian.lively.BuildConfig
  * - `LivelyDropout "AT,FOR"`: blackholes the network FOR seconds, AT seconds in.
  * - `LivelySlowConnect SECONDS`: holds up each primary connection attempt.
  * - `LivelyPathChange AT`: reports a network change AT seconds in.
+ * - `LivelyRegion CODE`: stands in for being in that country, for "Set from location".
  */
 object DebugFlags {
     var demo = false
@@ -28,6 +29,7 @@ object DebugFlags {
     var dropout: Pair<Double, Double>? = null
     var slowConnectSeconds = 0.0
     var pathChangeAt = 0.0
+    var region: String? = null
 
     fun read(intent: Intent?) {
         val extras: Bundle = intent?.extras ?: return
@@ -41,6 +43,7 @@ object DebugFlags {
         }
         extras.number("LivelySlowConnect")?.let { slowConnectSeconds = it }
         extras.number("LivelyPathChange")?.let { pathChangeAt = it }
+        extras.getString("LivelyRegion")?.let { region = it.uppercase() }
     }
 
     /** `--ez KEY true` or `-e KEY YES`. */

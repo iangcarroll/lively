@@ -1,5 +1,8 @@
 package sh.ian.lively.ui
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +36,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Hearing
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Speed
@@ -91,6 +95,7 @@ import sh.ian.lively.model.ChineseScript
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguageSide
 import sh.ian.lively.model.Latency
+import sh.ian.lively.model.LocationLanguages
 import sh.ian.lively.model.Pro
 import sh.ian.lively.model.ProviderOption
 import sh.ian.lively.model.SpeechProviders
@@ -111,6 +116,7 @@ fun SettingsScreen(
     settings: AppSettings,
     account: Account?,
     pro: Pro,
+    location: LocationLanguages,
     hasBroker: Boolean,
     onBack: () -> Unit,
     onAccount: () -> Unit,
@@ -196,6 +202,26 @@ fun SettingsScreen(
                             Text("Chinese script", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         }
                         ScriptPicker(settings, Modifier.padding(start = 68.dp, end = 16.dp, bottom = 14.dp))
+                    }
+                }
+
+                val setUsesLocation = rememberLocationSwitch(location)
+                Group(footer = listOfNotNull(LocationLanguages.SUMMARY, location.status.message).joinToString(" ")) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = settings.usesLocationLanguages,
+                                role = Role.Switch,
+                                onValueChange = setUsesLocation,
+                            )
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        SettingsIcon(Icons.Rounded.LocationOn, Blue)
+                        Text("Set from location", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Switch(checked = settings.usesLocationLanguages, onCheckedChange = null)
                     }
                 }
 
@@ -348,6 +374,16 @@ private fun engineFooter(settings: AppSettings): String {
         lines += "Faster speed shows words sooner; Accurate waits a little longer for better transcripts."
     }
     return lines.joinToString(" ")
+}
+
+/**
+ * Turns "Set from location" on and off. Turning it on asks for approximate
+ * location access first; see [LocationLanguages].
+ */
+@Composable
+fun rememberLocationSwitch(location: LocationLanguages): (Boolean) -> Unit {
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> location.enable(granted) }
+    return { on -> if (on) ask.launch(Manifest.permission.ACCESS_COARSE_LOCATION) else location.disable() }
 }
 
 @Composable

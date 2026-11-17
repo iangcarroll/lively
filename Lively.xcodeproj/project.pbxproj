@@ -316,6 +316,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = "Config/Lively-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Lively reads the text in photos you take so it can translate it.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lively looks up the country you're in so it can choose the local language for you.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Lively listens to your conversation so it can transcribe and translate it live.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Lively transcribes on device when it can't reach a speech service.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -364,6 +365,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = "Config/Lively-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Lively reads the text in photos you take so it can translate it.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lively looks up the country you're in so it can choose the local language for you.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Lively listens to your conversation so it can transcribe and translate it live.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Lively transcribes on device when it can't reach a speech service.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

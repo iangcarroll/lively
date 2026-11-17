@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Optional "Set from location": the country, for the local language. Asked for only when it's turned on. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- Tablets and Chromebooks without a mic can still install it and use a headset. -->
     <uses-feature android:name="android.hardware.microphone" android:required="false" />

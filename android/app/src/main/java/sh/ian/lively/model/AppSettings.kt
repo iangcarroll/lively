@@ -59,6 +59,23 @@ class AppSettings(
         languages = languages.with(language, side)
     }
 
+    private var _usesLocationLanguages by mutableStateOf(prefs.bool("usesLocationLanguages"))
+
+    /** Optional: the pair follows the country the device is in. See [LocationLanguages]. */
+    var usesLocationLanguages: Boolean
+        get() = _usesLocationLanguages
+        set(value) {
+            _usesLocationLanguages = value
+            prefs.putBool("usesLocationLanguages", value)
+        }
+
+    /** The country the pair was last set for, so a choice made there by hand sticks. */
+    var locationLanguageRegion: String? = prefs.string("locationLanguageRegion")
+        set(value) {
+            field = value
+            prefs.putString("locationLanguageRegion", value)
+        }
+
     private var _pickupRange by mutableStateOf(PickupRange.from(prefs.string("pickupRange")))
 
     /** How far away the mic listens; quieter sound is sent as silence. */

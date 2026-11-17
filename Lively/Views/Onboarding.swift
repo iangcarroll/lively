@@ -228,14 +228,17 @@ private struct LanguagesPage: View {
             title: "Pick your languages",
             message: "Lively listens for both and translates each into the other. You can change them any time."
         ) {
-            VStack(spacing: -14) {
-                LanguageCard(caption: "You speak", language: settings.languages.first, ink: Color(.firstLanguageInk)) {
-                    choosing = .first
+            VStack(spacing: 16) {
+                VStack(spacing: -14) {
+                    LanguageCard(caption: "You speak", language: settings.languages.first, ink: Color(.firstLanguageInk)) {
+                        choosing = .first
+                    }
+                    swapButton.zIndex(1)
+                    LanguageCard(caption: "They speak", language: settings.languages.second, ink: Color(.secondLanguageInk)) {
+                        choosing = .second
+                    }
                 }
-                swapButton.zIndex(1)
-                LanguageCard(caption: "They speak", language: settings.languages.second, ink: Color(.secondLanguageInk)) {
-                    choosing = .second
-                }
+                locationButton
             }
             .padding(.horizontal, 24)
             .overlay(alignment: .bottom) {
@@ -262,6 +265,36 @@ private struct LanguagesPage: View {
             }
             .presentationDetents([.large])
         }
+    }
+
+    /// Optional: asks for location access and sets the pair for this country.
+    private var locationButton: some View {
+        let location = LocationLanguages.shared
+        let on = settings.usesLocationLanguages || location.isEnabling
+        return VStack(spacing: 6) {
+            Button {
+                if on { location.disable() } else { Task { await location.enable() } }
+            } label: {
+                Label(on ? "Using your location" : "Use my location", systemImage: on ? "location.fill" : "location")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
+                    .contentShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(on ? Color.accentColor : .secondary)
+            .background((on ? Color.accentColor : .secondary).opacity(0.12), in: .capsule)
+            .accessibilityHint("Sets the languages for the country you're in")
+            .accessibilityAddTraits(on ? .isSelected : [])
+            if let message = location.status.message {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .animation(.snappy, value: location.status)
     }
 
     private var swapButton: some View {

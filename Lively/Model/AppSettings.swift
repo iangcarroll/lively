@@ -46,6 +46,16 @@ final class AppSettings {
         languages = pair
     }
 
+    /// Optional: the pair follows the country the device is in. See `LocationLanguages`.
+    var usesLocationLanguages: Bool {
+        didSet { defaults.set(usesLocationLanguages, forKey: "usesLocationLanguages") }
+    }
+
+    /// The country the pair was last set for, so a choice made there by hand sticks.
+    var locationLanguageRegion: String? {
+        didSet { defaults.set(locationLanguageRegion, forKey: "locationLanguageRegion") }
+    }
+
     /// How far away the mic listens; quieter sound is sent as silence.
     var pickupRange: PickupRange {
         didSet { defaults.set(pickupRange.rawValue, forKey: "pickupRange") }
@@ -128,6 +138,8 @@ final class AppSettings {
             second: Language(defaults.string(forKey: "secondLanguage") ?? LanguagePair.default.second.rawValue)
         )
         languages = SpeechProvider.with(id: providerID).supports(stored) && stored.first != stored.second ? stored : .default
+        usesLocationLanguages = defaults.bool(forKey: "usesLocationLanguages")
+        locationLanguageRegion = defaults.string(forKey: "locationLanguageRegion")
         latency = Latency(rawValue: defaults.integer(forKey: "latency")) ?? .fastest
         pickupRange = PickupRange(rawValue: defaults.string(forKey: "pickupRange") ?? "") ?? .default
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified

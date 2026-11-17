@@ -24,6 +24,12 @@ broker, account and Pro allowance:
   muting the mic while it speaks unless headphones are connected.
   Separate incoming-headphone / outgoing-speaker playback is currently an
   iOS 26.2+ feature; Android uses its normal audio output.
+- Optional **Set from location** in Settings and the welcome tour: asks for
+  approximate location, then sets your system language (or English) and the
+  language of the country you're in, as on iOS; see
+  [../README.md](../README.md#languages-from-your-location). It uses the
+  platform `LocationManager` and `Geocoder` (Core Location and MapKit on iOS),
+  with the mobile network's country as a fallback.
 - Typing instead of speaking from the keyboard button, translated by
   DeepSeek through the key broker, falling back to ML Kit on the device
   (Apple's Translation framework on iOS).
@@ -93,6 +99,7 @@ adb shell am start -n sh.ian.lively/.MainActivity --ez LivelyDemo true --ez Live
 | `LivelyDropout "AT,FOR"` | Debug builds: blackholes the network FOR seconds, AT seconds in. |
 | `LivelySlowConnect SECONDS` | Debug builds: holds up each connection attempt, so a second one races it. |
 | `LivelyPathChange AT` | Debug builds: reports a network change AT seconds in. |
+| `LivelyRegion CODE` | Debug builds: stands in for being in that country, for Set from location. |
 
 To try real audio on an emulator, render the test conversation and hand it
 to the app:
@@ -151,6 +158,7 @@ draws the same bubbles as the iOS icon.
 | `Audio/SpeechPlayer.swift` (AVAudioEngine) | `audio/SpeechPlayer.kt` (AudioTrack; no shared audio session to coordinate) |
 | `Model/Account.swift`, `Pro.swift` | `model/Account.kt`, `model/Pro.kt` (Play Billing) |
 | `Support/Keychain.swift` | `support/Stores.kt` (Keystore-sealed preferences, kept out of backups) |
+| `Model/LocationLanguages.swift` (Core Location, MapKit) | `model/LocationLanguages.kt`, `support/RegionLocator.kt` (LocationManager, Geocoder) |
 | `NLLanguageRecognizer` | `model/LanguageDetector.kt` (script counting, then `TextClassifier`) |
 | Vision text recognition (`Support/TextRecognizer.swift`) | `support/TextRecognizer.kt` (ML Kit, a model per script) |
 | `StringTransform("Hans-Hant")` | ICU `Transliterator("Hans-Hant")` |

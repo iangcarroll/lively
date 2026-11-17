@@ -44,6 +44,26 @@ lines go to DeepSeek through the key broker, falling back to on-device
 translation (Apple's Translation framework; ML Kit on Android). Voxtral uses its
 own Mistral translator for them.
 
+## Languages from your location
+
+Optional and off by default: **Settings › Set from location**, or **Use my
+location** on the welcome tour's language page. Turning it on is when Lively
+asks for location access (approximate only on Android). It looks up the country
+you're in and sets the pair: your side is the system language when the engine
+supports it, otherwise English; the other side is that country's most widely
+spoken language (Japan → Japanese, Brazil → Portuguese, and Traditional Chinese
+in Taiwan, Hong Kong and Macau). The pair stays as it is where the local
+language is your own, isn't one the engine has, or the country isn't in the
+table (`Model/LocationLanguages.swift`, `model/LocationLanguages.kt`).
+
+After that Lively checks when it opens and sets the pair again only on arriving
+in another country, so a choice made by hand sticks, and never over a
+conversation in progress. Only the country code is kept. The location goes to
+the system's reverse geocoder (MapKit on iOS/macOS, the platform `Geocoder` on
+Android) and nowhere else; Android falls back to the mobile network's country
+when there's no geocoder. In a Debug build, `-LivelyRegion JP` (iOS) or
+`-e LivelyRegion JP` (Android) stands in for being there.
+
 ## Offline conversations (iOS / macOS)
 
 Open **Settings › Offline Languages**, then **Download languages** while online.

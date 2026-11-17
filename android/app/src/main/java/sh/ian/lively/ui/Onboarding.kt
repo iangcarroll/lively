@@ -51,7 +51,9 @@ import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.UnfoldMore
 import androidx.compose.material3.Icon
@@ -91,6 +93,7 @@ import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -107,6 +110,7 @@ import sh.ian.lively.model.AppSettings
 import sh.ian.lively.model.DemoConversation
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguageSide
+import sh.ian.lively.model.LocationLanguages
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -117,7 +121,7 @@ private enum class Step { WELCOME, TABLE, LANGUAGES, ACCOUNT }
  * instead of describing it, picks the two languages, and offers sign-in.
  */
 @Composable
-fun OnboardingScreen(settings: AppSettings, account: Account?, onFinish: () -> Unit) {
+fun OnboardingScreen(settings: AppSettings, account: Account?, location: LocationLanguages, onFinish: () -> Unit) {
     // Sign-in is offered only when the build has an account service.
     val steps = if (account == null) listOf(Step.WELCOME, Step.TABLE, Step.LANGUAGES) else Step.entries
     val pager = rememberPagerState { steps.size }
@@ -173,7 +177,7 @@ fun OnboardingScreen(settings: AppSettings, account: Account?, onFinish: () -> U
                         when (steps[index]) {
                             Step.WELCOME -> WelcomePage(settings.providers.maxOf { it.languages.size })
                             Step.TABLE -> TablePage(active = pager.currentPage == index)
-                            Step.LANGUAGES -> LanguagesPage(settings)
+                            Step.LANGUAGES -> LanguagesPage(settings, location)
                             Step.ACCOUNT -> account?.let { AccountPage(it, onSignedIn = onFinish) }
                         }
                     }
@@ -297,8 +301,9 @@ private fun TablePage(active: Boolean) = OnboardingPage(
 ) { TableDemo(active) }
 
 @Composable
-private fun LanguagesPage(settings: AppSettings) {
+private fun LanguagesPage(settings: AppSettings, location: LocationLanguages) {
     var choosing by remember { mutableStateOf<LanguageSide?>(null) }
+    val setUsesLocation = rememberLocationSwitch(location)
     val view = LocalView.current
     OnboardingPage(
         title = "Pick your languages",
@@ -322,6 +327,36 @@ private fun LanguagesPage(settings: AppSettings) {
                 ) {
                     Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.SwapVert, null) }
                 }
+            }
+            // Optional: asks for location access and sets the pair for this country.
+            val on = settings.usesLocationLanguages
+            val tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            Surface(
+                onClick = { setUsesLocation(!on) },
+                shape = CircleShape,
+                color = tint.copy(alpha = 0.12f),
+                contentColor = tint,
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .semantics { selected = on },
+            ) {
+                Row(
+                    Modifier.heightIn(min = 48.dp).padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(if (on) Icons.Rounded.LocationOn else Icons.Outlined.LocationOn, null, Modifier.size(18.dp))
+                    Text(if (on) "Using your location" else "Use my location", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            location.status.message?.let { message ->
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
             }
             AnimatedVisibility(Language.CHINESE in settings.languages) {
                 ScriptPicker(settings, Modifier.padding(top = 20.dp).widthIn(max = 320.dp))
