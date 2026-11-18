@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.WifiOff
@@ -99,6 +100,7 @@ fun FaceToFaceScreen(
     onEndEditing: () -> Unit,
     onShowTranscript: () -> Unit,
     onShowSettings: () -> Unit,
+    onShowAddress: () -> Unit,
     /** Opens the languages sheet, from either half's language tag. */
     onChangeLanguages: () -> Unit,
     modifier: Modifier = Modifier,
@@ -137,7 +139,7 @@ fun FaceToFaceScreen(
             onChangeLanguages = onChangeLanguages,
             showsListeningPrompt = showsListeningPrompt,
         )
-        ControlStrip(store, onSwap, showsTextInput, onShowsTextInputChange, onShowTranscript, onShowSettings, sides)
+        ControlStrip(store, onSwap, showsTextInput, onShowsTextInputChange, onShowTranscript, onShowSettings, onShowAddress, sides)
         val bottom = contentPadding.calculateBottomPadding()
         FaceToFaceHalf(
             store, nearDisplayLanguage, nearRole, pair, script,
@@ -169,6 +171,7 @@ private fun ControlStrip(
     onShowsTextInputChange: (Boolean) -> Unit,
     onShowTranscript: () -> Unit,
     onShowSettings: () -> Unit,
+    onShowAddress: () -> Unit,
     /** Side insets for the controls; the hairlines ignore them. */
     sides: Modifier,
 ) {
@@ -207,6 +210,12 @@ private fun ControlStrip(
                         var menu by remember { mutableStateOf(false) }
                         TonalIconButton(Icons.Rounded.MoreVert, "More", size = buttonSize, onClick = { menu = true })
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
+                            DropdownMenuItem(
+                                text = { Text("Address") },
+                                leadingIcon = { Icon(Icons.Rounded.Place, null) },
+                                onClick = { menu = false; onShowAddress() },
+                            )
+                            HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Transcript view") },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ViewList, null) },

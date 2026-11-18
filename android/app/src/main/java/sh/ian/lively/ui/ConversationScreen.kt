@@ -28,7 +28,14 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.KeyboardHide
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import sh.ian.lively.model.ConnectionStatus
 import androidx.compose.material.icons.rounded.Splitscreen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -99,6 +106,8 @@ fun ConversationScreen(
     listenerNear: Boolean,
     onListenerNearChange: (Boolean) -> Unit,
     onShowSettings: () -> Unit,
+    /** Opens the address lookup, which is separate from the conversation. */
+    onShowAddress: () -> Unit,
     /** Opens Lively Pro saying today's free time has run out. */
     onShowLimit: () -> Unit,
 ) {
@@ -114,6 +123,13 @@ fun ConversationScreen(
     val insets = if (automaticOffline) WindowInsets.safeDrawing.exclude(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)) else WindowInsets.safeDrawing
     var showsTextInput by rememberSaveable { mutableStateOf(false) }
     var showsLanguages by rememberSaveable { mutableStateOf(false) }
+    // The listening guidance fades once a live conversation is under way and
+    // returns when the phone is handed over. Settings, Pro and the address
+    // lookup are other destinations, which pause it by leaving this one.
+    val listeningPrompt = rememberListeningPromptVisibility(
+        isLive = store.isListening && store.status == ConnectionStatus.Live,
+        isCovered = showsLanguages,
+    )
     /** The turn being corrected in the text bar. */
     var editing by remember { mutableStateOf<Utterance?>(null) }
     /** The bar opened for an edit, so it closes when the edit ends. */
@@ -189,8 +205,10 @@ fun ConversationScreen(
                         onEndEditing = endEditing,
                         onShowTranscript = { onShowsTranscriptChange(true) },
                         onShowSettings = onShowSettings,
+                        onShowAddress = onShowAddress,
                         onChangeLanguages = { showsLanguages = true },
                         contentPadding = insets.asPaddingValues(),
+                        showsListeningPrompt = listeningPrompt.showsListeningPrompt,
                     )
                 } else {
                     TranscriptLayout(
@@ -202,7 +220,9 @@ fun ConversationScreen(
                         onEndEditing = endEditing,
                         onFaceToFace = { onShowsTranscriptChange(false) },
                         onShowSettings = onShowSettings,
+                        onShowAddress = onShowAddress,
                         onChangeLanguages = { showsLanguages = true },
+                        showsListeningPrompt = listeningPrompt.showsListeningPrompt,
                     )
                 }
             }
@@ -273,6 +293,7 @@ private fun TranscriptLayout(
     onEndEditing: () -> Unit,
     onFaceToFace: () -> Unit,
     onShowSettings: () -> Unit,
+    onShowAddress: () -> Unit,
     onChangeLanguages: () -> Unit,
     showsListeningPrompt: Boolean = true,
 ) {
@@ -310,7 +331,23 @@ private fun TranscriptLayout(
             // on, so it can be stopped from here.
             if (store.speaksTranslations) SpeakAloudButton(store)
             if (!wide) TonalIconButton(Icons.Rounded.Splitscreen, "Face-to-face mode", onFaceToFace)
-            TonalIconButton(Icons.Rounded.Settings, "Settings", onShowSettings)
+            Box {
+                var menu by remember { mutableStateOf(false) }
+                TonalIconButton(Icons.Rounded.MoreVert, "More", onClick = { menu = true })
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
+                    DropdownMenuItem(
+                        text = { Text("Address") },
+                        leadingIcon = { Icon(Icons.Rounded.Place, null) },
+                        onClick = { menu = false; onShowAddress() },
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Settings") },
+                        leadingIcon = { Icon(Icons.Rounded.Settings, null) },
+                        onClick = { menu = false; onShowSettings() },
+                    )
+                }
+            }
         }
 
         // Bottom controls: clear, the mic in the middle, and text input.

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -116,8 +117,24 @@ class LivelyUiTest {
         compose.onNodeWithContentDescription("Clear conversation").performClick()
         waitForText("Tap the mic to start")
         compose.onNodeWithContentDescription("Face-to-face mode").performClick()
-        // Swap sides is in the More menu, which only face-to-face has.
+        // Back in face-to-face, which has no button for itself.
+        compose.waitUntilDoesNotExist(hasContentDescription("Face-to-face mode"), 5_000)
+    }
+
+    @Test fun addressOpensFromBothLayouts() {
+        launch("LivelyDemo")
+        compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 10_000)
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Address").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("address-query"), 5_000)
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 5_000)
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Transcript view").performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Face-to-face mode"), 5_000)
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Address").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("address-query"), 5_000)
     }
 
     @Test fun settingsPickALanguage() {

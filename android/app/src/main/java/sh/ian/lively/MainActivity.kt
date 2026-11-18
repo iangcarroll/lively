@@ -60,6 +60,7 @@ import sh.ian.lively.model.LanguageSide
 import sh.ian.lively.model.ReviewPrompt
 import sh.ian.lively.support.DebugFlags
 import sh.ian.lively.ui.AccountScreen
+import sh.ian.lively.ui.AddressLookupScreen
 import sh.ian.lively.ui.ConversationScreen
 import sh.ian.lively.ui.LanguageListScreen
 import sh.ian.lively.ui.LivelyTheme
@@ -178,6 +179,7 @@ private object Routes {
     const val SETTINGS = "settings"
     const val ACCOUNT = "settings/account"
     const val PRO = "pro"
+    const val ADDRESS = "address"
     /** Lively Pro, opened because today's free time ran out. */
     const val PRO_LIMIT = "pro/limit"
     const val LANGUAGE = "settings/language/{side}"
@@ -267,6 +269,11 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
                     prefs.putBool("listenerNear", it)
                 },
                 onShowSettings = { nav.navigateSingle(Routes.SETTINGS) },
+                onShowAddress = {
+                    // Keeps address lookup separate from ongoing conversation audio.
+                    store.pauseForAddressLookup()
+                    nav.navigateSingle(Routes.ADDRESS)
+                },
                 onShowLimit = { nav.navigateSingle(Routes.PRO_LIMIT) },
             )
             if (offersLocation) {
@@ -277,6 +284,13 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
                     if (changed) store.settingsDidClose()
                 }
             }
+        }
+        composable(Routes.ADDRESS) {
+            val language = remember {
+                if (store.isAutomaticLanguageMode) store.detectedPartnerLanguage ?: store.listenerLanguage
+                else settings.languages.second
+            }
+            AddressLookupScreen(initialLanguage = language, onBack = { nav.popBackStack() })
         }
         composable(Routes.ONBOARDING) {
             OnboardingScreen(settings, graph.account, graph.locationLanguages) {

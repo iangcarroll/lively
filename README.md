@@ -5,10 +5,12 @@ Live conversation translation for iOS, macOS and Android.
 Either person speaks whenever they want. The speech engine detects the language
 and turn boundaries, and the transcript keeps each turn with its translation.
 
-## Conversation modes (iOS / macOS)
+## Conversation modes
 
-**Automatic** is the default with the Soniox engine. Choose only **Your language**
-in Settings: the language you read and hear. There is no conversation pair to
+**Automatic** is the default for new installs with the Soniox engine; an
+install set up before it existed keeps its saved pair until the mode is changed
+in Settings or the languages sheet. Choose only **Your language**: the language
+you read and hear. There is no conversation pair to
 set and no speaker-selection popup. The other side stays **Automatic** until
 speech identifies a supported partner language; an unknown destination never
 falls back to the saved manual pair.
@@ -125,7 +127,8 @@ Queries and address results are kept only for the current lookup screen.
 
 ## Languages from your location
 
-Optional and off by default: **Settings › Set from location**, or **Use my
+Optional and off by default, and only with **Choose a pair** (location picks
+a pair, which Automatic doesn't use): **Settings › Set from location**, or **Use my
 location** on the welcome tour's language page. Anyone who hasn't turned it on
 is also asked once, by a card over the conversation on the next open that
 isn't the welcome tour; either answer closes it for good. Turning it on is when Lively
@@ -357,7 +360,7 @@ yearly first and selected, with what it saves against twelve months, and both
 plans and Subscribe in view without scrolling. When a free day runs out, the
 same screen opens in place of an alert, and offers sign-in as the free way to
 another hour to anyone signed out. After a couple of conversations of four
-turns or more, the app asks once for an App Store review
+translated turns or more, the app asks once for an App Store review
 (`Model/ReviewPrompt.swift`).
 
 ### Apple developer account and TestFlight

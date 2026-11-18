@@ -1,16 +1,17 @@
 # Lively for Android
 
 A native Android version of Lively, in Kotlin and Jetpack Compose with
-Material 3. It shares Lively's earlier paired conversation flows, cloud engines, key
+Material 3. It shares Lively's conversation flows, cloud engines, key
 broker, account and Pro allowance:
 
-The new Swift-app **Automatic** mode is iOS/macOS work and has not been ported
-to Android. Android still uses a selected language pair and Soniox's native
-`two_way` stream. It does not have the saved-listener-only `one_way` adapter,
-partner discovery, unknown-target waiting turns, or silent recent-turn backfill.
-The Swift app keeps its manual pair mode too. This is a runtime difference,
-not a new Android setup or key requirement; both apps still use
-`https://lively.ian.sh`.
+- **Automatic** conversations, as on iOS: choose only **Your language** and
+  Lively finds the other from speech, with a Soniox `one_way` session and the
+  same rules (the first other-language turn sets the partner, a different
+  language needs two agreeing turns, the newest three waiting turns are
+  filled in silently, and context resets after ten minutes idle). It is in
+  **Settings › Conversation**, the languages sheet and the welcome tour, needs
+  the Soniox engine and internet, and is the default for new installs;
+  installs set up before it keep their pair. **Choose a pair** is unchanged.
 
 - Face-to-face layout on phones (the far half upside down), a chat transcript
   from the ⋮ menu, and side-by-side columns at 600 dp and wider (unfolded
@@ -21,17 +22,15 @@ not a new Android setup or key requirement; both apps still use
   audio Soniox hadn't finalized when the session dropped), catch-up
   sessions after a dropout, make-before-break handover when the network
   changes, a warm session for a quick resume, and one opened at launch so
-  the first tap on the mic is live at once. This follows the earlier Swift
-  architecture (see the table below), rather than the new Automatic adapter.
+  the first tap on the mic is live at once. All of it is a port of the
+  Swift code, file by file (see the table below).
 - Tap the mic to start and stop, or hold it to listen only while it's
   pressed, as on iOS.
-  iOS and macOS show a five-second listening reminder, with known languages or
-  an Automatic unknown-partner state, and keep the mic labeled Start/Stop.
-  On iPhone, turning or moving the phone substantially brings the reminder back
-  for a handoff. Stopped/connecting/offline guidance and VoiceOver instructions
-  remain visible. The fading and handoff behavior is scoped to the Swift app;
-  Android keeps its bilingual listening prompt above the transcript controls
-  and its Start/Stop microphone caption.
+  The listening reminder fades five seconds after listening goes live and
+  comes back when the phone is turned or moved for a handoff, as on iPhone
+  (the game rotation vector, gyroscope and linear acceleration sensors stand
+  in for Core Motion; no permission is needed). Stopped, connecting and
+  offline guidance, and guidance with TalkBack on, stay visible.
   The Swift layouts also reserve space for guidance and typing controls, follow
   the newest turn through viewport or text-size changes, and keep manual history
   scrolling stable during those layout changes.
@@ -50,9 +49,11 @@ not a new Android setup or key requirement; both apps still use
 - Typing instead of speaking from the keyboard button, translated by
   DeepSeek through the key broker, falling back to ML Kit on the device
   (Apple's Translation framework on iOS).
-- The separate **More › Address** lookup is currently available on iOS/macOS.
-  It uses Apple Maps with its own address-language preference and does not change
-  conversation or voice settings. It has not been ported to Android.
+- **⋮ › Address** looks a place up and shows its address in another language,
+  with its own address-language preference; it pauses the conversation and
+  changes no conversation or voice settings. iOS uses Apple Maps; Android
+  uses the system `Geocoder`, which usually returns one match, has no map,
+  and resolves landmarks less reliably.
 - Translating a photo from the camera button in the text field: take one
   or choose one, and ML Kit reads its text on the device (Vision on iOS)
   and adds it as a typed turn. The Latin, Chinese, Japanese, Korean and
@@ -75,8 +76,9 @@ not a new Android setup or key requirement; both apps still use
   offer Translate. Completed history retains its own targets when the partner
   changes. An established partner changes only after two distinct agreeing final
   source segments, and runtime context resets after ten minutes of inactivity.
-  Automatic does not promise unrestricted offline detection. These changes are
-  iOS/macOS scoped; Android cloud speech behavior is unchanged.
+  Automatic does not promise unrestricted offline detection. Android has the
+  same Automatic rules but no on-device engine, so offline it waits for the
+  network in either mode.
   It also has an Offline Voice Library with 54 Kokoro presets in 8 languages,
   including 5 Japanese voices, from one 92,022,138-byte shared download. Voice
   selections are saved per language, independently of conversation targets.
@@ -208,7 +210,11 @@ draws the same bubbles as the iOS icon.
 | `Audio/NoiseGate.swift` | `audio/NoiseGate.kt` (same thresholds) |
 | `Networking/ResilientSocket.swift` | `net/ResilientSocket.kt` (OkHttp WebSockets) |
 | `Networking/SonioxTranscriber.swift`, `SonioxKeyProvider.swift`, `RegionProber.swift` | `net/` files of the same names |
-| `Networking/AutomaticSonioxTranscriber.swift` | Not ported; Android retains the selected-pair Soniox adapter |
+| `Networking/AutomaticSonioxTranscriber.swift` | `net/AutomaticSonioxTranscriber.kt` |
+| `Model/AddressLocation.swift`, `Model/AddressLookupStore.swift` | `model/AddressLocation.kt`, `model/AddressLookupStore.kt` |
+| `Networking/MapAddressLookupService.swift` | `net/MapAddressLookupService.kt` (system `Geocoder` in place of MapKit) |
+| `Views/AddressLookupView.swift` | `ui/AddressLookupScreen.kt` |
+| `Model/ListeningPromptPolicy.swift`, `Views/ListeningPromptVisibility.swift` | `model/ListeningPromptPolicy.kt`, `ui/ListeningPromptVisibility.kt` |
 | `Networking/RealtimeTranscriber.swift`, `Translator.swift` | `net/RealtimeTranscriber.kt`, `net/MistralTranslator.kt`, `net/BrokerTranslator.kt`, `net/OnDeviceTranslator.kt` |
 | `Model/ConversationStore.swift` | `model/ConversationStore.kt` |
 | `Networking/SonioxSpeaker.swift` | `net/SonioxSpeaker.kt` (OkHttp WebSocket) |
