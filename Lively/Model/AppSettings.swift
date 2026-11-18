@@ -17,7 +17,11 @@ final class AppSettings {
     }
 
     var usesAutomaticLanguageDetection: Bool {
-        conversationMode == .automatic && providerID == SpeechProvider.soniox.id
+        #if DEBUG
+        // The demo is a scripted conversation in the saved pair.
+        if defaults.bool(forKey: "LivelyDemo") { return false }
+        #endif
+        return conversationMode == .automatic && providerID == SpeechProvider.soniox.id
     }
 
     /// `SpeechProvider.id` of the chosen engine.
@@ -150,7 +154,11 @@ final class AppSettings {
     }
 
     private init() {
-        conversationMode = ConversationMode(rawValue: defaults.string(forKey: "conversationMode") ?? "") ?? .automatic
+        let mode = ConversationMode.initial(
+            saved: defaults.string(forKey: "conversationMode"), onboardingDone: defaults.bool(forKey: "onboardingDone"))
+        // Saved at once, so finishing the welcome tour doesn't change it.
+        defaults.set(mode.rawValue, forKey: "conversationMode")
+        conversationMode = mode
         let providerID = defaults.string(forKey: "speechProvider") ?? SpeechProvider.fallback.id
         self.providerID = providerID
         let stored = LanguagePair(
@@ -191,6 +199,13 @@ final class AppSettings {
 enum ConversationMode: String, CaseIterable, Identifiable, Sendable {
     case automatic, pair
     var id: String { rawValue }
+
+    /// The mode at launch. Automatic is for new installs; someone who set
+    /// Lively up before it existed keeps their pair, which also works offline.
+    static func initial(saved: String?, onboardingDone: Bool) -> ConversationMode {
+        saved.flatMap(ConversationMode.init) ?? (onboardingDone ? .pair : .automatic)
+    }
+
     var label: String {
         switch self {
         case .automatic: "Automatic"

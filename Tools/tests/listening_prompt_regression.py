@@ -123,7 +123,7 @@ def lifecycle_variants(controller, screen, controls):
         ("stopped-screen-keeps-sensors-running", "&& store.isListening &&", "&&"),
         ("nonlive-screen-keeps-sensors-running", "&& store.status == .live", ""),
         ("nonlive-guidance-hidden", "store.status != .live || ", ""),
-        ("covering-sheet-keeps-sensors-running", "&& !showSettings && !showOnboarding && !showAddress && !showPro", ""),
+        ("covering-sheet-keeps-sensors-running", "&& !showSettings && !showOnboarding && !showAddress && !showLanguages && !hitFreeLimit", ""),
         ("voiceover-guidance-hidden", "|| voiceOverEnabled", ""),
         ("disappearance-does-not-stop", ".onDisappear { listeningPrompt.setActive(false) }", ".onDisappear { }"),
     ]:

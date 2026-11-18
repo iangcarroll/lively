@@ -61,7 +61,8 @@ struct PromptTestScreen {
     var showSettings = false
     var showOnboarding = false
     var showAddress = false
-    var showPro = false
+    var showLanguages = false
+    var hitFreeLimit = false
     var voiceOverEnabled = false
     let listeningPrompt = ListeningPromptVisibility()
     // INSERT_SCREEN_GATES
@@ -258,13 +259,15 @@ struct PromptTestScreen {
             check(screen.showsListeningPrompt, "background reset restores an expired cue")
         }
         screen.scenePhase = .active
-        for modal in 0..<4 {
+        for modal in 0..<5 {
             screen.showSettings = modal == 0; screen.showOnboarding = modal == 1
-            screen.showAddress = modal == 2; screen.showPro = modal == 3
+            screen.showAddress = modal == 2; screen.showLanguages = modal == 3
+            screen.hitFreeLimit = modal == 4
             check(!screen.listeningPromptIsActive, "covering sheet stops handoff sensing: \(modal)")
         }
         screen.showSettings = false; screen.showOnboarding = false
-        screen.showAddress = false; screen.showPro = false
+        screen.showAddress = false; screen.showLanguages = false
+        screen.hitFreeLimit = false
         screen.activityChanged(screen.listeningPromptIsActive)
         await scheduled(1, "returning to visible conversation starts a fresh cue")
         let task = PromptTestTask.tasks.last!

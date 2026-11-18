@@ -304,7 +304,8 @@ struct ConversationScreen: View {
     /// With "Set from location" on, sets the pair on arriving in another
     /// country. Not over a conversation: changing the pair clears it.
     private func followLocation() {
-        guard settings.usesLocationLanguages, !isDemo else { return }
+        // Location chooses a pair, which automatic detection doesn't use.
+        guard settings.usesLocationLanguages, !settings.usesAutomaticLanguageDetection, !isDemo else { return }
         Task {
             let idle = store.utterances.isEmpty && !store.isListening
             if await LocationLanguages.shared.update(canChange: idle) { store.settingsDidClose() }
@@ -530,7 +531,9 @@ struct ConversationScreen: View {
     /// whether to show it. Android asks Google Play the same way.
     private func conversationPaused() {
         guard !isDemo, !countedConversation else { return }
-        let turns = store.utterances.count(where: \.isFinal)
+        // Only turns that were translated; a row still waiting for the other
+        // language, or one the engine took back, wasn't a conversation.
+        let turns = store.visibleUtterances.count { $0.isFinal && !$0.translation.isEmpty }
         guard turns >= ReviewPrompt.minTurns else { return }
         countedConversation = true
         goodConversations += 1

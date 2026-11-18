@@ -56,8 +56,17 @@ struct SettingsRegression {
         let defaults = IsolatedDefaults.standard
         defer { defaults.removePersistentDomain(forName: IsolatedDefaults.suiteName) }
         defaults.removePersistentDomain(forName: IsolatedDefaults.suiteName)
+        defaults.set(true, forKey: "onboardingDone")
+        let existing = AppSettings()
+        expect(existing.conversationMode == .pair, "installation set up before automatic keeps its pair")
+        expect(!existing.usesAutomaticLanguageDetection, "existing installation stays on its pair")
+        expect(defaults.string(forKey: "conversationMode") == "pair", "kept pair is saved at launch")
+        defaults.removePersistentDomain(forName: IsolatedDefaults.suiteName)
         let fresh = AppSettings()
         expect(fresh.conversationMode == .automatic, "new installation defaults to automatic")
+        defaults.set(true, forKey: "onboardingDone")
+        expect(AppSettings().conversationMode == .automatic, "finishing the tour keeps a new installation automatic")
+        defaults.removeObject(forKey: "onboardingDone")
         expect(fresh.usesAutomaticLanguageDetection, "default Soniox activates automatic")
         expect(fresh.speechListenerLanguage == .english, "fresh listener uses saved leading language")
         let pair = LanguagePair(first: Language("es"), second: Language("de"))
@@ -65,7 +74,7 @@ struct SettingsRegression {
         defaults.set(pair.second.rawValue, forKey: "secondLanguage")
         defaults.set("fr", forKey: "speechListenerLanguage")
         let migrated = AppSettings()
-        expect(migrated.conversationMode == .automatic, "existing settings without mode migrate to automatic")
+        expect(migrated.conversationMode == .automatic, "saved automatic mode survives a changed pair")
         expect(migrated.languages == pair, "migration preserves manual pair")
         expect(migrated.speechListenerLanguage == Language("fr"), "automatic listener is outside manual pair")
         migrated.speechListenerLanguage = Language("ja")
@@ -128,8 +137,9 @@ def main():
     variants = [("automatic-settings", settings, True)]
     if args.negative_controls:
         for name, old, new in [
-            ("default-manual-pair", 'ConversationMode(rawValue: defaults.string(forKey: "conversationMode") ?? "") ?? .automatic',
-             'ConversationMode(rawValue: defaults.string(forKey: "conversationMode") ?? "") ?? .pair'),
+            ("default-manual-pair", "?? (onboardingDone ? .pair : .automatic)", "?? .pair"),
+            ("existing-installation-switched-to-automatic", "?? (onboardingDone ? .pair : .automatic)", "?? .automatic"),
+            ("launch-mode-not-saved", 'defaults.set(mode.rawValue, forKey: "conversationMode")', "_ = mode"),
             ("automatic-getter-clamped-to-pair", "if usesAutomaticLanguageDetection {\n                return Language.soniox.contains(language) ? language : .english\n            }", ""),
             ("automatic-setter-clamped-to-pair", "guard usesAutomaticLanguageDetection\n                ? Language.soniox.contains(newValue) : languages.contains(newValue) else { return }",
              "guard languages.contains(newValue) else { return }"),

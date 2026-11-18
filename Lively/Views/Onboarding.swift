@@ -387,8 +387,10 @@ struct LanguagesSheet: View {
     @Bindable var settings: AppSettings
     @State private var choosing: LanguageSide?
     @State private var choosingOwn = false
-    /// Half height for the two cards; full height for the list of languages.
-    @State private var detent = PresentationDetent.medium
+    /// Tall enough for the mode, both cards and the script without
+    /// scrolling; full height for the list of languages.
+    private static let compact = PresentationDetent.height(560)
+    @State private var detent = LanguagesSheet.compact
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -448,12 +450,12 @@ struct LanguagesSheet: View {
                 OwnLanguageList(settings: settings)
             }
         }
-        .presentationDetents([.medium, .large], selection: $detent)
+        .presentationDetents([Self.compact, .large], selection: $detent)
         .onChange(of: choosing) { _, side in
-            if side == nil && !choosingOwn { detent = .medium }
+            if side == nil && !choosingOwn { detent = Self.compact }
         }
         .onChange(of: choosingOwn) { _, own in
-            if !own && choosing == nil { detent = .medium }
+            if !own && choosing == nil { detent = Self.compact }
         }
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 460)

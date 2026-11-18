@@ -78,15 +78,20 @@ struct SettingsView: View {
                 } footer: {
                     Text(settings.usesAutomaticLanguageDetection
                          ? "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection needs internet."
-                         : "Lively listens for this pair and translates both ways. Automatic detection is available with the Soniox engine and internet.")
+                         : settings.providerID == SpeechProvider.soniox.id
+                             ? "Lively listens for this pair and translates both ways."
+                             : "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine.")
                 }
 
-                Section {
-                    Toggle(isOn: usesLocation) {
-                        Label { Text("Set from location") } icon: { SettingsIcon(systemImage: "location.fill", color: .blue) }
+                // Location chooses a pair, which automatic detection doesn't use.
+                if !settings.usesAutomaticLanguageDetection {
+                    Section {
+                        Toggle(isOn: usesLocation) {
+                            Label { Text("Set from location") } icon: { SettingsIcon(systemImage: "location.fill", color: .blue) }
+                        }
+                    } footer: {
+                        Text([LocationLanguages.summary, LocationLanguages.shared.status.message].compactMap(\.self).joined(separator: " "))
                     }
-                } footer: {
-                    Text([LocationLanguages.summary, LocationLanguages.shared.status.message].compactMap(\.self).joined(separator: " "))
                 }
 
                 Section {
@@ -97,7 +102,7 @@ struct SettingsView: View {
                         Label { Text("Offline Languages") } icon: { SettingsIcon(systemImage: "arrow.down.circle.fill", color: .indigo) }
                     }
                 } footer: {
-                    Text("Prepare a language pair for conversations without internet. Choose Language pair and the On-device engine to use these downloads.")
+                    Text("Prepare a language pair for conversations without internet. These downloads are used with Choose a pair and the On-device engine.")
                 }
 
                 Section {
