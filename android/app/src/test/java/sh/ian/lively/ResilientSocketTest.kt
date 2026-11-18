@@ -296,6 +296,9 @@ class ResilientSocketTest {
         bufferedSpeech(socket)
         socket.pause()
         val session = session(0)
+        // The server sees the connection open before the client has spoken;
+        // the clock below must not run out ahead of the opening message.
+        await("the session is configured") { session.frames.isNotEmpty() }
         advance(ResilientSocket.DRAIN_DEADLINE_MS - 1)
         // The timeout can't discard pending audio at once.
         assertEquals(SpeechEngineStatus.Connecting, socket.status)
