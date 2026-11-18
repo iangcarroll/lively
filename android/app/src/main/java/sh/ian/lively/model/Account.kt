@@ -25,8 +25,8 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * Optional sign-in with an emailed code, through Lively's key broker
- * (`Server/key-broker/src/auth.ts`). A signed-in app sends its session token
+ * Optional sign-in with Google or an emailed code, through Lively's key broker
+ * (`Server/key-broker/src/auth.ts` and `identity.ts`). A signed-in app sends its session token
  * with key requests and gets a per-account listening budget instead of the
  * per-install one.
  *
@@ -39,8 +39,10 @@ class Account(
     private val secrets: SecretStore,
     private val prefs: Preferences,
     private val scope: CoroutineScope,
-    /** Demo mode never reaches the broker: any email gets a code, and the code is 123456. */
-    private val isDemo: () -> Boolean,
+    /** Demo mode never reaches the broker: any email gets a code, the code is 123456, and Sign in with Google skips Google. */
+    val isDemo: () -> Boolean,
+    /** The OAuth web client ID for Sign in with Google; null when the build has none. */
+    val googleClientID: String? = null,
     baseClient: OkHttpClient = ResilientSocket.sharedClient,
 ) {
     class AccountException(message: String) : Exception(message)
@@ -60,6 +62,9 @@ class Account(
 
     val isSignedIn: Boolean get() = email != null
 
+    /** Whether to show Sign in with Google: the build has a client ID, or it's demo mode. */
+    val offersGoogle: Boolean get() = googleClientID != null || isDemo()
+
     /** Emails a 6-digit code to [email]. */
     suspend fun sendCode(email: String) {
         if (isDemo()) {
@@ -76,10 +81,26 @@ class Account(
             this.email = email
             return
         }
-        val body = post("v1/auth/email/verify", mapOf("email" to email, "code" to code))
+        adopt(post("v1/auth/email/verify", mapOf("email" to email, "code" to code)), email)
+    }
+
+    /**
+     * Signs in with the ID token Sign in with Google returned. [nonce] is the
+     * value the request carried.
+     */
+    suspend fun signInWithGoogle(idToken: String, nonce: String) {
+        if (isDemo()) {
+            delay(600)
+            email = "demo@example.com"
+            return
+        }
+        adopt(post("v1/auth/google", mapOf("id_token" to idToken, "nonce" to nonce)), null)
+    }
+
+    private fun adopt(body: JsonObject, email: String?) {
         val newToken = body.string("token") ?: throw AccountException("Something went wrong. Try again.")
         val user = body.obj("user")
-        val confirmed = user?.string("email") ?: email
+        val confirmed = user?.string("email") ?: email ?: throw AccountException("Something went wrong. Try again.")
         secrets.write(newToken, TOKEN_ACCOUNT)
         secrets.write(confirmed, EMAIL_ACCOUNT)
         token = newToken
@@ -173,9 +194,18 @@ class Account(
     private fun brokerMessage(body: String): String? =
         runCatching { (Json.parseToJsonElement(body) as JsonObject).string("message") }.getOrNull()
 
-    private companion object {
-        const val TOKEN_ACCOUNT = "lively-session-token"
-        const val EMAIL_ACCOUNT = "lively-account-email"
-        const val FREE_PRO_KEY = "LivelyAccountFreePro"
+    companion object {
+        /**
+         * Sign in with Apple's Hide My Email gives the account a relay address,
+         * which means nothing to the person, so the app doesn't show it.
+         */
+        fun hidesEmail(email: String): Boolean = email.lowercase().endsWith("@privaterelay.appleid.com")
+
+        /** What to call the account: its email, unless Apple hides it. */
+        fun displayName(email: String): String = if (hidesEmail(email)) "Apple Account" else email
+
+        private const val TOKEN_ACCOUNT = "lively-session-token"
+        private const val EMAIL_ACCOUNT = "lively-account-email"
+        private const val FREE_PRO_KEY = "LivelyAccountFreePro"
     }
 }

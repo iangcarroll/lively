@@ -54,7 +54,7 @@ Privacy Policy: https://lively.cautela.hk/privacy
 ## Review information
 
 - Sign-in required: No
-- Notes: `Lively does not require an account. To exercise the primary flow, skip the optional email sign-in, allow microphone access, tap the microphone, and speak English or Chinese. The default Soniox engine obtains a temporary key automatically. Free use is an hour a day (two hours when signed in with a one-time email code). Lively Pro, an auto-renewing subscription in Settings › Lively Pro, raises it to 10 hours a day; Restore Purchases is on the same screen. Accounts can be deleted in Settings › Account › Delete Account. Settings also offers an optional Voxtral + Mistral engine for users who provide their own Mistral API key.`
+- Notes: `Lively does not require an account. To exercise the primary flow, skip the optional sign-in, allow microphone access, tap the microphone, and speak English or Chinese. The default Soniox engine obtains a temporary key automatically. Free use is an hour a day (two hours when signed in, with Sign in with Apple or a one-time email code). Lively Pro, an auto-renewing subscription in Settings › Lively Pro, raises it to 10 hours a day; Restore Purchases is on the same screen. Accounts can be deleted in Settings › Account › Delete Account. Settings also offers an optional Voxtral + Mistral engine for users who provide their own Mistral API key.`
 - Release: Manual release after approval
 
 ## In-app purchases

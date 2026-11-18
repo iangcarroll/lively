@@ -1,6 +1,8 @@
+import AuthenticationServices
+import CryptoKit
 import SwiftUI
 
-/// Sign in with an emailed code, or see who's signed in. Pushed from
+/// Sign in with Apple or an emailed code, or see who's signed in. Pushed from
 /// Settings; its content is also the last step of onboarding.
 struct AccountView: View {
     let account: Account
@@ -49,7 +51,7 @@ struct AccountContent: View {
                     colors: [Color(.firstLanguageInk), Color(red: 0.55, green: 0.29, blue: 0.6), Color(.secondLanguageInk)],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 ))
-                if let email = account.email, let initial = email.first {
+                if let email = account.email, !Account.hidesEmail(email), let initial = email.first {
                     Text(String(initial).uppercased())
                         .font(.system(size: 34, weight: .semibold, design: .rounded))
                 } else {
@@ -66,7 +68,7 @@ struct AccountContent: View {
                     .font(.system(.title, design: .rounded, weight: .bold))
                 Text(account.isSignedIn
                     ? "Your translation time follows you to every device you sign in on."
-                    : "Optional, and it takes a few seconds. Signing in gives you more translation time every day.")
+                    : "Optional, and it takes a few seconds. Signing in doubles your free translation time to two hours a day.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -77,12 +79,12 @@ struct AccountContent: View {
 
     private var benefits: some View {
         VStack(alignment: .leading, spacing: 18) {
-            BenefitRow(systemImage: "timer", color: .orange, title: "More translation time",
-                       detail: "A bigger daily allowance than without an account.")
+            BenefitRow(systemImage: "timer", color: .orange, title: "Two hours a day, free",
+                       detail: "Double the hour you get without an account.")
             BenefitRow(systemImage: "iphone.gen3", color: .blue, title: "On all your devices",
                        detail: "Sign in on each one; your allowance comes along.")
-            BenefitRow(systemImage: "envelope.fill", color: .green, title: "No password to remember",
-                       detail: "We email you a 6-digit code each time.")
+            BenefitRow(systemImage: "key.fill", color: .green, title: "No password to remember",
+                       detail: "Use Sign in with Apple, or a 6-digit code we email you.")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
@@ -130,8 +132,8 @@ private struct SignedInCard: View {
             HStack(spacing: 12) {
                 SettingsIcon(systemImage: "envelope.fill", color: .blue)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Email").font(.caption).foregroundStyle(.secondary)
-                    Text(email).font(.body).lineLimit(1).truncationMode(.middle)
+                    Text(Account.hidesEmail(email) ? "Email hidden" : "Email").font(.caption).foregroundStyle(.secondary)
+                    Text(Account.displayName(for: email)).font(.body).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "checkmark.seal.fill")
@@ -214,10 +216,14 @@ private struct SignedInCard: View {
     }
 }
 
-/// Two steps, one action each: type an email and continue, then type the
-/// code, which signs in by itself once all six digits are there.
+/// One tap with Sign in with Apple. Or two steps, one action each: type an
+/// email and continue, then type the code, which signs in by itself once all
+/// six digits are there.
 private struct SignInForm: View {
     let account: Account
+    @Environment(\.colorScheme) private var colorScheme
+    /// The nonce whose hash the current Sign in with Apple request carries.
+    @State private var appleNonce = ""
 
     @State private var email = ""
     @State private var code = ""
@@ -255,8 +261,62 @@ private struct SignInForm: View {
 
     // MARK: Email
 
+    /// First and biggest, since it's one tap and nothing to type.
+    private var appleButton: some View {
+        SignInWithAppleButton(.continue) { request in
+            let nonce = UUID().uuidString + UUID().uuidString
+            appleNonce = nonce
+            request.requestedScopes = [.email]
+            request.nonce = SHA256.hash(data: Data(nonce.utf8)).map { String(format: "%02x", $0) }.joined()
+        } onCompletion: { result in
+            switch result {
+            case .success(let authorization):
+                guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                      let token = credential.identityToken.flatMap({ String(data: $0, encoding: .utf8) }) else {
+                    errorMessage = "Couldn't sign in with Apple. Try again."
+                    return
+                }
+                let code = credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
+                let nonce = appleNonce
+                run { try await account.signInWithApple(identityToken: token, authorizationCode: code, nonce: nonce) }
+            case .failure(let error):
+                // Closing the sheet isn't an error.
+                if (error as? ASAuthorizationError)?.code != .canceled {
+                    errorMessage = "Couldn't sign in with Apple. Try again, or use your email."
+                }
+            }
+        }
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        // The button keeps the style it was made with.
+        .id(colorScheme)
+        .frame(height: 52)
+        .clipShape(.capsule)
+        .disabled(working)
+        #if DEBUG
+        // Demo mode signs in without Apple's sheet, which needs a real Apple Account.
+        .overlay {
+            if account.isDemo {
+                Color.clear.contentShape(.capsule)
+                    .onTapGesture { run { try await account.signInWithApple(identityToken: "", authorizationCode: nil, nonce: "") } }
+                    .accessibilityHidden(true)
+            }
+        }
+        #endif
+    }
+
+    private var orDivider: some View {
+        HStack(spacing: 12) {
+            Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
+            Text("or").font(.footnote.weight(.medium)).foregroundStyle(.secondary)
+            Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
+        }
+        .accessibilityHidden(true)
+    }
+
     private var emailStep: some View {
         VStack(spacing: 14) {
+            appleButton
+            orDivider
             HStack(spacing: 12) {
                 Image(systemName: "at")
                     .font(.system(size: 17, weight: .semibold))

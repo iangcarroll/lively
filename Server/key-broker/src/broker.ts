@@ -73,6 +73,16 @@ export interface Env {
   APP_REVIEW_EMAIL?: string;
   /** First 128 bits of SHA-256 of `code:<normalized email>:<code>`, as a Worker secret. */
   APP_REVIEW_CODE_HASH?: string;
+  /**
+   * Sign in with Google (identity.ts): the OAuth web client ID the Android app
+   * asks for tokens for. Empty turns it off. Sign in with Apple uses APP_BUNDLE_ID.
+   */
+  GOOGLE_CLIENT_ID: string;
+  /** Optional: a Sign in with Apple key, to revoke the app's access when an account is deleted. */
+  APPLE_TEAM_ID?: string;
+  APPLE_KEY_ID?: string;
+  /** The key's .p8 contents, as a Worker secret. */
+  APPLE_PRIVATE_KEY?: string;
   /** Lively Pro. Lists are comma-separated. */
   APP_BUNDLE_ID: string;
   APP_STORE_PRODUCT_IDS: string;

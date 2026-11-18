@@ -8,6 +8,7 @@ struct ConversationScreen: View {
     @State private var showSettings = false
     @State private var showOnboarding = false
     @State private var showPro = false
+    @State private var showAccount = false
     @AppStorage("onboardingDone") private var onboardingDone = false
     /// The card offering "Set from location", shown once on an open after the welcome tour.
     @State private var showLocationOffer = false
@@ -184,9 +185,31 @@ struct ConversationScreen: View {
             .frame(minWidth: 460, minHeight: 640)
             #endif
         }
+        .sheet(isPresented: $showAccount) {
+            if let account = Account.shared {
+                NavigationStack {
+                    AccountView(account: account).toolbar {
+                        ToolbarItem(placement: .confirmationAction) { Button("Done") { showAccount = false } }
+                    }
+                }
+                // Signed in: back to the conversation, where Start now works.
+                .onChange(of: account.isSignedIn) { _, signedIn in
+                    if signedIn { showAccount = false }
+                }
+                #if os(macOS)
+                .frame(minWidth: 460, minHeight: 640)
+                #endif
+            }
+        }
         .alert("Lively", isPresented: alertBinding) {
             if !settings.hasCredentials { Button("Open Settings") { showSettings = true } }
-            if Pro.shared.freeLimitReached && !Pro.shared.isPro { Button("Get Lively Pro") { showPro = true } }
+            if Pro.shared.freeLimitReached && !Pro.shared.isPro {
+                // Signing in is free and doubles the day, so it comes first.
+                if let account = Account.shared, !account.isSignedIn {
+                    Button("Sign In for Another Hour") { showAccount = true }
+                }
+                Button("Get Lively Pro") { showPro = true }
+            }
             Button("OK", role: .cancel) {}
         } message: {
             Text(store.alert ?? "")

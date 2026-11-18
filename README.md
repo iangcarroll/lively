@@ -250,6 +250,12 @@ broker at `https://lively.cautela.hk` (see
 [Server/key-broker](Server/key-broker/README.md)). For Voxtral, add a Mistral
 key in Settings.
 
+Signing in is optional and doubles the free hour a day: Sign in with Apple
+(`Views/AccountView.swift`; Sign in with Google on Android) or a code sent by
+email. The broker checks the token and opens the account; see
+[Server/key-broker](Server/key-broker/README.md#sign-in). When a signed-out
+day's time runs out, the alert offers signing in before Lively Pro.
+
 Lively Pro is an App Store subscription that raises the daily translation
 allowance (`Model/Pro.swift`, `Views/ProView.swift`). The key broker checks
 each signed transaction itself; see
@@ -267,7 +273,7 @@ The iOS widget uses `hk.cautela.lively.widgets`; both iOS targets share
 and enable automatic signing for both targets.
 
 For the new account, register both bundle IDs and the shared App Group, enable
-the group for both targets, and create the `hk.cautela.lively` app in App Store
+the group for both targets and Sign in with Apple for the app, and create the `hk.cautela.lively` app in App Store
 Connect. Recreate the monthly/yearly products in [App Store metadata](AppStore/metadata.md)
 under that app and configure its production and sandbox Server Notifications V2
 URL as `https://lively.cautela.hk/v1/appstore/notifications`.

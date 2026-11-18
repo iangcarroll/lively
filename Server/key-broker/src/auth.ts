@@ -7,6 +7,8 @@
  *   POST /v1/auth/logout        Authorization: Bearer <token> → 200 {ok}
  *   POST /v1/auth/delete        Authorization: Bearer <token> → 200 {ok}
  *
+ * Sign in with Apple and Google (identity.ts) open the same accounts.
+ *
  * `user` is {id, email, free_pro}. An account with `free_pro` gets Lively Pro
  * without a subscription (see broker.ts).
  *
@@ -21,6 +23,7 @@
 
 import { error, hash, json, networkOf, nowSeconds } from "./broker";
 import type { Env } from "./broker";
+import { revokeAppleGrant } from "./identity";
 
 export interface User {
   id: string;
@@ -131,18 +134,22 @@ export async function verifyEmailSignIn(request: Request, env: Env, now: number)
   ).bind(email, row.code_hash, nowSeconds(now), limits.codeMaxAttempts).first();
   if (!claimed) return error(400, "code_expired", "That code has expired. Ask for a new one.");
 
-  const userID = crypto.randomUUID();
-  const token = randomToken();
   const user = await env.DB.prepare(
-      "INSERT INTO users (id, email) VALUES (?1, ?2) ON CONFLICT(email) DO UPDATE SET email = email RETURNING id, email, free_pro",
-    ).bind(userID, email).first<UserRow>();
+    "INSERT INTO users (id, email) VALUES (?1, ?2) ON CONFLICT(email) DO UPDATE SET email = email RETURNING id",
+  ).bind(crypto.randomUUID(), email).first<{ id: string }>();
   if (!user) throw new Error("Sign-in did not return an account");
-  const account = userOf(user);
-  await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?1, ?2, ?3)")
-    .bind(await tokenHash(token), account.id, nowSeconds(now) + limits.sessionDays * 86_400)
-    .run();
+  return openSession(env, now, user.id);
+}
 
-  return json(200, { token, user: userJSON(account) });
+/** Starts a session for an account whose owner has just proved who they are. */
+export async function openSession(env: Env, now: number, userID: string): Promise<Response> {
+  const user = await env.DB.prepare("SELECT id, email, free_pro FROM users WHERE id = ?").bind(userID).first<UserRow>();
+  if (!user) throw new Error("Sign-in did not return an account");
+  const token = randomToken();
+  await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?1, ?2, ?3)")
+    .bind(await tokenHash(token), user.id, nowSeconds(now) + readAuthLimits(env).sessionDays * 86_400)
+    .run();
+  return json(200, { token, user: userJSON(userOf(user)) });
 }
 
 export async function me(request: Request, env: Env, now: number): Promise<Response> {
@@ -158,13 +165,15 @@ export async function logout(request: Request, env: Env): Promise<Response> {
 }
 
 /**
- * Deletes the account, its sessions and any pending code. Usage counters
+ * Deletes the account, its sessions and any pending code, and ends the
+ * app's access to the Apple Account it signed in with. Usage counters
  * hold only a hash of the account ID and expire within a day. A Pro
  * subscription isn't tied to the account, so it keeps working.
  */
 export async function deleteAccount(request: Request, env: Env, now: number): Promise<Response> {
   const auth = await authenticate(request, env, now);
   if (auth.state !== "signed_in") return unauthorized();
+  await revokeAppleGrant(env, now, auth.user.id);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(auth.user.id),
     env.DB.prepare("DELETE FROM login_codes WHERE email = ?").bind(auth.user.email),

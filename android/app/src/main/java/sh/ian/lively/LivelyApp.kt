@@ -47,7 +47,7 @@ class LivelyApp : Application() {
         private val brokerURL = BuildConfig.KEY_BROKER_URL.takeIf { it.isNotEmpty() }
 
         /** Null when the build has no key broker. */
-        val account: Account? = brokerURL?.let { Account(it, secrets, prefs, scope, isDemo = { DebugFlags.demo }) }
+        val account: Account? = brokerURL?.let { Account(it, secrets, prefs, scope, isDemo = { DebugFlags.demo }, googleClientID = BuildConfig.GOOGLE_CLIENT_ID.ifBlank { null }) }
         val pro = Pro(context, scope, account, isDemo = { DebugFlags.demo })
 
         /**

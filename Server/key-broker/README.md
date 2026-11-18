@@ -271,7 +271,9 @@ Set it to 0 to take it away. The app rereads it at launch.
 
 ## Sign-in
 
-Sign-in is optional, with a 6-digit code sent by email.
+Sign-in is optional: Sign in with Apple (iOS and macOS), Sign in with Google
+(Android), or a 6-digit code sent by email. All three open the same account
+for the same email.
 
 ```
 POST /v1/auth/email/start   {"email": "a@example.com"}
@@ -299,6 +301,58 @@ working.
 | `CODES_PER_EMAIL_PER_DAY` | 10 | codes sent to one address per UTC day |
 | `CODES_PER_IP_PER_HOUR` | 20 | codes requested from one IP per hour |
 | `SESSION_DAYS` | 365 | how long a session token lasts |
+
+### Sign in with Apple and Google
+
+```
+POST /v1/auth/apple   {"identity_token": "<JWT>", "nonce": "<random>", "authorization_code": "<optional>"}
+POST /v1/auth/google  {"id_token": "<JWT>", "nonce": "<random>"}
+200 {"token": "<43 chars>", "user": {...}}      (as /v1/auth/email/verify)
+```
+
+The app gets an ID token from the system's sign-in sheet. `src/identity.ts`
+checks it without calling the provider, apart from fetching its public keys
+(cached for an hour):
+
+1. The RS256 signature, with the key the token's `kid` names in
+   `https://appleid.apple.com/auth/keys` or
+   `https://www.googleapis.com/oauth2/v3/certs`.
+2. The issuer, and the audience: `APP_BUNDLE_ID` for Apple, `GOOGLE_CLIENT_ID`
+   for Google.
+3. That it hasn't expired and was issued in the last 10 minutes.
+4. The nonce. The app makes a random one per attempt; Apple's token carries its
+   SHA-256, Google's carries it as is.
+
+The account is found by the provider's ID for the person (`apple_sub`,
+`google_sub`), or else by the token's verified email, which links it to an
+account an emailed code made. A token without a verified email can't make an
+account. People who use Apple's Hide My Email get an account under their
+relay address, which the apps show as "Apple Account".
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | empty | OAuth web client ID the Android app asks for tokens for; empty turns Google sign-in off (503) |
+| `APPLE_TEAM_ID`, `APPLE_KEY_ID` | unset | the team and a Sign in with Apple key, for revoking |
+| `APPLE_PRIVATE_KEY` (secret) | unset | that key's `.p8` contents |
+
+Setting up:
+
+- **Apple:** enable the Sign in with Apple capability on the
+  `hk.cautela.lively` App ID (automatic signing does this from the
+  entitlement). Apple asks apps to revoke their access when an account is
+  deleted: create a key with Sign in with Apple enabled under Certificates,
+  Identifiers & Profiles › Keys, set `APPLE_TEAM_ID` and `APPLE_KEY_ID` in
+  `wrangler.jsonc`, and `npx wrangler secret put APPLE_PRIVATE_KEY` with the
+  `.p8` file's contents. With those, sign-in exchanges the app's authorization
+  code for a refresh token (stored on the account) and deleting the account
+  revokes it. Without them, sign-in still works and nothing is revoked.
+- **Google:** in Google Cloud Console › APIs & Services › Credentials, create
+  an OAuth client of type **Web application** (its ID is `GOOGLE_CLIENT_ID`
+  and the Android build's `livelyGoogleClientId`), and one of type **Android**
+  for package `sh.ian.lively` with the SHA-1 of each signing certificate: the
+  Play app signing key, the upload key, and the debug key for local builds.
+
+### Codes
 
 A new code replaces the last one, and a code works once. With the defaults,
 someone guessing at an account gets 50 guesses a day, about a 1 in 20,000

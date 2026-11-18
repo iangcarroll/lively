@@ -28,6 +28,9 @@ android {
         // Lively's key broker (Server/key-broker), which hands out temporary
         // Soniox keys. Empty means Soniox needs a key entered in Settings.
         buildConfigField("String", "KEY_BROKER_URL", "\"${providers.gradleProperty("livelyKeyBrokerUrl").getOrElse("https://lively.cautela.hk")}\"")
+        // Sign in with Google: the OAuth web client ID, the same value as the
+        // broker's GOOGLE_CLIENT_ID. Empty hides the button, leaving email sign-in.
+        buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${providers.gradleProperty("livelyGoogleClientId").getOrElse("")}\"")
     }
 
     // Play upload signing, from ~/.gradle/gradle.properties or -P flags:
@@ -97,6 +100,10 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.billing)
+    // Sign in with Google, through Credential Manager.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
     implementation(libs.mlkit.translate)
     // Text recognition for photos, bundled so it works offline and without
     // Play services, like Vision on iOS. One model per script.

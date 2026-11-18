@@ -190,6 +190,9 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
         mutableStateOf(start == Routes.CONVERSATION && !DebugFlags.demo && !prefs.bool("locationOfferDone") && !settings.usesLocationLanguages)
     }
 
+    /** The account screen was opened from the used-up alert, so signing in closes it. */
+    var accountReturnsOnSignIn by remember { mutableStateOf(false) }
+
     ForegroundEffects(graph, store)
 
     NavHost(
@@ -235,6 +238,12 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
                 },
                 onShowSettings = { nav.navigateSingle(Routes.SETTINGS) },
                 onShowPro = { nav.navigateSingle(Routes.PRO) },
+                onShowAccount = graph.account?.takeUnless { it.isSignedIn }?.let {
+                    {
+                        accountReturnsOnSignIn = true
+                        nav.navigateSingle(Routes.ACCOUNT)
+                    }
+                },
             )
             if (offersLocation) {
                 LocationOfferCard(graph.locationLanguages) { changed ->
@@ -280,7 +289,15 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
             LanguageListScreen(settings, side, onDone = { nav.popBackStack() })
         }
         composable(Routes.ACCOUNT) {
-            graph.account?.let { AccountScreen(it, onBack = { nav.popBackStack() }) }
+            graph.account?.let { account ->
+                // Opened from the used-up alert: once signed in, back to the
+                // conversation, where Start now works.
+                LaunchedEffect(account.isSignedIn) {
+                    if (account.isSignedIn && accountReturnsOnSignIn) nav.popBackStack()
+                    if (account.isSignedIn) accountReturnsOnSignIn = false
+                }
+                AccountScreen(account, onBack = { accountReturnsOnSignIn = false; nav.popBackStack() })
+            }
         }
         composable(Routes.PRO) {
             ProScreen(graph.pro, graph.account, onBack = { nav.popBackStack() })

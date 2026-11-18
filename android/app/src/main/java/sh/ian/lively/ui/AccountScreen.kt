@@ -14,9 +14,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +35,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
@@ -46,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AlternateEmail
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Star
@@ -85,7 +89,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
@@ -100,11 +107,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import sh.ian.lively.R
 import sh.ian.lively.model.Account
+import sh.ian.lively.support.GoogleSignIn
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/** Sign in with an emailed code, or see who's signed in. Pushed from Settings. */
+/** Sign in with Google or an emailed code, or see who's signed in. Pushed from Settings. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountScreen(account: Account, onBack: () -> Unit) {
@@ -153,9 +162,13 @@ fun AccountContent(account: Account, modifier: Modifier = Modifier) {
                     Column(verticalArrangement = Arrangement.spacedBy(32.dp)) {
                         SignInForm(account)
                         Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.padding(horizontal = 4.dp)) {
-                            Benefit(Icons.Rounded.Timer, Color(0xFFFF9500), "More translation time", "A bigger daily allowance than without an account.")
+                            Benefit(Icons.Rounded.Timer, Color(0xFFFF9500), "Two hours a day, free", "Double the hour you get without an account.")
                             Benefit(Icons.Rounded.Devices, Color(0xFF007AFF), "On all your devices", "Sign in on each one; your allowance comes along.")
-                            Benefit(Icons.Rounded.Email, Color(0xFF34C759), "No password to remember", "We email you a 6-digit code each time.")
+                            Benefit(
+                                Icons.Rounded.Key, Color(0xFF34C759), "No password to remember",
+                                // Without a Google client ID, the build only has email sign-in.
+                                if (account.offersGoogle) "Use Sign in with Google, or a 6-digit code we email you." else "We email you a 6-digit code each time.",
+                            )
                         }
                     }
                 }
@@ -176,7 +189,7 @@ private fun Header(account: Account) {
                 .background(Brush.linearGradient(listOf(colors.firstInk, Color(0xFF8C4A99), colors.secondInk))),
             contentAlignment = Alignment.Center,
         ) {
-            val initial = account.email?.firstOrNull()
+            val initial = account.email?.takeUnless(Account::hidesEmail)?.firstOrNull()
             if (initial != null) {
                 Text(initial.uppercase(), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
             } else {
@@ -193,7 +206,7 @@ private fun Header(account: Account) {
             if (account.isSignedIn) {
                 "Your translation time follows you to every device you sign in on."
             } else {
-                "Optional, and it takes a few seconds. Signing in gives you more translation time every day."
+                "Optional, and it takes a few seconds. Signing in doubles your free translation time to two hours a day."
             },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -234,8 +247,8 @@ private fun SignedInCard(account: Account, email: String) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 SettingsIcon(Icons.Rounded.Email, Color(0xFF007AFF))
                 Column(Modifier.weight(1f)) {
-                    Text("Email", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(email, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                    Text(if (Account.hidesEmail(email)) "Email hidden" else "Email", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(Account.displayName(email), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                 }
                 Icon(Icons.Rounded.Verified, "Verified", tint = Lively.colors.live)
             }
@@ -329,8 +342,9 @@ private fun ErrorLine(message: String) {
 }
 
 /**
- * Two steps, one action each: type an email and continue, then type the
- * code, which signs in by itself once all six digits are there.
+ * One tap with Sign in with Google. Or two steps, one action each: type an
+ * email and continue, then type the code, which signs in by itself once all
+ * six digits are there.
  */
 @Composable
 private fun SignInForm(account: Account) {
@@ -343,6 +357,7 @@ private fun SignInForm(account: Account) {
     var resendAvailableAt by rememberSaveable { mutableLongStateOf(0L) }
     val shake = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val trimmed = email.trim()
     val plausible = trimmed.split("@").let { it.size == 2 && it[0].isNotEmpty() && it[1].contains(".") && !it[1].endsWith(".") }
@@ -366,6 +381,22 @@ private fun SignInForm(account: Account) {
         codeSentTo = address
         code = ""
         resendAvailableAt = System.currentTimeMillis() + RESEND_DELAY_MS
+    }
+
+    fun signInWithGoogle() {
+        if (working) return
+        run {
+            // Demo mode signs in without Google's sheet, which needs a real Google account.
+            if (account.isDemo()) return@run account.signInWithGoogle("", "")
+            val clientID = account.googleClientID ?: return@run
+            try {
+                // Null: the person closed the sheet, which isn't an error.
+                val result = GoogleSignIn.request(context, clientID) ?: return@run
+                account.signInWithGoogle(result.idToken, result.nonce)
+            } catch (e: GoogleSignIn.Failed) {
+                throw Account.AccountException(e.message ?: "Couldn't sign in with Google. Try again.")
+            }
+        }
     }
 
     fun signIn() {
@@ -397,7 +428,11 @@ private fun SignInForm(account: Account) {
             },
         ) { sentTo ->
             if (sentTo == null) {
-                EmailStep(email, { email = it; errorMessage = null }, plausible, working, onSubmit = { if (plausible && !working) send(trimmed) })
+                EmailStep(
+                    email, { email = it; errorMessage = null }, plausible, working,
+                    onSubmit = { if (plausible && !working) send(trimmed) },
+                    onGoogle = if (account.offersGoogle) ::signInWithGoogle else null,
+                )
             } else {
                 CodeStep(
                     sentTo = sentTo,
@@ -427,13 +462,25 @@ private fun SignInForm(account: Account) {
 }
 
 @Composable
-private fun EmailStep(email: String, onEmailChange: (String) -> Unit, plausible: Boolean, working: Boolean, onSubmit: () -> Unit) {
+private fun EmailStep(
+    email: String,
+    onEmailChange: (String) -> Unit,
+    plausible: Boolean,
+    working: Boolean,
+    onSubmit: () -> Unit,
+    /** Null when the build has no Google client ID. */
+    onGoogle: (() -> Unit)?,
+) {
     var focused by remember { mutableStateOf(false) }
     val border by animateColorAsState(
         if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         label = "border",
     )
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (onGoogle != null) {
+            GoogleButton(onGoogle, enabled = !working)
+            OrDivider()
+        }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -476,6 +523,42 @@ private fun EmailStep(email: String, onEmailChange: (String) -> Unit, plausible:
             )
         }
         PillButton("Email me a code", onClick = onSubmit, enabled = plausible, working = working)
+    }
+}
+
+/** First and biggest, since it's one tap and nothing to type. Styled to Google's branding guidelines. */
+@Composable
+private fun GoogleButton(onClick: () -> Unit, enabled: Boolean) {
+    val dark = isSystemInDarkTheme()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .alpha(if (enabled) 1f else 0.5f)
+            .clip(CircleShape)
+            .background(if (dark) Color(0xFF131314) else Color.White)
+            .border(1.dp, if (dark) Color(0xFF8E918F) else Color(0xFF747775), CircleShape)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Image(painterResource(R.drawable.ic_google), null, Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(
+            "Continue with Google",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (dark) Color(0xFFE3E3E3) else Color(0xFF1F1F1F),
+        )
+    }
+}
+
+@Composable
+private fun OrDivider() {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("or", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 

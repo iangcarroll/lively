@@ -1,6 +1,7 @@
 import { appStoreNotification } from "./appstore";
 import { deleteAccount, deleteExpiredAuth, logout, me, startEmailSignIn, verifyEmailSignIn } from "./auth";
 import { error, issueSonioxKey, issueSonioxSpeechKey, json, nowSeconds, type Env } from "./broker";
+import { appleSignIn, googleSignIn } from "./identity";
 import { translate } from "./translate";
 import { isVoiceRoute, voices } from "./voices";
 
@@ -10,7 +11,7 @@ const PUBLIC_PAGES = new Set(["/", "/privacy", "/support", "/terms", "/delete-ac
 
 const privacy = page(
   "Privacy Policy",
-  `<p><strong>Effective November 16, 2026</strong></p>
+  `<p><strong>Effective November 17, 2026</strong></p>
   <p>Lively is provided by Cautela Limited, a Hong Kong company, and translates live conversations across its supported languages. It is designed to work without an account, advertising, analytics, or tracking.</p>
   <h2>Speech and translations</h2>
   <p>When you start listening, Lively sends microphone audio to the speech provider selected in Settings so it can transcribe and translate the conversation in real time. The default provider is Soniox. Soniox says its real-time API processes audio, transcripts, and translations transiently, does not store that content, and does not use it to train models.</p>
@@ -21,8 +22,8 @@ const privacy = page(
   <h2>Temporary keys and abuse prevention</h2>
   <p>To use the default provider without creating an account, the app creates a random installation identifier and stores it in your device Keychain (on Android, in app storage encrypted with a key held by the Android Keystore). Lively's key service receives that identifier and your network address to enforce usage limits and prevent abuse. It stores one-way hashes and short-lived counters, not your raw identifier, raw network address, audio, or transcript.</p>
   <h2>Optional account</h2>
-  <p>You can optionally sign in for a larger listening allowance. If you do, Lively collects your email address, stores it with a randomly generated account identifier, and stores only hashes of sign-in codes and session tokens. Your email is used only to send a requested sign-in code and operate your account. It is not used for marketing or linked to your conversation content.</p>
-  <p>You can delete your account at any time in Settings → Account → Delete Account or at <a href="/delete-account">lively.cautela.hk/delete-account</a>. This immediately deletes your email address, account identifier and sessions from Lively's servers.</p>
+  <p>You can optionally sign in for a larger listening allowance. You can sign in with Apple, with Google on Android, or with a code sent to your email address. If you do, Lively collects your email address, stores it with a randomly generated account identifier, and stores only hashes of sign-in codes and session tokens. With Sign in with Apple or Google, Lively also receives and stores that provider's identifier for your account, so it can recognise you next time, and with Apple a token used only to end Lively's access when you delete your account. Apple lets you hide your email address, in which case Lively receives a relay address instead. Lively does not receive your name, contacts, or password. Your email is used only to send a requested sign-in code and operate your account. It is not used for marketing or linked to your conversation content.</p>
+  <p>You can delete your account at any time in Settings → Account → Delete Account or at <a href="/delete-account">lively.cautela.hk/delete-account</a>. This immediately deletes your email address, account identifier, sign-in provider identifiers and sessions from Lively's servers.</p>
   <h2>Lively Pro purchases</h2>
   <p>Lively Pro is sold through Apple's App Store, and Apple processes your payment. Lively never receives your payment details or Apple ID. To check that a subscription is active, the app sends Lively's key service the signed transaction record the App Store issued, which includes the product, its purchase and expiry dates, and a transaction identifier. Lively uses it only to apply your Pro allowance, and keeps a one-way hash of the transaction identifier in short-lived usage counters. If a purchase is refunded, Lively stores that transaction identifier to stop the refunded subscription from being used.</p>
   <p>On Android, Lively Pro is sold through Google Play, and Google processes your payment. Lively never receives your payment details or Google account. To check that a subscription is active, the app sends Lively's key service the purchase token Google Play issued, and the key service asks Google for the subscription's product, status and expiry date. Lively uses it only to apply your Pro allowance, and keeps a one-way hash of the token in short-lived usage counters.</p>
@@ -54,6 +55,7 @@ const accountDeletion = page(
   "Delete your account",
   `<p>Delete your optional Lively account and its associated data. You can also delete it while signed in under Settings → Account in the app.</p>
   <p>Deletion is immediate and permanent. It removes your email address, account identifier and all active sessions. Short-lived, one-way-hashed usage counters expire automatically and cannot be linked back to you after deletion. Lively does not store conversation audio or transcripts on its servers. Deleting your account does not cancel a Lively Pro subscription.</p>
+  <p>If you signed in with Apple and chose to hide your email, delete the account in the app instead.</p>
   <form id="email-form"><label for="email">Account email</label><input id="email" type="email" autocomplete="email" required><button type="submit">Email me a code</button></form>
   <form id="code-form" hidden><label for="code">6-digit code</label><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required><button class="danger" type="submit">Delete account permanently</button></form>
   <p id="status" role="status" aria-live="polite"></p>
@@ -85,6 +87,8 @@ const ROUTES: Record<string, { method: string; handle: (request: Request, env: E
   "/v1/translate": { method: "POST", handle: translate },
   "/v1/auth/email/start": { method: "POST", handle: startEmailSignIn },
   "/v1/auth/email/verify": { method: "POST", handle: verifyEmailSignIn },
+  "/v1/auth/apple": { method: "POST", handle: appleSignIn },
+  "/v1/auth/google": { method: "POST", handle: googleSignIn },
   "/v1/auth/me": { method: "GET", handle: me },
   "/v1/auth/logout": { method: "POST", handle: logout },
   "/v1/auth/delete": { method: "POST", handle: deleteAccount },

@@ -68,6 +68,12 @@
     "CODES_PER_IP_PER_HOUR": "20",
     "SESSION_DAYS": "365",
     // APP_REVIEW_EMAIL and APP_REVIEW_CODE_HASH are private Worker secrets.
+    // Sign in with Apple checks tokens against APP_BUNDLE_ID. To revoke the
+    // app's access when an account is deleted, set APPLE_TEAM_ID and
+    // APPLE_KEY_ID here and the key's .p8 as the secret APPLE_PRIVATE_KEY.
+    // Sign in with Google (Android): the OAuth web client ID, the same value
+    // as the app's `livelyGoogleClientId`. Empty turns Google sign-in off.
+    "GOOGLE_CLIENT_ID": "",
     // Lively Pro. Sandbox is TestFlight's environment, where purchases are free.
     "APP_BUNDLE_ID": "hk.cautela.lively",
     "APP_STORE_PRODUCT_IDS": "hk.cautela.lively.pro.monthly,hk.cautela.lively.pro.yearly",

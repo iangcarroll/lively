@@ -533,7 +533,7 @@ private fun AccountRow(email: String?, onClick: () -> Unit) {
                 .background(Brush.linearGradient(listOf(colors.firstInk, colors.secondInk))),
             contentAlignment = Alignment.Center,
         ) {
-            val initial = email?.firstOrNull()
+            val initial = email?.takeUnless(Account::hidesEmail)?.firstOrNull()
             if (initial != null) {
                 Text(initial.uppercase(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
             } else {
@@ -542,14 +542,14 @@ private fun AccountRow(email: String?, onClick: () -> Unit) {
         }
         Column(Modifier.weight(1f)) {
             Text(
-                email ?: "Sign in to Lively",
+                email?.let(Account::displayName) ?: "Sign in to Lively",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.MiddleEllipsis,
             )
             Text(
-                if (email == null) "More translation time every day" else "Account",
+                if (email == null) "Two free hours a day instead of one" else "Account",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

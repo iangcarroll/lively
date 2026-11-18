@@ -60,7 +60,12 @@ broker, account and Pro allowance:
 - Swipe a turn in the transcript, or long-press it, to delete it. Long-press
   also offers Edit, which fixes a misheard transcript and translates it
   again; in face-to-face, long-press one of your own lines.
-- Optional email sign-in, and Lively Pro through Google Play Billing. The
+- Optional sign-in with Google (Credential Manager; the counterpart to Sign in
+  with Apple on iOS) or an emailed code, and Lively Pro through Google Play
+  Billing. The Google button needs `-PlivelyGoogleClientId=<OAuth web client
+  ID>` (or the same line in `~/.gradle/gradle.properties`) and is hidden
+  without it; see the
+  [broker's setup](../Server/key-broker/README.md#sign-in-with-apple-and-google). The
   broker checks Play purchases with the Play Developer API
   ([Server/key-broker](../Server/key-broker/README.md#google-play-subscriptions)).
 - The welcome tour, 60 languages with each reader's prompts in their own
@@ -93,7 +98,7 @@ adb shell am start -n sh.ian.lively/.MainActivity --ez LivelyDemo true --ez Live
 
 | Extra | Does |
 |---|---|
-| `LivelyDemo` | Plays a scripted conversation through the real pipeline, without a key. Sign-in accepts any email and the code 123456. Pro shows sample prices. |
+| `LivelyDemo` | Plays a scripted conversation through the real pipeline, without a key. Sign-in accepts any email and the code 123456, and Continue with Google signs in without Google. Pro shows sample prices. |
 | `LivelyDemoAutoPlay` | Starts the demo when the conversation appears. |
 | `LivelyOnboarding` | Shows the welcome tour on every launch. |
 | `LivelyAudioFile PATH` | Debug builds: plays a 16-bit WAV into the app instead of the mic. |
@@ -169,6 +174,7 @@ draws the same bubbles as the iOS icon.
 | `Networking/SonioxSpeaker.swift` | `net/SonioxSpeaker.kt` (OkHttp WebSocket) |
 | `Audio/SpeechPlayer.swift` (AVAudioEngine) | `audio/SpeechPlayer.kt` (AudioTrack; no shared audio session to coordinate) |
 | `Model/Account.swift`, `Pro.swift` | `model/Account.kt`, `model/Pro.kt` (Play Billing) |
+| `SignInWithAppleButton` in `Views/AccountView.swift` | `support/GoogleSignIn.kt` (Sign in with Google, Credential Manager) |
 | `Support/Keychain.swift` | `support/Stores.kt` (Keystore-sealed preferences, kept out of backups) |
 | `Model/LocationLanguages.swift` (Core Location, MapKit) | `model/LocationLanguages.kt`, `support/RegionLocator.kt` (LocationManager, Geocoder) |
 | `NLLanguageRecognizer` | `model/LanguageDetector.kt` (script counting, then `TextClassifier`) |

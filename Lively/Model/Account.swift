@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// Optional sign-in with an emailed code, through Lively's key broker
-/// (`Server/key-broker/src/auth.ts`). A signed-in app sends its session token
+/// Optional sign-in with Apple or an emailed code, through Lively's key broker
+/// (`Server/key-broker/src/auth.ts` and `identity.ts`). A signed-in app sends its session token
 /// with key requests and gets a per-account listening budget instead of the
 /// per-install one.
 ///
@@ -21,6 +21,17 @@ final class Account {
     }
 
     var isSignedIn: Bool { email != nil }
+
+    /// Sign in with Apple's Hide My Email gives the account a relay address,
+    /// which means nothing to the person, so the app doesn't show it.
+    static func hidesEmail(_ email: String) -> Bool {
+        email.lowercased().hasSuffix("@privaterelay.appleid.com")
+    }
+
+    /// What to call the account: its email, unless Apple hides it.
+    static func displayName(for email: String) -> String {
+        hidesEmail(email) ? "Apple Account" : email
+    }
 
     private let brokerURL: URL
     private let session: URLSession
@@ -41,8 +52,8 @@ final class Account {
 
     #if DEBUG
     /// Demo mode (`-LivelyDemo YES`) never reaches the broker: any email
-    /// gets a code, and the code is 123456.
-    private var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }
+    /// gets a code, the code is 123456, and Sign in with Apple skips Apple.
+    var isDemo: Bool { UserDefaults.standard.bool(forKey: "LivelyDemo") }
     #endif
 
     /// Emails a 6-digit code to `email`.
@@ -65,7 +76,26 @@ final class Account {
             return
         }
         #endif
-        let body = try await post("v1/auth/email/verify", ["email": email, "code": code], as: SignedIn.self)
+        adopt(try await post("v1/auth/email/verify", ["email": email, "code": code], as: SignedIn.self))
+    }
+
+    /// Signs in with what Sign in with Apple returned. `nonce` is the value
+    /// whose SHA-256 the request carried; `authorizationCode` lets the broker
+    /// revoke the app's access if the account is deleted.
+    func signInWithApple(identityToken: String, authorizationCode: String?, nonce: String) async throws {
+        #if DEBUG
+        if isDemo {
+            try await Task.sleep(for: .milliseconds(600))
+            email = "demo@privaterelay.appleid.com"
+            return
+        }
+        #endif
+        var body = ["identity_token": identityToken, "nonce": nonce]
+        if let authorizationCode { body["authorization_code"] = authorizationCode }
+        adopt(try await post("v1/auth/apple", body, as: SignedIn.self))
+    }
+
+    private func adopt(_ body: SignedIn) {
         Keychain.write(body.token, account: Self.tokenAccount)
         Keychain.write(body.user.email, account: Self.emailAccount)
         token = body.token

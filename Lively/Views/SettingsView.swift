@@ -373,7 +373,7 @@ private struct AccountRow: View {
                     colors: [Color(.firstLanguageInk), Color(.secondLanguageInk)],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 ))
-                if let initial = email?.first {
+                if let email, !Account.hidesEmail(email), let initial = email.first {
                     Text(String(initial).uppercased())
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
                 } else {
@@ -383,11 +383,11 @@ private struct AccountRow: View {
             .foregroundStyle(.white)
             .frame(width: 56, height: 56)
             VStack(alignment: .leading, spacing: 2) {
-                Text(email ?? "Sign in to Lively")
+                Text(email.map(Account.displayName(for:)) ?? "Sign in to Lively")
                     .font(.title3.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(email == nil ? "More translation time every day" : "Account")
+                Text(email == nil ? "Two free hours a day instead of one" : "Account")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

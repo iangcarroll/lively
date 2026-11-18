@@ -220,6 +220,26 @@ class BrokerClientTest {
         assertTrue(again.hasFreePro)
     }
 
+    @Test fun googleSignInSendsTheTokenAndStoresTheSession() = runTest {
+        server.enqueue(json(200, """{"token":"tok","user":{"email":"g@b.co","free_pro":false}}"""))
+        val account = Account(base, memory, memory, backgroundScope, isDemo = { false }, googleClientID = "client")
+        assertTrue(account.offersGoogle)
+        account.signInWithGoogle("id-token", "nonce-1")
+        assertEquals("g@b.co", account.email)
+        assertEquals("tok", memory.read("lively-session-token"))
+        val request = server.takeRequest()
+        assertEquals("/v1/auth/google", request.url.encodedPath)
+        val body = request.body!!.utf8()
+        assertTrue(body.contains("\"id_token\":\"id-token\""))
+        assertTrue(body.contains("\"nonce\":\"nonce-1\""))
+    }
+
+    @Test fun googleSignInIsHiddenWithoutAClientID() = runTest {
+        assertFalse(Account(base, memory, memory, backgroundScope, isDemo = { false }).offersGoogle)
+        assertEquals("Apple Account", Account.displayName("x1y2@privaterelay.appleid.com"))
+        assertEquals("a@b.co", Account.displayName("a@b.co"))
+    }
+
     @Test fun wrongCodesShowTheBrokersMessage() = runTest {
         server.enqueue(json(400, """{"error":"invalid_code","message":"That code didn't work."}"""))
         val account = Account(base, memory, memory, backgroundScope, isDemo = { false })

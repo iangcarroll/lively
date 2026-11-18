@@ -15,5 +15,10 @@
 	<!-- Optional "Set from location": the country, for the local language. -->
 	<key>com.apple.security.personal-information.location</key>
 	<true/>
+	<!-- Sign in with Apple, for the optional account. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>

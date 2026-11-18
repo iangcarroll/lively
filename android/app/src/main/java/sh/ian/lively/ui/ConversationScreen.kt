@@ -82,6 +82,8 @@ fun ConversationScreen(
     onNearLanguageChange: (Language) -> Unit,
     onShowSettings: () -> Unit,
     onShowPro: () -> Unit,
+    /** Null when the person is signed in, or the build has no accounts. */
+    onShowAccount: (() -> Unit)?,
 ) {
     val pair = settings.languages
     // The near side's language, kept within the current pair.
@@ -178,6 +180,10 @@ fun ConversationScreen(
                         TextButton(onClick = { dismiss(); onShowSettings() }) { Text("Open Settings") }
                     }
                     if (pro.freeLimitReached && !pro.isPro) {
+                        // Signing in is free and doubles the day, so it comes first.
+                        if (onShowAccount != null) {
+                            TextButton(onClick = { dismiss(); onShowAccount() }) { Text("Sign in for another hour") }
+                        }
                         TextButton(onClick = { dismiss(); onShowPro() }) { Text("Get Lively Pro") }
                     }
                     TextButton(onClick = dismiss) { Text("OK") }
