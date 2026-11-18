@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -57,7 +58,6 @@ import sh.ian.lively.model.get
  * Every language the engine supports, searchable by English or native
  * name. Picking the other side's language swaps the pair.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LanguageListScreen(
     settings: AppSettings,
@@ -66,12 +66,50 @@ fun LanguageListScreen(
     title: String = if (side == LanguageSide.FIRST) "First language" else "Second language",
     closeIcon: Boolean = false,
 ) {
-    var query by rememberSaveable { mutableStateOf("") }
     val current = settings.languages[side]
     val other = settings.languages.other(current)
     val all = remember(settings.providerID) { settings.provider.languages.sortedBy { it.englishName } }
+    fun pick(language: Language) {
+        settings.setLanguage(language, side)
+        onDone()
+    }
+    LanguageSearchList(title, all, onDone, closeIcon, pinned = {
+        item { SectionHeader("This conversation") }
+        items(settings.languages.all, key = { "pair-${it.code}" }) { LanguageRow(it, current, other, settings) { pick(it) } }
+        item { SectionHeader("All languages") }
+    }) { LanguageRow(it, current, other, settings) { pick(it) } }
+}
+
+/** The reader's saved language is independent of any conversation partner. */
+@Composable
+fun OwnLanguageListScreen(settings: AppSettings, onDone: () -> Unit, closeIcon: Boolean = false) {
+    val all = remember { Language.SONIOX.sortedBy { it.englishName } }
+    val current = settings.speechListenerLanguage
+    LanguageSearchList("Your language", all, onDone, closeIcon) {
+        LanguageRow(it, current, other = null, settings) {
+            settings.speechListenerLanguage = it
+            onDone()
+        }
+    }
+}
+
+/**
+ * A titled list of [languages] under a search field that matches English
+ * names, native names and codes. [pinned] rows lead the list until a search starts.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguageSearchList(
+    title: String,
+    languages: List<Language>,
+    onDone: () -> Unit,
+    closeIcon: Boolean,
+    pinned: LazyListScope.() -> Unit = {},
+    row: @Composable (Language) -> Unit,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
     val trimmed = query.trim()
-    val matches = if (trimmed.isEmpty()) all else all.filter {
+    val matches = if (trimmed.isEmpty()) languages else languages.filter {
         it.englishName.contains(trimmed, ignoreCase = true) ||
             it.nativeName.contains(trimmed, ignoreCase = true) ||
             it.code == trimmed.lowercase()
@@ -122,16 +160,8 @@ fun LanguageListScreen(
                 .padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
         ) {
-            fun pick(language: Language) {
-                settings.setLanguage(language, side)
-                onDone()
-            }
-            if (trimmed.isEmpty()) {
-                item { SectionHeader("This conversation") }
-                items(settings.languages.all, key = { "pair-${it.code}" }) { LanguageRow(it, current, other, settings) { pick(it) } }
-                item { SectionHeader("All languages") }
-            }
-            items(matches, key = { it.code }) { LanguageRow(it, current, other, settings) { pick(it) } }
+            if (trimmed.isEmpty()) pinned()
+            items(matches, key = { it.code }) { row(it) }
             if (matches.isEmpty()) {
                 item {
                     Column(
@@ -160,7 +190,7 @@ private fun SectionHeader(text: String) {
 }
 
 @Composable
-private fun LanguageRow(language: Language, current: Language, other: Language, settings: AppSettings, onClick: () -> Unit) {
+private fun LanguageRow(language: Language, current: Language, other: Language?, settings: AppSettings, onClick: () -> Unit) {
     val isCurrent = language == current
     Row(
         Modifier

@@ -48,9 +48,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import sh.ian.lively.audio.SpeechPlayer
 import sh.ian.lively.audio.MicCapture
+import sh.ian.lively.model.AppSettings
 import sh.ian.lively.model.ConversationHost
 import sh.ian.lively.model.ConversationStore
 import sh.ian.lively.model.Language
@@ -63,6 +65,7 @@ import sh.ian.lively.ui.LanguageListScreen
 import sh.ian.lively.ui.LivelyTheme
 import sh.ian.lively.ui.LocationOfferCard
 import sh.ian.lively.ui.OnboardingScreen
+import sh.ian.lively.ui.OwnLanguageListScreen
 import sh.ian.lively.ui.ProScreen
 import sh.ian.lively.ui.SettingsScreen
 import java.lang.ref.WeakReference
@@ -88,7 +91,9 @@ class MainActivity : ComponentActivity() {
                 model.host.attach(this@MainActivity)
                 onDispose { model.host.attach(null) }
             }
-            LivelyTheme {
+            // Automatic conversations color by the listener's language rather than the pair.
+            val settings = graph.settings
+            LivelyTheme(automaticListener = if (settings.usesAutomaticLanguageDetection) settings.speechListenerLanguage else null) {
                 LivelyNavigation(graph, model.store)
             }
         }
@@ -176,6 +181,8 @@ private object Routes {
     /** Lively Pro, opened because today's free time ran out. */
     const val PRO_LIMIT = "pro/limit"
     const val LANGUAGE = "settings/language/{side}"
+    /** The reader's own language, for an automatic conversation. */
+    const val OWN_LANGUAGE = "settings/own-language"
     fun language(side: LanguageSide) = "settings/language/${side.name}"
 }
 
@@ -186,6 +193,7 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
     val settings = graph.settings
     var showsTranscript by remember { mutableStateOf(prefs.bool("phoneShowsTranscript")) }
     var nearLanguage by remember { mutableStateOf(Language(prefs.string("nearLanguage") ?: settings.languages.first.code)) }
+    var listenerNear by remember { mutableStateOf(prefs.bool("listenerNear", default = true)) }
     val start = remember {
         when {
             DebugFlags.forceOnboarding -> Routes.ONBOARDING
@@ -197,8 +205,12 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
 
     // The card offering "Set from location", shown once on an open after the
     // welcome tour: not on the launch that shows the tour, which has its own button.
+    // Location chooses a pair, which automatic detection doesn't use.
     var offersLocation by remember {
-        mutableStateOf(start == Routes.CONVERSATION && !DebugFlags.demo && !prefs.bool("locationOfferDone") && !settings.usesLocationLanguages)
+        mutableStateOf(
+            start == Routes.CONVERSATION && !DebugFlags.demo && !prefs.bool("locationOfferDone") &&
+                !settings.usesLocationLanguages && !settings.usesAutomaticLanguageDetection,
+        )
     }
 
     /** The account screen was opened from the used-up screen, so signing in closes both. */
@@ -206,6 +218,7 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
 
     ForegroundEffects(graph, store)
     ReviewPromptEffect(graph, store)
+    SettingsEffects(graph.settings, store)
 
     NavHost(
         navController = nav,
@@ -248,6 +261,11 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
                     nearLanguage = it
                     prefs.putString("nearLanguage", it.code)
                 },
+                listenerNear = listenerNear,
+                onListenerNearChange = {
+                    listenerNear = it
+                    prefs.putBool("listenerNear", it)
+                },
                 onShowSettings = { nav.navigateSingle(Routes.SETTINGS) },
                 onShowLimit = { nav.navigateSingle(Routes.PRO_LIMIT) },
             )
@@ -263,8 +281,13 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
         composable(Routes.ONBOARDING) {
             OnboardingScreen(settings, graph.account, graph.locationLanguages) {
                 prefs.putBool("onboardingDone", true)
-                nearLanguage = settings.languages.first
-                prefs.putString("nearLanguage", nearLanguage.code)
+                if (settings.usesAutomaticLanguageDetection) {
+                    listenerNear = true
+                    prefs.putBool("listenerNear", true)
+                } else {
+                    nearLanguage = settings.languages.first
+                    prefs.putString("nearLanguage", nearLanguage.code)
+                }
                 store.settingsDidClose()
                 nav.navigate(Routes.CONVERSATION) { popUpTo(0) { inclusive = true } }
                 if (!settings.hasCredentials) nav.navigate(Routes.SETTINGS)
@@ -283,6 +306,7 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
                 onAccount = { nav.navigateSingle(Routes.ACCOUNT) },
                 onPro = { nav.navigateSingle(Routes.PRO) },
                 onLanguage = { nav.navigateSingle(Routes.language(it)) },
+                onOwnLanguage = { nav.navigateSingle(Routes.OWN_LANGUAGE) },
                 onWelcome = { nav.navigate(Routes.ONBOARDING) { popUpTo(Routes.CONVERSATION) } },
                 onClear = {
                     store.clear()
@@ -293,6 +317,9 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
         composable(Routes.LANGUAGE) { entry ->
             val side = LanguageSide.valueOf(entry.arguments?.getString("side") ?: LanguageSide.FIRST.name)
             LanguageListScreen(settings, side, onDone = { nav.popBackStack() })
+        }
+        composable(Routes.OWN_LANGUAGE) {
+            OwnLanguageListScreen(settings, onDone = { nav.popBackStack() })
         }
         composable(Routes.ACCOUNT) {
             graph.account?.let { account ->
@@ -349,7 +376,9 @@ private fun ReviewPromptEffect(graph: LivelyApp.Graph, store: ConversationStore)
             val stopped = wasListening && !listening
             wasListening = listening
             if (!stopped || DebugFlags.demo || counted) return@collectLatest
-            val turns = store.utterances.count { it.isFinal && it.hasContent }
+            // Only turns that were translated; a row still waiting for the other
+            // language, or one the engine took back, wasn't a conversation.
+            val turns = store.visibleUtterances.count { it.isFinal && it.translation.isNotEmpty() }
             if (turns < ReviewPrompt.MIN_TURNS) return@collectLatest
             counted = true
             val good = prefs.int("goodConversations") + 1
@@ -368,6 +397,25 @@ private fun ReviewPromptEffect(graph: LivelyApp.Graph, store: ConversationStore)
                 // No Play Store, or it declined; there's nothing to tell anyone.
             }
         }
+    }
+}
+
+/**
+ * Settings that take effect at once, wherever they're changed: the
+ * conversation's mode and the listener's language start a new conversation,
+ * and a change of languages stops speech meant for the old ones.
+ */
+@Composable
+private fun SettingsEffects(settings: AppSettings, store: ConversationStore) {
+    LaunchedEffect(settings, store) {
+        launch { snapshotFlow { settings.languages }.drop(1).collect { store.speechRoutingDidChange() } }
+        launch {
+            snapshotFlow { settings.speechListenerLanguage }.drop(1).collect {
+                if (settings.usesAutomaticLanguageDetection) store.settingsDidClose()
+                store.speechRoutingDidChange()
+            }
+        }
+        launch { snapshotFlow { settings.conversationMode }.drop(1).collect { store.settingsDidClose() } }
     }
 }
 
@@ -395,7 +443,8 @@ private fun ForegroundEffects(graph: LivelyApp.Graph, store: ConversationStore) 
                     graph.scope.launch { graph.account?.refresh() }
                     // With "Set from location" on, sets the pair on arriving in
                     // another country. Not over a conversation: changing the pair clears it.
-                    if (graph.settings.usesLocationLanguages && !DebugFlags.demo) {
+                    // Location chooses a pair, which automatic detection doesn't use.
+                    if (graph.settings.usesLocationLanguages && !graph.settings.usesAutomaticLanguageDetection && !DebugFlags.demo) {
                         graph.scope.launch {
                             val idle = store.utterances.isEmpty() && !store.isListening
                             if (graph.locationLanguages.update(canChange = idle)) store.settingsDidClose()

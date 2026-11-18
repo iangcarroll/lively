@@ -781,7 +781,7 @@ class ConversationStore(
         utterance.waitsForAutomaticPartner =
             resolvedLanguage == listenerLanguage && utterance.target == null && detectedPartnerLanguage == null
         utterance.isFinal = utterance.isFinal || segment.isClosed
-        if (hasNativeTranslation && nativeTarget != null) {
+        if (nativeTarget != null && hasNativeTranslation) {
             utterance.translation = convertScript(Filler.strip(segment.translation, nativeTarget), nativeTarget)
             utterance.translatedSource = utterance.trimmedSource
             utterance.translatedLanguage = resolvedLanguage
