@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// First launch: a short, mostly visual tour. It shows Lively working
-/// instead of describing it, picks the two languages, and offers sign-in.
+/// instead of describing it, saves language preferences, and offers sign-in.
 struct OnboardingView: View {
     @Bindable var settings: AppSettings
     var onFinish: () -> Void
@@ -231,19 +231,27 @@ private struct TablePage: View {
 private struct LanguagesPage: View {
     @Bindable var settings: AppSettings
     @State private var choosing: LanguageSide?
+    @State private var choosingOwn = false
 
     var body: some View {
         OnboardingPage(
-            title: "Pick your languages",
-            message: "Lively listens for both and translates each into the other. You can change them any time."
+            title: settings.usesAutomaticLanguageDetection ? "Choose your language" : "Pick your languages",
+            message: settings.usesAutomaticLanguageDetection
+                ? "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection uses internet."
+                : "Lively listens for both and translates each into the other. You can change them any time."
         ) {
             VStack(spacing: 16) {
-                LanguagePairPicker(settings: settings) { choosing = $0 }
-                locationButton
+                if settings.usesAutomaticLanguageDetection {
+                    AutomaticLanguagePicker(settings: settings) { choosingOwn = true }
+                } else {
+                    LanguagePairPicker(settings: settings) { choosing = $0 }
+                    // Location chooses a pair, which automatic detection doesn't use.
+                    locationButton
+                }
             }
             .padding(.horizontal, 24)
             .overlay(alignment: .bottom) {
-                if settings.languages.contains(.chinese) {
+                if !settings.usesAutomaticLanguageDetection && settings.languages.contains(.chinese) {
                     Picker("Chinese script", selection: $settings.chineseScript) {
                         ForEach(ChineseScript.allCases) { Text($0.label).tag($0) }
                     }
@@ -261,6 +269,17 @@ private struct LanguagesPage: View {
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel", systemImage: "xmark") { choosing = nil }
+                        }
+                    }
+            }
+            .presentationDetents([.large])
+        }
+        .sheet(isPresented: $choosingOwn) {
+            NavigationStack {
+                OwnLanguageList(settings: settings)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel", systemImage: "xmark") { choosingOwn = false }
                         }
                     }
             }
@@ -298,6 +317,34 @@ private struct LanguagesPage: View {
         .animation(.snappy, value: location.status)
     }
 
+}
+
+/// Automatic conversations: the reader's own language as a card, and a
+/// plain card saying the other language is found from speech.
+struct AutomaticLanguagePicker: View {
+    @Bindable var settings: AppSettings
+    var onChooseOwn: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            LanguageCard(caption: "Your language", language: settings.speechListenerLanguage, ink: Color(.firstLanguageInk), action: onChooseOwn)
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Other language").font(.subheadline.weight(.medium))
+                    Text("Automatic")
+                        .font(.system(.title, design: .rounded, weight: .bold))
+                    Text("Detected when they speak").font(.subheadline)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "globe").font(.title2)
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 22)
+            .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+            .background(Color(.card), in: .rect(cornerRadius: 28, style: .continuous))
+            .accessibilityElement(children: .combine)
+        }
+    }
 }
 
 /// The pair as two cards with a swap button between them. Tapping a card
@@ -339,6 +386,7 @@ struct LanguagePairPicker: View {
 struct LanguagesSheet: View {
     @Bindable var settings: AppSettings
     @State private var choosing: LanguageSide?
+    @State private var choosingOwn = false
     /// Half height for the two cards; full height for the list of languages.
     @State private var detent = PresentationDetent.medium
     @Environment(\.dismiss) private var dismiss
@@ -347,11 +395,26 @@ struct LanguagesSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    LanguagePairPicker(settings: settings) {
-                        detent = .large
-                        choosing = $0
+                    // Automatic detection is the online engine's; other
+                    // engines only take a pair.
+                    if settings.providerID == SpeechProvider.soniox.id {
+                        Picker("Conversation", selection: $settings.conversationMode) {
+                            ForEach(ConversationMode.allCases) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
                     }
-                    if settings.languages.contains(.chinese) {
+                    if settings.usesAutomaticLanguageDetection {
+                        AutomaticLanguagePicker(settings: settings) {
+                            detent = .large
+                            choosingOwn = true
+                        }
+                    } else {
+                        LanguagePairPicker(settings: settings) {
+                            detent = .large
+                            choosing = $0
+                        }
+                    }
+                    if settings.usesAutomaticLanguageDetection || settings.languages.contains(.chinese) {
                         Picker("Chinese script", selection: $settings.chineseScript) {
                             ForEach(ChineseScript.allCases) { Text($0.label).tag($0) }
                         }
@@ -368,6 +431,7 @@ struct LanguagesSheet: View {
                 .frame(maxWidth: 460)
                 .frame(maxWidth: .infinity)
                 .animation(.snappy, value: settings.languages)
+                .animation(.snappy, value: settings.conversationMode)
             }
             .background(Color(.canvas))
             .navigationTitle("Languages")
@@ -380,10 +444,16 @@ struct LanguagesSheet: View {
             .navigationDestination(item: $choosing) { side in
                 LanguageList(settings: settings, side: side, title: side == .first ? "You Speak" : "They Speak")
             }
+            .navigationDestination(isPresented: $choosingOwn) {
+                OwnLanguageList(settings: settings)
+            }
         }
         .presentationDetents([.medium, .large], selection: $detent)
         .onChange(of: choosing) { _, side in
-            if side == nil { detent = .medium }
+            if side == nil && !choosingOwn { detent = .medium }
+        }
+        .onChange(of: choosingOwn) { _, own in
+            if !own && choosing == nil { detent = .medium }
         }
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 460)

@@ -7,11 +7,25 @@ final class AppSettings {
 
     private let defaults = UserDefaults.standard
 
+    /// Online discovery keeps the headphone wearer's language fixed and learns
+    /// the other language from speech. The saved pair is for manual/offline use.
+    var conversationMode: ConversationMode {
+        didSet {
+            defaults.set(conversationMode.rawValue, forKey: "conversationMode")
+            publishWidgetLanguages()
+        }
+    }
+
+    var usesAutomaticLanguageDetection: Bool {
+        conversationMode == .automatic && providerID == SpeechProvider.soniox.id
+    }
+
     /// `SpeechProvider.id` of the chosen engine.
     var providerID: String {
         didSet {
             defaults.set(providerID, forKey: "speechProvider")
             if !provider.supports(languages) { languages = .default }
+            publishWidgetLanguages()
         }
     }
 
@@ -29,9 +43,7 @@ final class AppSettings {
         didSet {
             defaults.set(languages.first.rawValue, forKey: "firstLanguage")
             defaults.set(languages.second.rawValue, forKey: "secondLanguage")
-            #if os(iOS)
-            WidgetLanguages.publish(languages)
-            #endif
+            publishWidgetLanguages()
         }
     }
 
@@ -80,17 +92,24 @@ final class AppSettings {
     }
 
     private var speechListenerLanguageCode: String {
-        didSet { defaults.set(speechListenerLanguageCode, forKey: "speechListenerLanguage") }
+        didSet {
+            defaults.set(speechListenerLanguageCode, forKey: "speechListenerLanguage")
+            publishWidgetLanguages()
+        }
     }
 
     /// The headset wearer's language, independent of the face-to-face layout.
     var speechListenerLanguage: Language {
         get {
             let language = Language(speechListenerLanguageCode)
+            if usesAutomaticLanguageDetection {
+                return Language.soniox.contains(language) ? language : .english
+            }
             return languages.contains(language) ? language : languages.first
         }
         set {
-            guard languages.contains(newValue) else { return }
+            guard usesAutomaticLanguageDetection
+                ? Language.soniox.contains(newValue) : languages.contains(newValue) else { return }
             speechListenerLanguageCode = newValue.rawValue
         }
     }
@@ -131,6 +150,7 @@ final class AppSettings {
     }
 
     private init() {
+        conversationMode = ConversationMode(rawValue: defaults.string(forKey: "conversationMode") ?? "") ?? .automatic
         let providerID = defaults.string(forKey: "speechProvider") ?? SpeechProvider.fallback.id
         self.providerID = providerID
         let stored = LanguagePair(
@@ -153,10 +173,29 @@ final class AppSettings {
         for credential in SpeechProvider.allCredentials {
             credentials[credential.id] = Keychain.read(account: credential.id) ?? ""
         }
-        #if os(iOS)
         // didSet doesn't run here; the widgets may not have this pair yet.
-        WidgetLanguages.publish(languages)
+        publishWidgetLanguages()
+    }
+
+    private func publishWidgetLanguages() {
+        #if os(iOS)
+        if usesAutomaticLanguageDetection {
+            WidgetLanguages.publishAutomatic(listener: speechListenerLanguage)
+        } else {
+            WidgetLanguages.publish(languages)
+        }
         #endif
+    }
+}
+
+enum ConversationMode: String, CaseIterable, Identifiable, Sendable {
+    case automatic, pair
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .pair: "Choose a pair"
+        }
     }
 }
 

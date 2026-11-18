@@ -10,32 +10,40 @@ struct UtteranceBubble: View {
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
 
-    private var spoken: Language { utterance.language }
-    private var leading: Bool { spoken == utterance.languages.first }
+    private var spoken: Language? { utterance.sourceLanguage }
+    private var ink: Color { spoken?.ink ?? .secondary }
+    private var unclassified: Bool { utterance.isAutomatic && spoken == nil && utterance.target == nil }
+    private var leading: Bool {
+        utterance.isAutomatic ? spoken == utterance.listenerLanguage : spoken == utterance.languages.first
+    }
 
     var body: some View {
         HStack {
-            if !leading { Spacer(minLength: 40) }
+            if !leading && !unclassified { Spacer(minLength: 40) }
             VStack(alignment: .leading, spacing: 10) {
                 block(spoken, text: utterance.trimmedSource, spoken: true)
-                Divider().overlay(spoken.ink.opacity(0.2))
-                translation
+                if !utterance.isSourceOnly {
+                    Divider().overlay(ink.opacity(0.2))
+                    translation
+                }
             }
             .padding(14)
             .background {
                 // The speaker's color marks whose turn it was.
                 let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
                 shape.fill(Color(.card))
-                shape.fill(spoken.ink.opacity(0.08))
-                shape.strokeBorder(spoken.ink.opacity(0.25), lineWidth: 1)
+                shape.fill(ink.opacity(0.08))
+                shape.strokeBorder(ink.opacity(0.25), lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
             .contextMenu {
-                Button("Copy \(spoken.nativeName)", systemImage: "doc.on.doc") {
-                    Clipboard.copy(utterance.trimmedSource)
+                if !utterance.trimmedSource.isEmpty {
+                    Button(spoken.map { "Copy \($0.nativeName)" } ?? "Copy original", systemImage: "doc.on.doc") {
+                        Clipboard.copy(utterance.trimmedSource)
+                    }
                 }
                 if !utterance.translation.isEmpty {
-                    Button("Copy \(utterance.target.nativeName)", systemImage: "doc.on.doc") {
+                    Button(utterance.target.map { "Copy \($0.nativeName)" } ?? "Copy translation", systemImage: "doc.on.doc") {
                         Clipboard.copy(utterance.translation)
                     }
                 }
@@ -47,27 +55,29 @@ struct UtteranceBubble: View {
                     Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
                 }
             }
-            if leading { Spacer(minLength: 40) }
+            if leading && !unclassified { Spacer(minLength: 40) }
         }
         .animation(.snappy(duration: 0.25), value: utterance.translation)
-        .animation(.snappy(duration: 0.25), value: utterance.language)
+        .animation(.snappy(duration: 0.25), value: utterance.sourceLanguage)
     }
 
-    private func block(_ language: Language, text: String, spoken: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            LanguageTag(language: language, spoken: spoken)
+    private func block(_ language: Language?, text: String, spoken: Bool) -> some View {
+        let missingSource = spoken && text.isEmpty && utterance.isFinal
+        return VStack(alignment: .leading, spacing: 4) {
+            OptionalLanguageTag(language: language, spoken: spoken, unknownTitle: spoken ? utterance.unidentifiedLanguageTitle : "Automatic")
             HStack(alignment: .lastTextBaseline, spacing: 6) {
-                Text(text)
-                    .font(.transcript(language, emphasized: !spoken))
-                    .foregroundStyle(spoken ? AnyShapeStyle(.primary) : AnyShapeStyle(language.ink))
+                Text(missingSource ? "—" : text)
+                    .font(.transcript(language ?? utterance.listenerLanguage, emphasized: !spoken))
+                    .foregroundStyle(spoken ? AnyShapeStyle(.primary) : AnyShapeStyle(language?.ink ?? .secondary))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(missingSource ? "Original transcript unavailable" : text)
                 if spoken && !utterance.isFinal {
-                    TypingDots(color: language.ink)
+                    TypingDots(color: language?.ink ?? .secondary)
                 }
             }
         }
-        .environment(\.locale, language.locale)
+        .environment(\.locale, language?.locale ?? .current)
     }
 
     @ViewBuilder
@@ -79,12 +89,14 @@ struct UtteranceBubble: View {
                     .opacity(utterance.translationState == .current || utterance.isFinal ? 1 : 0.75)
                 statusLine
             }
+        } else if utterance.showsLanguagePrompt || target == nil {
+            PendingLanguageLabel(utterance: utterance, onTranslate: onRetry)
         } else {
             VStack(alignment: .leading, spacing: 6) {
-                LanguageTag(language: target)
+                OptionalLanguageTag(language: target)
                 statusLine
-                if case .working = utterance.translationState { TypingDots(color: target.ink) }
-                else if case .idle = utterance.translationState { TypingDots(color: target.ink) }
+                if case .working = utterance.translationState { TypingDots(color: target?.ink ?? .secondary) }
+                else if case .idle = utterance.translationState { TypingDots(color: target?.ink ?? .secondary) }
             }
         }
     }
@@ -92,6 +104,8 @@ struct UtteranceBubble: View {
     @ViewBuilder
     private var statusLine: some View {
         switch utterance.translationState {
+        case .awaitingPartner:
+            PendingLanguageLabel(utterance: utterance, onTranslate: onRetry)
         case .waitingForNetwork:
             Label("Waiting for connection", systemImage: "wifi.slash")
                 .font(.caption)
@@ -105,7 +119,7 @@ struct UtteranceBubble: View {
             .tint(.orange)
         default:
             if utterance.isLate {
-                Label("Caught up after a dropout", systemImage: "clock.arrow.circlepath")
+                Label("Delayed transcription", systemImage: "clock.arrow.circlepath")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

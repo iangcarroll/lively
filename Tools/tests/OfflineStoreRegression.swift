@@ -7,8 +7,10 @@ struct SpeechProvider {
 }
 enum ProviderCredential { case mistral }
 enum SpeechSource { case original, downloaded }
+enum ConversationMode { case automatic, pair }
 final class AppSettings {
     var provider = SpeechProvider(id: "cloud")
+    var conversationMode = ConversationMode.pair
     var languages = LanguagePair(first: .english, second: Language("fr"))
     var chineseScript = ChineseScript.simplified
     var translationModel = "test"
@@ -122,8 +124,16 @@ final class ConversationStore {
     var utterances: [Utterance] = []
     var isOnline = true
     var isUsingOnDevice = false
+    // This suite retains its explicit offline pair contract. Automatic mode
+    // uses the separate actual-method automatic conversation regression.
+    let isAutomaticLanguageMode = false
+    var listenerLanguage = Language.english
+    var detectedPartnerLanguage: Language?
+    var automaticSessionID = UUID()
+    var automaticLastActivity = Date()
     var demo: String?
     var translator: (any TranslationService)?
+    var primaryTranslator: (any TranslationService)?
     var translations: [UUID: Task<Void, Never>] = [:]
     var speaker: (any TranslationSpeaker)?
     var speakerSource: SpeechSource?
@@ -137,6 +147,8 @@ final class ConversationStore {
     func speak(_ utterance: Utterance, stable: String, complete: Bool) { speechCompletions += 1 }
     func setSpeaksTranslations(_ on: Bool) { settings.speaksTranslations = on }
     func refreshStatus() {}
+    func expireAutomaticContext(at now: Date) {}
+    func canUseAutomaticTurn(_ utterance: Utterance) -> Bool { false }
     func chooseSpeaker() -> (any TranslationSpeaker)? { activeSpeaker() }
     func changeNetwork(_ online: Bool) { setPath(online: online, interface: .wifi) }
     func translateSpeech(_ text: String) -> Utterance {
@@ -353,6 +365,39 @@ final class ConversationStore {
         }
         check(Calls.cloud == 1 && waiting.utterances.first?.translation.hasPrefix("local:") == false,
               "the held turn is translated in the cloud once back online")
+        for typed in [false, true] {
+            for localStillActive in [false, true] {
+                Calls.reset()
+                Calls.missingPack = true
+                let recovering = ConversationStore()
+                // Native Soniox speech has no primary text translator. Its
+                // local fallback still owns recognition during reconnection.
+                recovering.isUsingOnDevice = true
+                recovering.translator = AppleTranslator()
+                recovering.changeNetwork(false)
+                let text = "Recover this retained sentence."
+                let row: Utterance
+                if typed {
+                    recovering.submitTyped(text, language: .english)
+                    row = recovering.utterances[0]
+                } else { row = recovering.translateSpeech(text) }
+                await until { row.translationState == .waitingForNetwork }
+                check(Calls.local.count == 1 && Calls.cloud == 0,
+                      "a missing local pack holds typed and spoken turns without a cloud call while offline")
+                if !localStillActive {
+                    recovering.isUsingOnDevice = false
+                    recovering.translator = nil
+                }
+                recovering.changeNetwork(true)
+                for _ in 0..<60 where row.translationState != .current {
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
+                check(row.translationState == .current && row.translation == "cloud:" + text,
+                      "restoration translates retained text even before local speech has handed back to cloud")
+                check(Calls.cloud == 1 && Calls.local.count == 1,
+                      "restoration requests cloud text once without retrying the known missing local pack")
+            }
+        }
         print("Offline store regression: \(assertions) assertions, \(failures) failures")
         if failures > 0 { exit(1) }
     }

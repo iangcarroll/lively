@@ -15,6 +15,7 @@ struct ConversationScreen: View {
     /// This conversation has been counted; cleared with the conversation.
     @State private var countedConversation = false
     @Environment(\.requestReview) private var requestReview
+    @State private var showAddress = false
     @AppStorage("onboardingDone") private var onboardingDone = false
     /// The card offering "Set from location", shown once on an open after the welcome tour.
     @State private var showLocationOffer = false
@@ -31,7 +32,12 @@ struct ConversationScreen: View {
     /// On phones, face-to-face is the main layout; the transcript is an alternative.
     @AppStorage("phoneShowsTranscript") private var phoneShowsTranscript = false
     @AppStorage("nearLanguage") private var nearLanguage: Language = .english
+    @AppStorage("listenerNear") private var listenerNear = true
+    @State private var addressLanguage: Language = .english
+    @State private var listeningPrompt = ListeningPromptVisibility()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
 
     /// Unfolded iPhone Duo, landscape phones, iPad and Mac get side-by-side columns.
     private static let wideBreakpoint: CGFloat = 640
@@ -46,8 +52,9 @@ struct ConversationScreen: View {
                 if !wide && !phoneShowsTranscript {
                     FaceToFaceScreen(
                         store: store,
-                        languages: settings.languages,
+                        languages: store.isAutomaticLanguageMode ? nil : settings.languages,
                         nearLanguage: near,
+                        listenerNear: $listenerNear,
                         showsTextInput: showsTextInput,
                         textInputFocused: $textInputFocused,
                         onSetTextInput: setTextInput,
@@ -56,7 +63,9 @@ struct ConversationScreen: View {
                         onShowTranscript: { withAnimation(.snappy) { phoneShowsTranscript = true } },
                         onShowSettings: { showSettings = true },
                         onShowLanguages: { showLanguages = true },
-                        statusColumn: column
+                        onShowAddress: openAddress,
+                        statusColumn: column,
+                        showsListeningPrompt: showsListeningPrompt
                     )
                     // Below its status icons, the iPhone Duo's column is free.
                     .ignoresSafeArea(edges: column?.edges ?? [])
@@ -67,13 +76,14 @@ struct ConversationScreen: View {
                     // press on the mic mid-hold.
                     // It spans the iPhone Duo's column, so the bottom bar's
                     // buttons in it take taps; everything else keeps clear of it.
-                    ZStack { transcript(wide: wide).padding(column?.edges ?? [], column?.width ?? 0) }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .safeAreaBar(edge: .top) {
-                            topBar(wide: wide, column: column)
-                                .padding(column?.edges ?? [], column?.width ?? 0)
-                        }
-                        .safeAreaBar(edge: .bottom) { controls(column: column) }
+                    ConversationTranscriptLayout {
+                        topBar(wide: wide, column: column)
+                            .padding(column?.edges ?? [], column?.width ?? 0)
+                    } transcript: {
+                        transcript(wide: wide).padding(column?.edges ?? [], column?.width ?? 0)
+                    } footer: {
+                        controls(column: column)
+                    }
                         .ignoresSafeArea(edges: column?.edges ?? [])
                         .transition(.opacity)
                 }
@@ -99,20 +109,19 @@ struct ConversationScreen: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if store.asksWhoIsSpeaking {
+            let automaticOffline = store.isAutomaticLanguageMode && !store.isOnline
+            let unavailableOriginalVoice = !store.isOnline && settings.speaksTranslations && settings.speechSource == .original
+            let missingDownloadedVoice = settings.speaksTranslations && settings.speechSource == .downloaded && !NeuralVoicePacks.shared.isReady
+            if automaticOffline || ((store.isUsingOnDevice || settings.provider.id == SpeechProvider.onDevice.id) && (unavailableOriginalVoice || missingDownloadedVoice)) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("On-device · Who's speaking?").font(.caption.weight(.semibold))
-                    Picker("Who's speaking?", selection: $settings.offlineSpokenLanguage) {
-                        ForEach(settings.languages.all) { language in
-                            Text(language.nativeName).tag(language)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    if !store.isOnline, settings.speaksTranslations, settings.speechSource == .original {
+                    if automaticOffline {
+                        Text("Automatic detection needs internet. Choose a language pair in Settings for on-device translation.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if unavailableOriginalVoice {
                         Text("Original voice needs internet; translations stay visible.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    if settings.speaksTranslations, settings.speechSource == .downloaded, !NeuralVoicePacks.shared.isReady {
+                    if !automaticOffline && missingDownloadedVoice {
                         Text(NeuralVoicePacks.shared.status == .checking
                              ? "Checking downloaded voices…"
                              : "Download voices in Settings → Offline Voice Library.")
@@ -143,8 +152,10 @@ struct ConversationScreen: View {
             store.speechRoutingDidChange()
         }
         .onChange(of: settings.speechListenerLanguage) { _, _ in
+            if settings.usesAutomaticLanguageDetection { store.settingsDidClose() }
             store.speechRoutingDidChange()
         }
+        .onChange(of: settings.conversationMode) { _, _ in store.settingsDidClose() }
         .onChange(of: settings.speechSource) { _, _ in store.speechRoutingDidChange() }
         .onChange(of: NeuralVoicePacks.shared.selectionRevision) { _, _ in store.speechRoutingDidChange() }
         .onChange(of: NeuralVoicePacks.shared.installedDirectory) { previous, current in
@@ -179,6 +190,9 @@ struct ConversationScreen: View {
         }
         .sheet(isPresented: $showLanguages, onDismiss: { store.settingsDidClose() }) {
             LanguagesSheet(settings: settings)
+        }
+        .sheet(isPresented: $showAddress) {
+            AddressLookupView(initialLanguage: addressLanguage)
         }
         .onChange(of: store.isListening) { was, now in
             if was && !now { conversationPaused() }
@@ -245,8 +259,13 @@ struct ConversationScreen: View {
             if phase == .background { Task { await NeuralSpeaker.releaseCachedModel() } }
             #endif
         }
+        .onChange(of: listeningPromptIsActive, initial: true) { _, active in
+            listeningPrompt.setActive(active)
+        }
+        .onDisappear { listeningPrompt.setActive(false) }
         .onOpenURL(perform: open)
         .onAppear {
+            listeningPrompt.setActive(listeningPromptIsActive)
             Task { await NeuralVoicePacks.shared.refresh() }
             if forcesOnboarding {
                 showOnboarding = true
@@ -273,7 +292,10 @@ struct ConversationScreen: View {
                 store.prewarm()
             }
             // Not on the launch that shows the welcome tour, which has its own button.
-            if onboardingDone, !locationOfferDone, !settings.usesLocationLanguages { showLocationOffer = true }
+            // Location chooses a pair, which automatic detection doesn't use.
+            if onboardingDone, !locationOfferDone, !settings.usesLocationLanguages, !settings.usesAutomaticLanguageDetection {
+                showLocationOffer = true
+            }
             // scenePhase is already active at launch, so onChange doesn't run.
             followLocation()
         }
@@ -296,11 +318,21 @@ struct ConversationScreen: View {
         if changed { store.settingsDidClose() }
     }
 
+    /// Only live, visible conversations need a temporary handoff reminder.
+    private var listeningPromptIsActive: Bool {
+        scenePhase == .active && store.isListening && store.status == .live
+            && !showSettings && !showOnboarding && !showAddress && !showLanguages && !hitFreeLimit && !voiceOverEnabled
+    }
+
+    private var showsListeningPrompt: Bool {
+        !store.isListening || store.status != .live || voiceOverEnabled || listeningPrompt.isVisible
+    }
+
     /// Links from the home and lock screen widgets: `lively://listen` starts
     /// listening, `lively://type` opens the text bar. Ignored until the
     /// welcome tour is done, since it picks the languages.
     private func open(_ url: URL) {
-        guard url.scheme == "lively", onboardingDone || isDemo, !showOnboarding else { return }
+        guard url.scheme?.lowercased() == "lively", onboardingDone || isDemo, !showOnboarding else { return }
         switch url.host() {
         case "listen": store.startListening()
         case "type": setTextInput(true)
@@ -311,7 +343,10 @@ struct ConversationScreen: View {
     /// The near side's language, kept within the current pair.
     private var near: Binding<Language> {
         Binding(
-            get: { settings.languages.contains(nearLanguage) ? nearLanguage : settings.languages.first },
+            get: {
+                if store.isAutomaticLanguageMode { return store.listenerLanguage }
+                return settings.languages.contains(nearLanguage) ? nearLanguage : settings.languages.first
+            },
             set: { nearLanguage = $0 }
         )
     }
@@ -319,8 +354,11 @@ struct ConversationScreen: View {
     private var onboarding: some View {
         OnboardingView(settings: settings) {
             onboardingDone = true
-            nearLanguage = settings.languages.first
+            if settings.usesAutomaticLanguageDetection { listenerNear = true }
+            else { nearLanguage = settings.languages.first }
             showOnboarding = false
+            store.settingsDidClose()
+            store.prewarm()
             if !settings.hasCredentials {
                 Task {
                     try? await Task.sleep(for: .milliseconds(600))
@@ -362,7 +400,10 @@ struct ConversationScreen: View {
         // button where there isn't.
         ViewThatFits(in: .horizontal) {
             topBarRow(wide: wide, column: column) {
-                LanguagePairButton(languages: settings.languages) { showLanguages = true }
+                LanguagePairButton(
+                    first: store.isAutomaticLanguageMode ? store.listenerLanguage : settings.languages.first,
+                    second: store.isAutomaticLanguageMode ? store.detectedPartnerLanguage : settings.languages.second
+                ) { showLanguages = true }
             }
             topBarRow(wide: wide, column: column) {
                 GlassIconButton(systemImage: "globe", label: "Change languages") { showLanguages = true }
@@ -393,13 +434,26 @@ struct ConversationScreen: View {
                 withAnimation(.snappy) { phoneShowsTranscript = false }
             }
         }
-        GlassIconButton(systemImage: "gearshape", label: "Settings") { showSettings = true }
+        Menu {
+            Button("Address", systemImage: "mappin.and.ellipse", action: openAddress)
+            Divider()
+            Button("Settings", systemImage: "gearshape") { showSettings = true }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .semibold))
+                .frame(width: GlassIconButton.size, height: GlassIconButton.size)
+                .contentShape(.circle)
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .circle)
+        .accessibilityLabel("More")
     }
 
     @ViewBuilder
     private func transcript(wide: Bool) -> some View {
         if store.visibleUtterances.isEmpty {
-            EmptyConversation(isListening: store.isListening, isConnecting: store.isConnecting)
+            EmptyConversation(store: store, showsListeningPrompt: showsListeningPrompt)
         } else if wide {
             ParallelTranscript(store: store, onEdit: startEditing)
         } else {
@@ -411,27 +465,26 @@ struct ConversationScreen: View {
         VStack(spacing: 8) {
             if showsTextInput {
                 TypeToTranslateBar(
-                    store: store, languages: settings.languages, language: settings.languages.first,
+                    store: store, languages: store.isAutomaticLanguageMode ? nil : settings.languages,
+                    language: store.isAutomaticLanguageMode ? store.listenerLanguage : settings.languages.first,
                     editing: $editing, focused: $textInputFocused
                 ) { setTextInput(false) }
                 .padding(.horizontal, 16)
                 .padding(column?.edges ?? [], column?.width ?? 0)
                 .transition(.opacity)
             }
-            if !store.visibleUtterances.isEmpty {
-                TranscriptListeningStatus(
-                    status: store.status,
-                    isListening: store.isListening,
-                    languages: settings.languages
-                )
+            if !store.visibleUtterances.isEmpty && showsListeningPrompt {
+                TranscriptListeningStatus(store: store)
                 .padding(.horizontal, 16)
                 .padding(column?.edges ?? [], column?.width ?? 0)
+                .transition(.opacity)
             }
             // The status column is free this far down, so the keyboard button
             // sits in it, under the status icons, with the column's other
             // buttons stacked above it.
             controlRow(column: column)
         }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: showsListeningPrompt)
     }
 
     private func controlRow(column: StatusColumn?) -> some View {
@@ -489,6 +542,15 @@ struct ConversationScreen: View {
             reviewAsked = true
             requestReview()
         }
+    }
+
+    /// Keeps address lookup separate from ongoing conversation audio.
+    private func openAddress() {
+        textInputFocused = false
+        addressLanguage = store.isAutomaticLanguageMode
+            ? (store.detectedPartnerLanguage ?? store.listenerLanguage) : settings.languages.second
+        store.pauseForAddressLookup()
+        showAddress = true
     }
 
     /// Opens the text bar on a turn's transcript to correct it.

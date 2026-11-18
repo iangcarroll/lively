@@ -26,6 +26,7 @@ final class RealtimeTranscriber: SpeechEngine, SocketDialect {
     /// arrive within (delay - 350 ms) of it. Waiting about that long keeps
     /// trailing words in their turn without swallowing the next speaker's first.
     var textLag: Duration { .milliseconds(max(60, config.streamingDelayMs - 250)) }
+    var drainsTextOnPause: Bool { true }
 
     private static let endpoint = URL(string: "wss://api.mistral.ai/v1/audio/transcriptions/realtime")!
 
@@ -38,6 +39,8 @@ final class RealtimeTranscriber: SpeechEngine, SocketDialect {
 
     func start() { socket.start() }
     func stop() { socket.stop() }
+    func pause() { socket.pause() }
+    func resume() { socket.resume() }
     func send(_ chunk: Data) { socket.send(chunk) }
 
     // MARK: - SocketDialect
@@ -139,10 +142,13 @@ extension SpeechProvider {
             guard SpeechProvider.onDevice.supports(settings.languages) else {
                 return SpeechPipeline(engine: cloud, translator: translator)
             }
+            let makeLocal: () -> SpeechEngine = {
+                OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript,
+                                    spokenLanguage: settings.offlineSpokenLanguage)
+            }
             return SpeechPipeline(
                 engine: HybridSpeechEngine(
-                    local: OfflineSpeechEngine(languages: settings.languages, script: settings.chineseScript, spokenLanguage: settings.offlineSpokenLanguage),
-                    cloud: cloud
+                    local: makeLocal(), cloud: cloud, makeLocal: makeLocal
                 ),
                 translator: translator,
                 fallbackTranslator: AppleTranslator()

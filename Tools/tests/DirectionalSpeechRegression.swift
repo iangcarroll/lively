@@ -19,6 +19,7 @@ struct SpeechProvider {
     let id: String
     static let fallback = SpeechProvider(id: "test")
     static let onDevice = SpeechProvider(id: "on-device")
+    static let soniox = SpeechProvider(id: "soniox")
     static let allCredentials: [ProviderCredential] = [.soniox]
     var credentials: [ProviderCredential] { Self.allCredentials }
     static func with(id: String) -> SpeechProvider { Self(id: id) }
@@ -99,10 +100,12 @@ final class URLSessionWebSocketTask {
 // Store integration fakes: synthesis and voice-ID selection are covered by the
 // adapter suite. These record the target language and destination from Store.
 final class NeuralVoicePacks {
+    struct Voice { let languageCode: String }
     enum Status { case checking, notInstalled, ready, failed }
     static let shared = NeuralVoicePacks()
     var isReady = false
     var status = Status.notInstalled
+    func selectedVoice(for language: String) -> Voice? { Voice(languageCode: language) }
 }
 final class NeuralSpeaker: TranslationSpeaker {
     struct Line {
@@ -121,29 +124,31 @@ final class NeuralSpeaker: TranslationSpeaker {
 }
 
 // INSERT_ACTUAL_LANGUAGE
+// INSERT_ACTUAL_FILLER
+// INSERT_ACTUAL_UTTERANCE
 // INSERT_ACTUAL_SETTINGS
 // INSERT_ACTUAL_SPEAKER
 // INSERT_ACTUAL_TRANSLATION_SPEAKER
+// END_SHARED_DIRECTIONAL_DEPENDENCIES
 
-final class Utterance {
-    let id = UUID()
-    let target: Language
-    let languages: LanguagePair
-    let createdAt = Date.now
-    var isFinal = true
-    init(target: Language, languages: LanguagePair) { self.target = target; self.languages = languages }
-}
 final class ConversationStore {
     let settings: AppSettings
     let languages: LanguagePair
     var speakingSince: Date? = .distantPast
     var spoken: [UUID: Int] = [:]
     var speechFlushes: [UUID: Task<Void, Never>] = [:]
+    var utterances: [Utterance] = []
+    let automaticSessionID = UUID()
+    var isAutomaticLanguageMode: Bool { settings.usesAutomaticLanguageDetection }
     let speaker = SonioxSpeaker(credential: .apiKey("test-only"))
     init(settings: AppSettings) { self.settings = settings; languages = settings.languages }
     func activeSpeaker() -> SonioxSpeaker? { speaker }
     func testSpeak(target: Language, text: String = "Sentence.", turnLanguages: LanguagePair? = nil) {
-        speak(Utterance(target: target, languages: turnLanguages ?? languages), stable: text, complete: true)
+        let pair = turnLanguages ?? languages
+        let utterance = Utterance(language: pair.other(than: target), languages: pair)
+        utterance.isFinal = true
+        utterances.append(utterance)
+        speak(utterance, stable: text, complete: true)
     }
     // INSERT_ACTUAL_SPEECH_METHODS
 }
@@ -165,7 +170,7 @@ final class ConversationStore {
     static func drain() async { for _ in 0..<100 { await Task.yield() } }
     static func main() async throws {
         // Persistence is tested against the full production AppSettings source.
-        TestDefaults.standard.values = [:]
+        TestDefaults.standard.values = ["conversationMode": "pair"]
         let settings = AppSettings()
         check(settings.speechSource == .original, "original speech source is not the default")
         settings.speechSource = .downloaded
@@ -195,7 +200,7 @@ final class ConversationStore {
         check(changedPair.offlineSpokenLanguage == .english, "invalid offline speaker escaped current pair")
         changedPair.offlineSpokenLanguage = Language("fr")
         check(AppSettings().offlineSpokenLanguage == Language("fr"), "new offline speaker did not persist")
-        TestDefaults.standard.values = [:]
+        TestDefaults.standard.values = ["conversationMode": "pair"]
         check(settings.speechListenerLanguage == .english, "default listener is not first language")
         settings.speechListenerLanguage = .chinese
         check(TestDefaults.standard.string(forKey: "speechListenerLanguage") == "zh", "listener not persisted")
