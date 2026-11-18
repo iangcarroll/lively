@@ -15,6 +15,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import sh.ian.lively.model.Account
 import sh.ian.lively.model.AppSettings
+import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguageDetector
 import sh.ian.lively.model.LocationLanguages
 import sh.ian.lively.model.Pro
@@ -78,7 +79,7 @@ class LivelyApp : Application() {
         /** Translates typed text; null when the build has no key broker. */
         val brokerTranslator: BrokerTranslator? = brokerURL?.let { BrokerTranslator(it, installID, identity) }
 
-        val settings = AppSettings(prefs, secrets, SpeechProviders.all(scope, keyProvider))
+        val settings = AppSettings(prefs, secrets, SpeechProviders.all(scope, keyProvider, brokerTranslator), isDemo = { DebugFlags.demo })
 
         /** Optional "Set from location"; off until turned on. */
         val locationLanguages = LocationLanguages(settings, RegionLocator(context), scope, RegionLocator::systemLanguage)
@@ -107,15 +108,20 @@ class LivelyApp : Application() {
             ScriptConverter.toTraditional = { text -> synchronized(transliterator) { transliterator.transliterate(text) } }
 
             val classifier = context.getSystemService(TextClassificationManager::class.java)?.textClassifier
-            LanguageDetector.fallback = fallback@{ text, pair ->
-                classifier ?: return@fallback null
+            fun scores(text: String, languages: List<Language>): Map<Language, Float>? {
+                classifier ?: return null
                 val result = runCatching { classifier.detectLanguage(TextLanguage.Request.Builder(text).build()) }.getOrNull()
-                    ?: return@fallback null
-                val scores = pair.all.associateWith { language ->
+                    ?: return null
+                return languages.associateWith { language ->
                     val code = if (language.code == "no") "nb" else language.code
                     maxOf(result.getConfidenceScore(ULocale.forLanguageTag(code)), result.getConfidenceScore(ULocale(language.code)))
                 }
-                scores.maxByOrNull { it.value }?.takeIf { it.value > 0f }?.key
+            }
+            LanguageDetector.fallback = { text, pair ->
+                scores(text, pair.all)?.maxByOrNull { it.value }?.takeIf { it.value > 0f }?.key
+            }
+            LanguageDetector.amongFallback = { text, languages ->
+                scores(text, languages)?.maxByOrNull { it.value }?.takeIf { it.value >= LanguageDetector.CLEAR_SHARE }?.key
             }
         }
     }

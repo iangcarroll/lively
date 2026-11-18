@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 import sh.ian.lively.audio.MicCapture
 import sh.ian.lively.audio.NoiseGate
 import sh.ian.lively.audio.SpeechPlayer
+import sh.ian.lively.net.AutoSpeechSegment
 import sh.ian.lively.net.BrokerTranslationException
 import sh.ian.lively.net.FallbackTranslator
 import sh.ian.lively.net.MistralTranslator
@@ -32,6 +34,7 @@ import sh.ian.lively.net.SpeechSegment
 import sh.ian.lively.net.TranslationException
 import sh.ian.lively.net.TranslationService
 import java.io.IOException
+import java.util.UUID
 
 /** What the store needs from the platform: the mic, its permission, and the screen. */
 interface ConversationHost {
@@ -74,6 +77,8 @@ class ConversationStore(
     demo: Boolean = false,
     /** Builds the engine; tests swap in a fake. */
     private val makePipeline: (SpeechProvider) -> SpeechPipeline = { it.makePipeline(settings) },
+    /** The time in milliseconds; tests move it. */
+    private val now: () -> Long = System::currentTimeMillis,
 ) {
     val utterances = mutableStateListOf<Utterance>()
     var isListening by mutableStateOf(false)
@@ -99,7 +104,23 @@ class ConversationStore(
     /** The languages of the turns in [utterances]. */
     var languages = settings.languages
         private set
+    private var configuredAutomaticMode by mutableStateOf(settings.usesAutomaticLanguageDetection)
+    private var configuredListenerLanguage by mutableStateOf(settings.speechListenerLanguage)
+    private var automaticSessionID = UUID.randomUUID().toString()
+    private var automaticLastActivity = now()
+    private val automaticSegmentUtterances = mutableMapOf<Int, Utterance>()
+    private val automaticCatchUpUtterances = mutableMapOf<Int, Utterance>()
+    var detectedPartnerLanguage by mutableStateOf<Language?>(null)
+        private set
+    private var pendingPartnerLanguage: Language? = null
+    private var pendingPartnerConfirmations = 0
+    private val automaticLanguageEvidence = mutableSetOf<String>()
+    val isAutomaticLanguageMode: Boolean get() = configuredAutomaticMode
+    val listenerLanguage: Language
+        get() = if (isAutomaticLanguageMode) configuredListenerLanguage else settings.speechListenerLanguage
     private var engine: SpeechEngine? = null
+    /** The provider [engine] was built from, so a different one isn't resumed. */
+    private var engineProviderID: String? = null
     private var translator: TranslationService? = null
 
     /** The turn currently receiving transcript text. */
@@ -115,6 +136,8 @@ class ConversationStore(
     /** Where speech from the last dropout belongs in [utterances]. */
     private var dropoutIndex: Int? = null
     private val demo: DemoConversation? = if (demo) DemoConversation(scope) else null
+    /** A press can end while permission or audio startup is still pending. */
+    private var listeningStart: Job? = null
     /** Ends a paused engine's session once it's been idle for [WARM_PAUSE_MS]. */
     private var idleTeardown: Job? = null
     /** Settings changed while listening, so the engine isn't kept warm. */
@@ -167,6 +190,7 @@ class ConversationStore(
      * languages. Only the first call in a launch prewarms.
      */
     fun prewarm() {
+        synchronizeLanguages()
         if (didPrewarm || demo != null || engine != null || isListening || !settings.hasCredentials) return
         didPrewarm = true
         makeEngine(settings.provider).prewarm()
@@ -191,6 +215,13 @@ class ConversationStore(
         releaseEngine()
     }
 
+    /** A separate lookup should not receive late speech from a warm session. */
+    fun pauseForAddressLookup() {
+        stopListening()
+        releaseEngine()
+        speechRoutingDidChange()
+    }
+
     /** The network came or went, or moved to another interface. */
     fun setNetwork(online: Boolean, changedInterface: Boolean) {
         if (online && isOnline && changedInterface) engine?.networkPathChanged()
@@ -199,6 +230,24 @@ class ConversationStore(
         if (online == isOnline) return
         isOnline = online
         engine?.networkAvailable = online
+        if (isAutomaticLanguageMode) {
+            if (!online) {
+                val active = translations.keys.toSet()
+                translations.values.forEach { it.cancel() }
+                translations.clear()
+                for (utterance in utterances) {
+                    if (utterance.id in active && utterance.needsTranslation) {
+                        utterance.translationState = TranslationState.WaitingForNetwork
+                    }
+                }
+            } else {
+                for (utterance in utterances.toList()) {
+                    if (utterance.translationState == TranslationState.WaitingForNetwork && utterance.needsTranslation) {
+                        translate(utterance)
+                    }
+                }
+            }
+        }
         refreshStatus()
     }
 
@@ -217,10 +266,12 @@ class ConversationStore(
 
     // region Listening
 
-    fun toggleListening() = if (isListening) stopListening() else startListening()
+    fun toggleListening() = if (isListening || listeningStart != null) stopListening() else startListening()
 
     fun startListening() {
-        if (isListening) return
+        if (isListening || listeningStart != null) return
+        synchronizeLanguages()
+        expireAutomaticContext()
         demo?.let {
             isListening = true
             transcriberStatus = SpeechEngineStatus.Live
@@ -234,8 +285,11 @@ class ConversationStore(
             alert = "Add your $names in Settings to start."
             return
         }
-        scope.launch {
-            if (!host.requestMicPermission()) {
+        // Lazy, so a start that finishes at once still finds itself here.
+        val start = scope.launch(start = CoroutineStart.LAZY) {
+            val permitted = host.requestMicPermission()
+            listeningStart = null
+            if (!permitted) {
                 alert = "Lively needs microphone access. You can turn it on in Settings › Apps › Lively › Permissions."
                 return@launch
             }
@@ -262,26 +316,39 @@ class ConversationStore(
                 alert = e.message ?: "No microphone is available."
             }
         }
+        listeningStart = start
+        start.start()
     }
 
     private fun startEngine(provider: SpeechProvider) {
+        synchronizeLanguages()
+        dropoutIndex = utterances.size
         engine?.let { engine ->
-            // Still warm from the last pause.
-            idleTeardown?.cancel()
-            idleTeardown = null
-            engine.resume()
-            refreshStatus()
-            return
+            if (engineProviderID == provider.id && !engineIsStale) {
+                // Still warm from the last pause.
+                idleTeardown?.cancel()
+                idleTeardown = null
+                engine.resume()
+                refreshStatus()
+                return
+            }
+            // A session built for another provider or settings can't be reused.
+            this.engine = null
+            engineProviderID = null
+            engine.stop()
         }
         makeEngine(provider).start()
     }
 
     private fun makeEngine(provider: SpeechProvider): SpeechEngine {
+        retireNativeSegments()
+        engineIsStale = false
         val pipeline = makePipeline(provider)
         translator = pipeline.translator
         val engine = pipeline.engine
-        engine.onEvent = ::handle
-        engine.onStatus = { status ->
+        engine.onEvent = { event -> if (this.engine === engine) handle(event) }
+        engine.onStatus = status@{ status ->
+            if (this.engine !== engine) return@status
             transcriberStatus = status
             if (isListening) {
                 refreshStatus()
@@ -292,10 +359,13 @@ class ConversationStore(
         }
         engine.networkAvailable = isOnline
         this.engine = engine
+        engineProviderID = provider.id
         return engine
     }
 
     fun stopListening() {
+        listeningStart?.cancel()
+        listeningStart = null
         if (!isListening) return
         isListening = false
         demo?.stop()
@@ -304,8 +374,21 @@ class ConversationStore(
         level = 0f
         isHearing = false
         host.keepScreenAwake(false)
-        finalizeCurrent()
+        finalizeStoppedTurn()
         refreshStatus()
+    }
+
+    private fun finalizeStoppedTurn() {
+        val ending = current
+        if (engine?.drainsTextOnPause != true || ending == null) {
+            finalizeCurrent()
+            return
+        }
+        silenceTimer?.cancel()
+        silenceTimer = scope.launch {
+            delay(10_000)
+            if (current === ending) finalizeCurrent()
+        }
     }
 
     /**
@@ -335,13 +418,7 @@ class ConversationStore(
      * pick up, so the next start builds a new engine.
      */
     fun settingsDidClose() {
-        if (languages != settings.languages) {
-            // Turns in the old languages don't fit the new pair, and the
-            // engine listens for the old one.
-            languages = settings.languages
-            stopListening()
-            clear()
-        }
+        synchronizeLanguages()
         // The Soniox key may have changed.
         speaker?.stop()
         speaker = null
@@ -350,18 +427,49 @@ class ConversationStore(
         prefetchKey()
     }
 
+    /**
+     * Turns in the old languages don't fit the new ones, and the engine
+     * listens for the old ones.
+     */
+    private fun synchronizeLanguages() {
+        val automatic = settings.usesAutomaticLanguageDetection
+        val listener = settings.speechListenerLanguage
+        val changed = automatic != configuredAutomaticMode ||
+            (automatic && listener != configuredListenerLanguage) ||
+            (!automatic && languages != settings.languages)
+        if (!changed) return
+        stopListening()
+        releaseEngine()
+        languages = settings.languages
+        configuredAutomaticMode = automatic
+        configuredListenerLanguage = listener
+        clear()
+    }
+
     /** Closes a paused engine's session. */
     private fun releaseEngine() {
         if (isListening) return
         engineIsStale = false
         idleTeardown?.cancel()
         idleTeardown = null
-        engine?.stop()
+        val previous = engine
         engine = null
+        engineProviderID = null
+        previous?.stop()
+        retireNativeSegments()
+        // The demo has no engine to bring its translator back.
+        if (demo == null) translator = null
         transcriberStatus = SpeechEngineStatus.Idle
     }
 
     fun clear() {
+        // A new automatic conversation must not receive the previous socket's
+        // delayed language evidence or reuse its segment identifiers.
+        val resumeAutomatic = isAutomaticLanguageMode && isListening
+        if (isAutomaticLanguageMode && engine != null) {
+            stopListening()
+            releaseEngine()
+        }
         speaker?.stop()
         spoken.clear()
         speechFlushes.values.forEach { it.cancel() }
@@ -375,6 +483,8 @@ class ConversationStore(
         catchUpUtterances.clear()
         dropoutIndex = null
         utterances.clear()
+        resetAutomaticConversation()
+        if (resumeAutomatic) startListening()
     }
 
     /**
@@ -389,7 +499,11 @@ class ConversationStore(
         debounces.remove(utterance.id)?.cancel()
         speechFlushes.remove(utterance.id)?.cancel()
         spoken[utterance.id] = Int.MAX_VALUE
-        if (current === utterance) current = null
+        if (current === utterance) {
+            current = null
+            silenceTimer?.cancel()
+            silenceTimer = null
+        }
         utterances.removeAt(index)
         dropoutIndex?.let { if (index < it) dropoutIndex = it - 1 }
     }
@@ -404,13 +518,17 @@ class ConversationStore(
         if (!utterance.isFinal || trimmed.isEmpty() || trimmed == utterance.trimmedSource) return
         translations.remove(utterance.id)?.cancel()
         debounces.remove(utterance.id)?.cancel()
-        // A translating engine's late update to the segment must not undo the edit.
-        segmentUtterances.values.removeAll { it === utterance }
-        catchUpUtterances.values.removeAll { it === utterance }
-        utterance.setSource(trimmed, language = null)
+        // Keep the native binding so late updates are ignored instead of
+        // creating a second row for the reader's corrected turn.
+        utterance.setSource(trimmed, language = if (utterance.isAutomatic) utterance.sourceLanguage else null)
+        // The correction belongs to the reader even when retry must wait for
+        // an unidentified source language. Late native results cannot undo it.
         utterance.isTyped = true
+        utterance.isAutomaticSourceFinal = true
+        utterance.isExplicitTranslationRequest = true
+        utterance.suppressesAutomaticSpeech = false
         utterance.translatedSource = null
-        translate(utterance)
+        retryTranslation(utterance)
     }
 
     /**
@@ -420,6 +538,25 @@ class ConversationStore(
     fun submitTyped(text: String, language: Language) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
+        if (isAutomaticLanguageMode) {
+            expireAutomaticContext()
+            automaticLastActivity = now()
+            val hint = if (language in Language.SONIOX) language else listenerLanguage
+            val source = LanguageDetector.detect(trimmed, among = Language.SONIOX) ?: hint
+            val target = if (source == listenerLanguage) detectedPartnerLanguage else listenerLanguage
+            val utterance = Utterance.automatic(trimmed, source, target, listenerLanguage, automaticSessionID)
+            utterance.isTyped = true
+            utterance.isFinal = true
+            utterance.isAutomaticSourceFinal = true
+            if (target == null) {
+                utterance.wasAwaitingPartner = true
+                utterance.suppressesAutomaticSpeech = true
+                utterance.translationState = TranslationState.AwaitingPartner
+            }
+            utterances += utterance
+            translate(utterance)
+            return
+        }
         val detected = LanguageDetector.detect(trimmed, languages) ?: if (language in languages) language else languages.first
         val utterance = Utterance(languages, trimmed, detected)
         utterance.isTyped = true
@@ -450,12 +587,38 @@ class ConversationStore(
     /** Downloads the on-device models typed text needs, if they aren't there yet. */
     fun prepareTypedTranslation() {
         if (!translatesTypedTextOnDevice) return
-        val pair = languages
+        // Automatic has nothing to prepare until it has heard the other language.
+        val pair = if (isAutomaticLanguageMode) {
+            LanguagePair(listenerLanguage, detectedPartnerLanguage ?: return)
+        } else {
+            languages
+        }
         scope.launch { runCatching { onDeviceTranslator.prepare(pair) } }
     }
 
     fun retryTranslation(utterance: Utterance) {
+        if (utterance.isAutomatic) {
+            val source = utterance.sourceLanguage
+            if (source == null) {
+                utterance.translationState = TranslationState.AwaitingPartner
+                return
+            }
+            if (utterance.target == null) {
+                if (source != utterance.listenerLanguage) {
+                    utterance.bindAutomaticTarget(utterance.listenerLanguage)
+                } else {
+                    detectedPartnerLanguage?.let { utterance.bindAutomaticTarget(it) }
+                }
+            }
+            utterance.isExplicitTranslationRequest = true
+            utterance.isAutomaticSourceFinal = true
+            utterance.suppressesAutomaticSpeech = false
+        }
+        // A native session may end before its translation arrives. Retry
+        // through text translation without allowing a late native overwrite.
+        utterance.isTyped = true
         utterance.translatedSource = null
+        utterance.translatedLanguage = null
         translate(utterance)
     }
 
@@ -476,8 +639,11 @@ class ConversationStore(
                     utterances += it
                     current = it
                 }
+                val previousLanguage = utterance.language
                 utterance.append(if (utterance.source.isEmpty()) event.delta.trimStart() else event.delta)
-                scheduleTranslation(utterance, delayMs = 280)
+                val changed = utterance.language != previousLanguage
+                if (changed) invalidateTranslation(utterance)
+                scheduleTranslation(utterance, delayMs = if (changed) 0 else 280)
                 armSilenceFallback()
             }
 
@@ -499,10 +665,214 @@ class ConversationStore(
 
             is SpeechEvent.Segment -> apply(event.segment)
 
+            is SpeechEvent.AutoSegment -> applyAutomatic(event.segment)
+
             SpeechEvent.SessionReset -> {
                 finalizeCurrent()
+                failMissingSegmentTranslations()
+                for (utterance in automaticSegmentUtterances.values + automaticCatchUpUtterances.values) {
+                    settleInterruptedAutomaticTurn(utterance)
+                }
                 dropoutIndex = utterances.size
             }
+        }
+    }
+
+    /**
+     * Discovery belongs to this conversation, not the saved manual pair.
+     * Clearing or expiring it leaves completed history in its original direction.
+     */
+    private fun resetAutomaticConversation() {
+        val previous = automaticSessionID
+        for (utterance in utterances) {
+            if (utterance.automaticSessionID != previous) continue
+            translations.remove(utterance.id)?.cancel()
+            debounces.remove(utterance.id)?.cancel()
+            speechFlushes.remove(utterance.id)?.cancel()
+            if (utterance.translationState == TranslationState.Working ||
+                utterance.translationState == TranslationState.WaitingForNetwork
+            ) {
+                utterance.translationState =
+                    if (utterance.translation.isEmpty()) TranslationState.Failed(INTERRUPTED) else TranslationState.Current
+            }
+        }
+        automaticSessionID = UUID.randomUUID().toString()
+        automaticLastActivity = now()
+        detectedPartnerLanguage = null
+        pendingPartnerLanguage = null
+        pendingPartnerConfirmations = 0
+        automaticLanguageEvidence.clear()
+        automaticSegmentUtterances.clear()
+        automaticCatchUpUtterances.clear()
+    }
+
+    /**
+     * A later encounter should discover its own language, while a brief mic
+     * pause or background interruption keeps the current conversation intact.
+     */
+    private fun expireAutomaticContext() {
+        if (!isAutomaticLanguageMode || now() - automaticLastActivity <= CONTEXT_EXPIRY_MS) return
+        resetAutomaticConversation()
+    }
+
+    private fun applyAutomatic(segment: AutoSpeechSegment) {
+        if (!isAutomaticLanguageMode) return
+        val source = segment.source.trimStart()
+        val language = segment.language?.takeIf { it in Language.SONIOX }
+        val invalidLanguage = segment.language != null && language == null
+        val invalidTarget = segment.target != null && segment.target != listenerLanguage
+        val nativeTarget =
+            if (!invalidLanguage && segment.target == listenerLanguage && language != listenerLanguage) listenerLanguage else null
+        val hasNativeTranslation = nativeTarget != null && segment.translation.isNotBlank()
+        if (!segment.isCatchUp && source.isNotBlank()) {
+            expireAutomaticContext()
+            automaticLastActivity = now()
+        }
+        val existing = if (segment.isCatchUp) automaticCatchUpUtterances[segment.id] else automaticSegmentUtterances[segment.id]
+        val utterance = if (existing != null) {
+            // Keep deleted and explicitly corrected rows retired even if their
+            // provider segment still has a final update in flight.
+            if (utterances.none { it === existing } || existing.isTyped) return
+            existing
+        } else {
+            if (source.isBlank() && !hasNativeTranslation) return
+            // A provisional reply may follow a newly arriving language in
+            // the same provider turn. Capture its destination at completion.
+            Utterance.automatic(source, language, nativeTarget, listenerLanguage, automaticSessionID).also {
+                it.isLate = segment.isCatchUp
+                if (segment.isCatchUp) {
+                    val index = minOf(dropoutIndex ?: utterances.size, utterances.size)
+                    utterances.add(index, it)
+                    dropoutIndex = index + 1
+                    automaticCatchUpUtterances[segment.id] = it
+                } else {
+                    utterances += it
+                    automaticSegmentUtterances[segment.id] = it
+                }
+            }
+        }
+        val resolvedLanguage = language ?: utterance.sourceLanguage
+        if (!hasNativeTranslation && utterance.translation.isNotEmpty() && !utterance.isTyped) {
+            // Native snapshots replace a volatile preview; an empty update
+            // retracts it. Confirmed native text remains in every snapshot.
+            invalidateTranslation(utterance)
+            utterance.translation = ""
+            utterance.translatedSource = null
+            utterance.translatedLanguage = null
+            utterance.translatedTarget = null
+            if (nativeTarget == null) utterance.correctAutomaticTarget(null)
+        }
+        if (resolvedLanguage != null && resolvedLanguage != utterance.sourceLanguage) {
+            invalidateTranslation(utterance)
+            utterance.correctAutomaticTarget(nativeTarget)
+            utterance.isAutomaticSourceFinal = false
+        }
+        utterance.setSource(resolvedLanguage?.let { convertScript(source, it) } ?: source, resolvedLanguage)
+        if (nativeTarget != null) {
+            utterance.bindAutomaticTarget(nativeTarget)
+        } else if (resolvedLanguage == listenerLanguage && utterance.target == null &&
+            segment.isSourceFinal && segment.languageIsFinal
+        ) {
+            detectedPartnerLanguage?.let { utterance.bindAutomaticTarget(it) }
+        }
+        utterance.isAutomaticSourceFinal = utterance.isAutomaticSourceFinal ||
+            (segment.isSourceFinal && segment.languageIsFinal && language != null)
+        utterance.hasFinalAutomaticLanguage = segment.languageIsFinal && language != null
+        utterance.waitsForAutomaticPartner =
+            resolvedLanguage == listenerLanguage && utterance.target == null && detectedPartnerLanguage == null
+        utterance.isFinal = utterance.isFinal || segment.isClosed
+        if (hasNativeTranslation && nativeTarget != null) {
+            utterance.translation = convertScript(Filler.strip(segment.translation, nativeTarget), nativeTarget)
+            utterance.translatedSource = utterance.trimmedSource
+            utterance.translatedLanguage = resolvedLanguage
+            utterance.translatedTarget = nativeTarget
+            utterance.isTranslationOnly = source.isBlank()
+            utterance.translationState = if (segment.isSourceFinal) TranslationState.Current else TranslationState.Working
+            if (utterance.hasContent) {
+                speak(utterance, Filler.strip(segment.stableTranslation, nativeTarget), complete = false, completesTurn = false)
+            }
+        } else if (utterance.isSourceOnly) {
+            utterance.translationState = TranslationState.Idle
+        } else if (utterance.target == null || resolvedLanguage == null) {
+            utterance.translationState = TranslationState.AwaitingPartner
+        }
+
+        if (!segment.isCatchUp && !invalidTarget && segment.isPartnerEvidence &&
+            segment.languageIsFinal && segment.isSourceFinal &&
+            language != null && language != listenerLanguage && utterance.trimmedSource.any { it.isLetter() }
+        ) {
+            val original = utterance.trimmedSource.trim { it.isPunctuation() }.lowercase()
+            val translated = segment.translation.trim { it.isWhitespace() || it.isPunctuation() }.lowercase()
+            // A passthrough name or ambiguous shared word is not enough to
+            // choose the language for the listener's next reply.
+            if ((translated.isEmpty() || original != translated) && automaticLanguageEvidence.add(utterance.id)) {
+                if (language == detectedPartnerLanguage) {
+                    pendingPartnerLanguage = null
+                    pendingPartnerConfirmations = 0
+                } else {
+                    if (pendingPartnerLanguage == language) {
+                        pendingPartnerConfirmations += 1
+                    } else {
+                        pendingPartnerLanguage = language
+                        pendingPartnerConfirmations = 1
+                    }
+                    if (detectedPartnerLanguage == null || pendingPartnerConfirmations >= 2) {
+                        detectedPartnerLanguage = language
+                        pendingPartnerLanguage = null
+                        pendingPartnerConfirmations = 0
+                        bindPendingAutomaticTurns(language, before = utterance)
+                    }
+                }
+            }
+        }
+
+        if (utterance.isAutomaticSourceFinal && !hasNativeTranslation) {
+            if (resolvedLanguage == listenerLanguage && utterance.target == null) {
+                utterance.wasAwaitingPartner = true
+                utterance.suppressesAutomaticSpeech = true
+                utterance.translationState = TranslationState.AwaitingPartner
+            } else if (resolvedLanguage != null && utterance.target != null && utterance.needsTranslation &&
+                (resolvedLanguage == listenerLanguage || nativeTarget == listenerLanguage)
+            ) {
+                if (utterance.wasAwaitingPartner && !utterance.isExplicitTranslationRequest) {
+                    utterance.translationState = TranslationState.Idle
+                } else {
+                    utterance.isTyped = true
+                    translate(utterance)
+                }
+            }
+        }
+        if (!segment.isClosed && !segment.isCatchUp) {
+            current = utterance
+            armSilenceFallback()
+        } else if (current === utterance) {
+            current = null
+            silenceTimer?.cancel()
+        }
+        if (segment.isClosed && !segment.isSourceFinal) settleInterruptedAutomaticTurn(utterance)
+    }
+
+    /**
+     * Bind only unresolved turns from this encounter. The most recent three
+     * get visible backfill; none of these older questions plays automatically.
+     */
+    private fun bindPendingAutomaticTurns(language: Language, before: Utterance) {
+        val preceding = utterances.takeWhile { it !== before }.map { it.id }.toSet()
+        val pending = utterances.filter {
+            it.isAutomatic && it.automaticSessionID == automaticSessionID &&
+                it.sourceLanguage == listenerLanguage && it.target == null &&
+                (it.id in preceding || it.isAutomaticSourceFinal)
+        }
+        for (utterance in pending) {
+            utterance.bindAutomaticTarget(language)
+            utterance.waitsForAutomaticPartner = false
+            utterance.wasAwaitingPartner = true
+            utterance.suppressesAutomaticSpeech = true
+            utterance.translationState = TranslationState.Idle
+        }
+        for (utterance in pending.filter { it.isAutomaticSourceFinal }.takeLast(BACKFILLED_TURNS)) {
+            utterance.isTyped = true
+            translate(utterance)
         }
     }
 
@@ -515,17 +885,18 @@ class ConversationStore(
             applyCatchUp(segment)
             return
         }
-        val utterance = segmentUtterances[segment.id] ?: run {
-            if (segment.source.isBlank()) return
+        val existing = segmentUtterances[segment.id]
+        val utterance = if (existing != null) {
+            if (utterances.none { it === existing } || existing.isTyped) return
+            existing
+        } else {
+            if (!segment.startsATurn) return
             finalizeCurrent()
             // Earlier segments' translations are complete once a new one starts.
-            for (older in segmentUtterances.values) {
-                if (older.translationState == TranslationState.Working) older.translationState = TranslationState.Current
-            }
-            // Keep the last one: its translation can still arrive. Catch-up
-            // segments share the id sequence, so ids can skip.
-            val last = segmentUtterances.keys.maxOrNull()
-            segmentUtterances.keys.retainAll { it == last }
+            // Keep the last one: its translation can still arrive. Edited or
+            // retried turns keep their IDs until the engine retires so late
+            // native updates cannot recreate them. Catch-up IDs can skip.
+            retireOlderSegments(segmentUtterances)
             Utterance(languages).also {
                 utterances += it
                 segmentUtterances[segment.id] = it
@@ -536,12 +907,25 @@ class ConversationStore(
 
         if (segment.isClosed) {
             if (current === utterance) finalizeCurrent() else utterance.isFinal = true
-            if (!utterance.hasContent) utterances.remove(utterance)
         } else if (!utterance.isFinal) {
             current = utterance
             armSilenceFallback()
         }
-        if (utterance.hasContent) speak(utterance, segment.stableTranslation, complete = false)
+        if (utterance.hasContent) speak(utterance, segment.stableTranslation, complete = false, completesTurn = false)
+    }
+
+    /** Words, or a translation whose direction the provider has confirmed. */
+    private val SpeechSegment.startsATurn: Boolean
+        get() = source.isNotBlank() || (language?.let { it in languages } == true && translation.isNotBlank())
+
+    private fun retireOlderSegments(segments: MutableMap<Int, Utterance>) {
+        val last = segments.keys.maxOrNull()
+        for ((id, older) in segments) {
+            if (id != last && older.translationState == TranslationState.Working && !older.isTyped) {
+                finishAbandonedTranslation(older)
+            }
+        }
+        segments.entries.retainAll { it.key == last || it.value.isTyped }
     }
 
     /**
@@ -549,13 +933,13 @@ class ConversationStore(
      * ahead of whatever was said since.
      */
     private fun applyCatchUp(segment: SpeechSegment) {
-        val utterance = catchUpUtterances[segment.id] ?: run {
-            if (segment.source.isBlank()) return
-            for (older in catchUpUtterances.values) {
-                if (older.translationState == TranslationState.Working) older.translationState = TranslationState.Current
-            }
-            val last = catchUpUtterances.keys.maxOrNull()
-            catchUpUtterances.keys.retainAll { it == last }
+        val existing = catchUpUtterances[segment.id]
+        val utterance = if (existing != null) {
+            if (utterances.none { it === existing } || existing.isTyped) return
+            existing
+        } else {
+            if (!segment.startsATurn) return
+            retireOlderSegments(catchUpUtterances)
             Utterance(languages).also {
                 it.isLate = true
                 val index = minOf(dropoutIndex ?: utterances.size, utterances.size)
@@ -567,27 +951,110 @@ class ConversationStore(
 
         show(segment, utterance)
         utterance.isFinal = segment.isClosed
-        if (segment.isClosed && !utterance.hasContent) {
-            utterances.remove(utterance)
-            dropoutIndex = dropoutIndex?.let { maxOf(0, it - 1) }
-        }
-        if (utterance.hasContent) speak(utterance, segment.stableTranslation, complete = false)
+        if (utterance.hasContent) speak(utterance, segment.stableTranslation, complete = false, completesTurn = false)
     }
 
     private fun show(segment: SpeechSegment, utterance: Utterance) {
+        utterance.usesNativeTranslation = true
         // Detect first, so only Chinese text gets the chosen script; Japanese kanji must not.
         val source = segment.source.trimStart()
-        val language = segment.language ?: LanguageDetector.detect(source, languages) ?: utterance.language
+        val confirmed = segment.language?.takeIf { it in languages }
+        val language = confirmed ?: LanguageDetector.detect(source, languages) ?: utterance.language
         val target = languages.other(language)
+        if (utterance.hasContent && utterance.language != language) invalidateTranslation(utterance)
         utterance.setSource(convertScript(source, language), language)
         utterance.translation = convertScript(Filler.strip(segment.translation, target), target)
-        utterance.translatedSource = utterance.trimmedSource
+        utterance.isTranslationOnly = confirmed != null && utterance.source.isBlank() && utterance.translation.isNotBlank()
+        utterance.translatedSource = if (utterance.translation.isEmpty()) null else utterance.trimmedSource
+        utterance.translatedLanguage = if (utterance.translation.isEmpty()) null else utterance.language
         utterance.translationState =
             if (segment.isClosed && utterance.translation.isNotEmpty()) TranslationState.Current else TranslationState.Working
     }
 
     private fun convertScript(text: String, language: Language) =
         if (language == Language.CHINESE) settings.chineseScript.convert(text) else text
+
+    private fun finishAbandonedTranslation(utterance: Utterance) {
+        if (!utterance.hasContent) return
+        if (utterance.isAutomatic && utterance.isAwaitingLanguage) {
+            utterance.translationState = TranslationState.AwaitingPartner
+            return
+        }
+        if (utterance.translation.isEmpty()) {
+            utterance.translatedSource = null
+            utterance.translatedLanguage = null
+            utterance.translationState = TranslationState.Failed("Translation did not finish. Tap to retry.")
+        } else {
+            utterance.translationState = TranslationState.Current
+        }
+    }
+
+    private fun failMissingSegmentTranslations() {
+        val pending = segmentUtterances.values + catchUpUtterances.values +
+            automaticSegmentUtterances.values + automaticCatchUpUtterances.values
+        for (utterance in pending) {
+            if (utterance.translationState == TranslationState.Working && !utterance.isTyped) finishAbandonedTranslation(utterance)
+        }
+    }
+
+    /**
+     * Segment identifiers belong to an engine instance. Keep its visible
+     * history, but stop resolving a replacement engine's IDs to those turns.
+     */
+    private fun retireNativeSegments() {
+        // A filler may already have fallen out of the bounded native maps.
+        // Count hidden rows before finalization can remove an empty raw turn.
+        val hidden = utterances.filter { !it.hasContent }
+        dropoutIndex?.let { index ->
+            val removedBefore = utterances.take(index).count { candidate -> hidden.any { it === candidate } }
+            dropoutIndex = maxOf(0, index - removedBefore)
+        }
+        finalizeCurrent()
+        failMissingSegmentTranslations()
+        for (utterance in segmentUtterances.values + catchUpUtterances.values) utterance.isFinal = true
+        for (utterance in automaticSegmentUtterances.values + automaticCatchUpUtterances.values) {
+            utterance.isFinal = true
+            if (utterance.translationState == TranslationState.Working && !utterance.isTyped) finishAbandonedTranslation(utterance)
+            settleInterruptedAutomaticTurn(utterance)
+        }
+        for (utterance in hidden) {
+            translations.remove(utterance.id)?.cancel()
+            debounces.remove(utterance.id)?.cancel()
+            speechFlushes.remove(utterance.id)?.cancel()
+            spoken.remove(utterance.id)
+        }
+        utterances.removeAll { candidate -> hidden.any { it === candidate } }
+        segmentUtterances.clear()
+        catchUpUtterances.clear()
+        automaticSegmentUtterances.clear()
+        automaticCatchUpUtterances.clear()
+    }
+
+    /**
+     * A local reset does not prove that the provider finished the words.
+     * Keep them available for an explicit retry instead of automatically
+     * speaking a partial line that may also arrive in a replay.
+     */
+    private fun settleInterruptedAutomaticTurn(utterance: Utterance) {
+        if (!utterance.isAutomatic || utterance.isTyped || utterance.isAutomaticSourceFinal ||
+            !utterance.hasContent || utterance.translation.isNotEmpty()
+        ) {
+            return
+        }
+        utterance.isFinal = true
+        val source = utterance.sourceLanguage
+        if (utterance.target == null && source != null) {
+            if (source != utterance.listenerLanguage) {
+                utterance.bindAutomaticTarget(utterance.listenerLanguage)
+            } else {
+                detectedPartnerLanguage?.let { utterance.bindAutomaticTarget(it) }
+            }
+        }
+        utterance.waitsForAutomaticPartner =
+            source == utterance.listenerLanguage && utterance.target == null && detectedPartnerLanguage == null
+        utterance.translationState =
+            if (utterance.target == null) TranslationState.AwaitingPartner else TranslationState.Failed(INTERRUPTED)
+    }
 
     /**
      * Ends the turn if no text and no turn events have arrived for a while,
@@ -596,7 +1063,7 @@ class ConversationStore(
     private fun armSilenceFallback() {
         silenceTimer?.cancel()
         silenceTimer = scope.launch {
-            delay(3_000)
+            delay(if (isListening) 3_000 else 10_000)
             engine?.endTurn()
             finalizeCurrent()
         }
@@ -608,12 +1075,18 @@ class ConversationStore(
         current = null
         utterance.isFinal = true
         if (!utterance.hasContent) {
-            utterances.remove(utterance)
+            // An open native segment can still gain words after Stop.
+            // Keep its hidden object attached until its final update arrives.
+            val isOpenSegment = (segmentUtterances.values + automaticSegmentUtterances.values).any { it === utterance }
+            if (!isOpenSegment) utterances.remove(utterance)
             return
         }
         if (utterance.needsTranslation) {
-            scheduleTranslation(utterance, delayMs = 0)
-        } else if (translator != null && utterance.translationState == TranslationState.Current) {
+            debounces.remove(utterance.id)?.cancel()
+            translate(utterance)
+        } else if (translator != null && utterance.translationState == TranslationState.Current &&
+            (!utterance.usesNativeTranslation || utterance.isTyped)
+        ) {
             // Translated while it was spoken. A translating engine's turns
             // are read out as their segments arrive instead.
             speak(utterance, utterance.translation, complete = true)
@@ -623,6 +1096,17 @@ class ConversationStore(
     // endregion
 
     // region Translation
+
+    /**
+     * Cancel the old direction immediately, even if its request is stalled.
+     * Other turns retain their queued speech and playback accounting.
+     */
+    private fun invalidateTranslation(utterance: Utterance) {
+        translations.remove(utterance.id)?.cancel()
+        debounces.remove(utterance.id)?.cancel()
+        speechFlushes.remove(utterance.id)?.cancel()
+        spoken.remove(utterance.id)
+    }
 
     /**
      * Throttles translation while someone is speaking: at most one request
@@ -642,21 +1126,41 @@ class ConversationStore(
     }
 
     private fun translate(utterance: Utterance) {
+        // A native segment's translation belongs to its speech provider,
+        // which may still finish it on replay.
+        if (utterance.usesNativeTranslation && !utterance.isTyped) return
         val text = utterance.trimmedSource
-        val translator = (if (utterance.isTyped) textTranslator else translator) ?: return
+        if (utterance.isAutomatic && text.none { it.isLetterOrDigit() }) return
         if (text.isEmpty() || translations[utterance.id] != null) return
+        val language = utterance.sourceLanguage ?: return
+        val target = utterance.target ?: return
+        if (utterance.isAutomatic && !(canUseAutomaticTurn(utterance) && utterance.isAutomaticSourceFinal)) return
+        val translator = (if (utterance.isTyped) textTranslator else translator) ?: return
+        if (utterance.isAutomatic && !isOnline) {
+            utterance.translationState = TranslationState.WaitingForNetwork
+            return
+        }
 
-        val language = utterance.language
-        val target = utterance.target
-        val context = utterances.takeWhile { it !== utterance }.filter { it.isFinal && it.hasContent }.takeLast(3)
+        val context = utterances.takeWhile { it !== utterance }.filter {
+            it.isFinal && it.hasContent && (!utterance.isAutomatic || (it.sourceLanguage == language && it.target == target))
+        }.takeLast(3)
         val script = settings.chineseScript
+        // The direction can be corrected while a request is running.
+        fun isSameDirection() = utterance.sourceLanguage == language && utterance.target == target &&
+            (!utterance.isAutomatic || canUseAutomaticTurn(utterance))
 
         utterance.translationState = TranslationState.Working
         translations[utterance.id] = scope.launch {
             var attempt = 0
             while (isActive) {
-                // Hold the request until we're back online.
-                if (!isOnline) {
+                if (utterance.isAutomatic) {
+                    if (!isOnline) {
+                        utterance.translationState = TranslationState.WaitingForNetwork
+                        translations.remove(utterance.id)
+                        return@launch
+                    }
+                } else if (!isOnline) {
+                    // Hold the request until we're back online.
                     utterance.translationState = TranslationState.WaitingForNetwork
                     while (!isOnline) delay(250)
                     utterance.translationState = TranslationState.Working
@@ -668,11 +1172,15 @@ class ConversationStore(
                     // it's complete so the line doesn't flicker.
                     val streamLive = utterance.translation.isEmpty()
                     translator.translate(text, language, target, context, script).collect { token ->
+                        if (!isSameDirection()) throw DirectionChanged()
                         output += token
                         if (streamLive) utterance.translation = output
                     }
+                    if (!isSameDirection()) throw DirectionChanged()
                     utterance.translation = output.trim()
                     utterance.translatedSource = text
+                    utterance.translatedLanguage = language
+                    utterance.translatedTarget = target
                     utterance.translationState =
                         if (utterance.needsTranslation) TranslationState.Working else TranslationState.Current
                     translations.remove(utterance.id)
@@ -685,6 +1193,11 @@ class ConversationStore(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    if (e is DirectionChanged || !isSameDirection()) {
+                        translations.remove(utterance.id)
+                        translate(utterance)
+                        return@launch
+                    }
                     attempt += 1
                     val permanent = e is OnDeviceTranslationException ||
                         (e as? BrokerTranslationException)?.isPermanent == true ||
@@ -699,6 +1212,9 @@ class ConversationStore(
             }
         }
     }
+
+    /** The turn's source or target was corrected under a running request. */
+    private class DirectionChanged : Exception()
 
     // endregion
 
@@ -716,6 +1232,19 @@ class ConversationStore(
     /** True when a Soniox key is available for speech, from Settings or the broker. */
     val canSpeakTranslations: Boolean get() = SonioxSpeaker.credential(settings, keyProvider) != null
 
+    /**
+     * A language change applies immediately, including while Settings is open.
+     * Old turns must not be spoken for a newly selected listener.
+     */
+    fun speechRoutingDidChange() {
+        speaker?.stop()
+        speaker = null
+        speechFlushes.values.forEach { it.cancel() }
+        speechFlushes.clear()
+        spoken.clear()
+        speakingSince = if (settings.speaksTranslations) System.currentTimeMillis() else null
+    }
+
     private fun speechSettingChanged() {
         if (settings.speaksTranslations) {
             if (speakingSince == null) speakingSince = System.currentTimeMillis()
@@ -728,24 +1257,37 @@ class ConversationStore(
     }
 
     /**
-     * Reads a turn's translation aloud if it's into the second language,
-     * a sentence at a time. [stable] is the part of the translation that
-     * won't change; [complete] means nothing more is coming.
+     * Reads a turn's translation aloud if it's for the other person: into
+     * the second language of a pair, or away from the listener's language
+     * in Automatic. A sentence at a time. [complete] includes an unpunctuated
+     * tail. Native segments keep their character count after that flush
+     * because more stable words may arrive; completed text translations seal
+     * the turn with [completesTurn].
+     *
+     * iOS can also read the incoming direction into a headset; Android has
+     * one audio output, so only the outgoing direction is spoken.
      */
-    private fun speak(utterance: Utterance, stable: String, complete: Boolean) {
+    private fun speak(utterance: Utterance, stable: String, complete: Boolean, completesTurn: Boolean = true) {
         val since = speakingSince ?: return
-        if (!settings.speaksTranslations || utterance.createdAt < since || utterance.target != languages.second) return
+        val target = utterance.target ?: return
+        if (!settings.speaksTranslations || utterance.createdAt < since || utterance.suppressesAutomaticSpeech) return
+        if (utterance.isAutomatic) {
+            if (!canUseAutomaticTurn(utterance) || target !in Language.SONIOX || target == utterance.sourceLanguage) return
+            if (target == utterance.listenerLanguage) return
+        } else if (utterance.languages != settings.languages || target != languages.second) {
+            return
+        }
         val sent = spoken[utterance.id] ?: 0
         if (stable.length <= sent) return
         val fresh = stable.substring(sent)
         val ready = if (complete) fresh else completeSentences(fresh)
         if (ready.isNotEmpty()) {
             val speaker = activeSpeaker() ?: return
-            speaker.speak(ready, utterance.target)
+            speaker.speak(ready, target)
         }
         speechFlushes.remove(utterance.id)?.cancel()
         if (complete) {
-            spoken[utterance.id] = Int.MAX_VALUE
+            spoken[utterance.id] = if (completesTurn) Int.MAX_VALUE else sent + ready.length
         } else {
             spoken[utterance.id] = sent + ready.length
             // A last sentence without closing punctuation is read once the
@@ -754,10 +1296,16 @@ class ConversationStore(
             speechFlushes[utterance.id] = scope.launch {
                 delay(1_500)
                 speechFlushes.remove(utterance.id)
-                speak(utterance, stable, complete = true)
+                speak(utterance, stable, complete = true, completesTurn = completesTurn)
             }
         }
     }
+
+    private fun canUseAutomaticTurn(utterance: Utterance) =
+        isAutomaticLanguageMode && settings.usesAutomaticLanguageDetection &&
+            utterance.listenerLanguage == settings.speechListenerLanguage &&
+            utterances.any { it === utterance } &&
+            (utterance.automaticSessionID == automaticSessionID || utterance.isExplicitTranslationRequest)
 
     private fun activeSpeaker(): SonioxSpeaker? {
         speaker?.let { return it }
@@ -796,8 +1344,12 @@ class ConversationStore(
     }
 
     private fun after(delayMs: Long, action: () -> Unit) {
+        if (delayMs <= 0) {
+            action()
+            return
+        }
         scope.launch {
-            if (delayMs > 0) delay(delayMs)
+            delay(delayMs)
             action()
         }
     }
@@ -832,5 +1384,22 @@ class ConversationStore(
          * for the open stream, so this is kept short.
          */
         const val WARM_PAUSE_MS = 60_000L
+
+        /** An Automatic conversation idle this long starts over with a new partner. */
+        const val CONTEXT_EXPIRY_MS = 600_000L
+
+        /** How many waiting turns are translated once the partner's language is known. */
+        const val BACKFILLED_TURNS = 3
+
+        private const val INTERRUPTED = "Translation interrupted. Tap to retry."
     }
+}
+
+/** As `CharacterSet.punctuationCharacters` on iOS: the Unicode P categories. */
+private fun Char.isPunctuation() = when (Character.getType(this).toByte()) {
+    Character.CONNECTOR_PUNCTUATION, Character.DASH_PUNCTUATION, Character.START_PUNCTUATION,
+    Character.END_PUNCTUATION, Character.INITIAL_QUOTE_PUNCTUATION, Character.FINAL_QUOTE_PUNCTUATION,
+    Character.OTHER_PUNCTUATION,
+    -> true
+    else -> false
 }

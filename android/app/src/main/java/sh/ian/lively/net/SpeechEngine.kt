@@ -23,6 +23,11 @@ interface SpeechEngine {
      * this long after a boundary so trailing words stay in their turn.
      */
     val textLagMs: Long get() = 0
+    /**
+     * Raw transcript deltas can finish after pause. Keep their current turn
+     * open until the server's final boundary instead of splitting its tail.
+     */
+    val drainsTextOnPause: Boolean get() = false
 
     fun start()
     /**
@@ -58,11 +63,13 @@ sealed interface SpeechEvent {
     data object TurnResumed : SpeechEvent
     data object TurnEnded : SpeechEvent
     /**
-     * The latest state of a segment from an engine that translates by itself.
-     * Segments may be revised until they're closed, and their translation can
-     * keep arriving after that.
+     * The latest state of a turn from an engine that translates by itself.
+     * A local timeout can close it before the provider finishes, so accepted
+     * audio may still produce source corrections or more translation.
      */
     data class Segment(val segment: SpeechSegment) : SpeechEvent
+    /** Unrestricted speech with explicit source evidence and target. */
+    data class AutoSegment(val segment: AutoSpeechSegment) : SpeechEvent
     /** The server session was replaced; any open turn will not continue. */
     data object SessionReset : SpeechEvent
 }
@@ -77,12 +84,31 @@ data class SpeechSegment(
      */
     val stableTranslation: String = translation,
     val language: Language?,
+    /** Closed in the conversation UI; a local close can still drain results. */
     val isClosed: Boolean,
     /**
      * Speech held during a dropout and transcribed late, on its own session,
      * while live speech carried on.
      */
     val isCatchUp: Boolean = false,
+)
+
+data class AutoSpeechSegment(
+    val id: Int,
+    val source: String,
+    val language: Language?,
+    /** The canonical final source has a coherent language, even in catch-up. */
+    val languageIsFinal: Boolean,
+    /** Null for outgoing speech until its target has been discovered. */
+    val target: Language?,
+    val translation: String,
+    val stableTranslation: String,
+    val isClosed: Boolean,
+    /** Provider completion, distinct from a local UI timeout. */
+    val isSourceFinal: Boolean,
+    val isCatchUp: Boolean,
+    /** Live, corroborated provider completion that may identify a partner. */
+    val isPartnerEvidence: Boolean = false,
 )
 
 sealed interface SpeechEngineStatus {

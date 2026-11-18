@@ -158,7 +158,8 @@ data class SocketStream(val id: Int, val isCatchUp: Boolean)
  *   reconnect, silence is cut out of it. A short remainder is sent ahead of
  *   live audio; a long one goes to a separate catch-up session, so live
  *   speech isn't stuck behind it (Soniox works through a burst at only about
- *   1.15× real time). Dialects without side streams replay at most 5 s.
+ *   1.15× real time). Dialects without side streams replay the retained
+ *   speech on the primary before new live audio.
  * - When the network changes, a second socket opens on the new network and
  *   audio moves to it at the next utterance boundary (make-before-break).
  * - Audio the server hasn't finalized is kept until it is. When a session
@@ -190,6 +191,11 @@ class ResilientSocket(
 
     private var isRunning = false
     private var isPaused = false
+    /**
+     * A server that ends its session on pause must finish its old response
+     * before fresh microphone audio can start a replacement session.
+     */
+    private var isResumingAfterDrain = false
     private var nextStreamID = 0
 
     /** The connection that gets live audio. */
@@ -202,16 +208,54 @@ class ResilientSocket(
     private var reconnectJob: Job? = null
     private var hedgeJob: Job? = null
     private var keepaliveJob: Job? = null
+    /**
+     * A stopped microphone may still have accepted audio waiting to connect,
+     * or an end-of-audio response from a server that cannot stay warm.
+     */
+    private var pauseDrainJob: Job? = null
 
     private var failures = 0
     private var throttled = false
     private val backlog = ArrayDeque<ByteArray>()
 
+    /**
+     * Failed catch-up sessions retain their unfinished audio across a network
+     * outage. The original deadline bounds both backoff and offline waiting.
+     * [deadline] and [readyAt] are in [now] ms.
+     */
+    private class CatchUpRetry(
+        val audio: List<ByteArray>,
+        val deadline: Long,
+        val readyAt: Long,
+        val attempt: Int,
+    )
+    private val catchUpRetries = mutableListOf<CatchUpRetry>()
+    private var catchUpRetryJob: Job? = null
+
     var networkAvailable = true
         set(value) {
-            val old = field
+            if (field == value) return
             field = value
-            if (value && !old && status == SpeechEngineStatus.Reconnecting) connect()
+            if (!value) {
+                isResumingAfterDrain = false
+                keepaliveJob?.cancel()
+                keepaliveJob = null
+                if (!isPaused) {
+                    pauseDrainJob?.cancel()
+                    pauseDrainJob = null
+                }
+                reconnectJob?.cancel()
+                reconnectJob = null
+                hedgeJob?.cancel()
+                dropStandby()
+                tearDownPrimary(keepingAudio = true)
+                side.toList().forEach(::closeSide)
+                if (isRunning && isPaused) schedulePauseDrainDeadline()
+                if (isRunning) status = SpeechEngineStatus.Reconnecting
+            } else if (isRunning && !isPaused && (primary == null || status == SpeechEngineStatus.Reconnecting)) {
+                connect()
+            }
+            resumeCatchUpRetries()
         }
 
     /**
@@ -221,11 +265,13 @@ class ResilientSocket(
     private var blackholeUntil: Long? = null
 
     fun start() {
+        isResumingAfterDrain = false
         endPause()
         isRunning = true
         failures = 0
         throttled = false
         backlog.clear()
+        clearCatchUpRetries()
         connect()
         if (BuildConfig.DEBUG) scheduleSimulatedDropouts()
     }
@@ -243,6 +289,7 @@ class ResilientSocket(
     }
 
     fun stop() {
+        isResumingAfterDrain = false
         endPause()
         isRunning = false
         hedgeJob?.cancel()
@@ -250,6 +297,7 @@ class ResilientSocket(
         tearDownPrimary(keepingAudio = false)
         dropStandby()
         side.toList().forEach(::closeSide)
+        clearCatchUpRetries()
         backlog.clear()
         status = SpeechEngineStatus.Idle
     }
@@ -257,7 +305,7 @@ class ResilientSocket(
     fun send(chunk: ByteArray) {
         if (!isRunning || isPaused) return
         val primary = primary
-        if (primary != null && primary.isReady) {
+        if (primary != null && primary.isReady && !primary.isEnding) {
             enqueueAudio(chunk, primary)
         } else {
             backlog.addLast(chunk)
@@ -290,25 +338,54 @@ class ResilientSocket(
 
     /**
      * Stops taking audio but keeps the live session open, so [resume] is
-     * instant. A session that isn't live yet, or a server that can't idle,
-     * is stopped instead.
+     * instant. Accepted audio still waiting to connect is finalized once
+     * ready; servers that cannot idle get a bounded window to finish it.
      */
     fun pause() {
         if (!isRunning || isPaused) return
-        val primary = primary
-        val keepalive = dialect.keepaliveMessage
-        if (primary == null || !primary.isReady || keepalive == null) {
-            stop()
-            return
-        }
         isPaused = true
         hedgeJob?.cancel()
         dropStandby()
-        backlog.clear()
+        val primary = primary
+        if (primary != null && primary.isReady && !primary.isEnding) {
+            finishPausedAudio(primary)
+        } else {
+            schedulePauseDrainDeadline()
+        }
+    }
+
+    private fun finishPausedAudio(primary: Connection) {
+        flushBacklog(primary)
         primary.awaitingReplySince = null
-        dialect.pauseMessage?.let(primary::send)
-        debugLog("paused stream ${primary.stream.id}")
-        startKeepalive(primary, keepalive)
+        val keepalive = dialect.keepaliveMessage
+        if (keepalive != null) {
+            pauseDrainJob?.cancel()
+            pauseDrainJob = null
+            if (primary.hasSentAudio) dialect.pauseMessage?.let(primary::send)
+            startKeepalive(primary, keepalive)
+        } else {
+            primary.isEnding = true
+            dialect.endOfAudioMessage?.let(primary::send)
+            schedulePauseDrainDeadline()
+        }
+    }
+
+    private fun schedulePauseDrainDeadline() {
+        if (pauseDrainJob != null) return
+        pauseDrainJob = scope.launch {
+            delay(DRAIN_DEADLINE_MS)
+            if (isResumingAfterDrain) replaceDrainedSession()
+            else if (isPaused) stop()
+        }
+    }
+
+    private fun replaceDrainedSession() {
+        isResumingAfterDrain = false
+        pauseDrainJob?.cancel()
+        pauseDrainJob = null
+        // connect() closes the old turn before the replacement can emit text.
+        // Fresh audio held during the drain remains in the backlog.
+        connect()
     }
 
     private fun startKeepalive(primary: Connection, message: WsMessage) {
@@ -326,9 +403,19 @@ class ResilientSocket(
     fun resume() {
         val wasPaused = isPaused
         endPause()
-        val primary = primary
-        if (!wasPaused || !isRunning || primary == null) {
+        if (wasPaused && isRunning && primary?.isEnding == true) {
+            isResumingAfterDrain = true
+            schedulePauseDrainDeadline()
+            status = SpeechEngineStatus.Connecting
+            return
+        }
+        if (!wasPaused || !isRunning) {
             start()
+            return
+        }
+        val primary = primary
+        if (primary == null) {
+            connect()
             return
         }
         // A prewarmed session still connecting: audio waits in the backlog.
@@ -339,6 +426,8 @@ class ResilientSocket(
 
     private fun endPause() {
         isPaused = false
+        pauseDrainJob?.cancel()
+        pauseDrainJob = null
         keepaliveJob?.cancel()
         keepaliveJob = null
     }
@@ -353,6 +442,8 @@ class ResilientSocket(
         var isReady = false
         var isClosed = false
         var hasSentAudio = false
+        /** End-of-audio was sent; this connection can only return final text. */
+        var isEnding = false
         /** When audio first went out after the last server message. */
         var awaitingReplySince: Long? = null
         /** Audio to send once ready, then end the stream (catch-up only). */
@@ -396,6 +487,10 @@ class ResilientSocket(
 
     private fun connect() {
         if (!isRunning) return
+        if (!networkAvailable) {
+            status = SpeechEngineStatus.Reconnecting
+            return
+        }
         reconnectJob?.cancel()
         reconnectJob = null
         tearDownPrimary(keepingAudio = true)
@@ -569,6 +664,10 @@ class ResilientSocket(
             }
             SocketSignal.Boundary -> if (standby?.isReady == true) handOver()
             is SocketSignal.Retry -> {
+                if (isResumingAfterDrain) {
+                    replaceDrainedSession()
+                    return
+                }
                 throttled = throttled || signal.throttled
                 handleFailure()
             }
@@ -583,14 +682,13 @@ class ResilientSocket(
     private fun primaryIsUp(primary: Connection) {
         failures = 0
         throttled = false
-        status = SpeechEngineStatus.Live
-        val keepalive = dialect.keepaliveMessage
-        if (isPaused && keepalive != null) {
+        if (isPaused) {
             debugLog("stream ${primary.stream.id} is warm")
-            startKeepalive(primary, keepalive)
+            finishPausedAudio(primary)
         } else {
             flushBacklog(primary)
         }
+        status = SpeechEngineStatus.Live
     }
 
     private fun handleFailure() {
@@ -602,7 +700,7 @@ class ResilientSocket(
             return
         }
         // Nobody is waiting on a paused session; reconnect when they come back.
-        if (isPaused) {
+        if (isPaused && (backlog.isEmpty() || !networkAvailable)) {
             debugLog("paused session dropped")
             stop()
             return
@@ -642,9 +740,11 @@ class ResilientSocket(
     private fun fail(message: String) {
         endPause()
         hedgeJob?.cancel()
+        isRunning = false
         tearDownPrimary(keepingAudio = false)
         dropStandby()
-        isRunning = false
+        side.toList().forEach(::closeSide)
+        clearCatchUpRetries()
         backlog.clear()
         status = SpeechEngineStatus.Failed(message)
     }
@@ -740,27 +840,53 @@ class ResilientSocket(
     }
 
     /**
-     * A catch-up stream that never got to send its audio, say because the
-     * broker was rate-limiting keys after a burst of reconnects, tries again
-     * with backoff until its deadline, so held speech isn't dropped.
+     * Retry unsent audio and the suffix the server has not finalized. A
+     * successful send only queues bytes; it does not acknowledge recognition.
      */
     private fun retryCatchUp(failed: Connection) {
-        if (!failed.stream.isCatchUp || failed.replay.isEmpty() || !isRunning) return
+        if (!failed.stream.isCatchUp || !isRunning) return
+        val replay = failed.unconfirmed + failed.replay
+        failed.unconfirmed.clear()
+        failed.replay = emptyList()
+        if (replay.isEmpty()) return
         val delayMs = min(8_000L, 1_000L shl failed.attempt)
         if (now() + delayMs >= failed.deadline) {
             debugLog("catch-up stream ${failed.stream.id} gave up")
             return
         }
-        val replay = failed.replay
-        val deadline = failed.deadline
-        val attempt = failed.attempt + 1
-        scope.launch {
-            delay(delayMs)
-            if (isRunning) startCatchUp(replay, deadline, attempt)
+        catchUpRetries += CatchUpRetry(replay, failed.deadline, readyAt = now() + delayMs, attempt = failed.attempt + 1)
+        resumeCatchUpRetries()
+    }
+
+    private fun clearCatchUpRetries() {
+        catchUpRetryJob?.cancel()
+        catchUpRetryJob = null
+        catchUpRetries.clear()
+    }
+
+    private fun resumeCatchUpRetries() {
+        catchUpRetryJob?.cancel()
+        catchUpRetryJob = null
+        if (!isRunning) return
+        val time = now()
+        catchUpRetries.removeAll { it.deadline <= time }
+        if (networkAvailable) {
+            val ready = catchUpRetries.filter { it.readyAt <= time }
+            catchUpRetries.removeAll { it.readyAt <= time }
+            ready.forEach { startCatchUp(it.audio, it.deadline, it.attempt) }
+        }
+        // Offline jobs remain owned until restoration or expiry; a backoff
+        // timer firing without a network must not consume their only retry.
+        val wake = catchUpRetries.minOfOrNull { if (networkAvailable) min(it.readyAt, it.deadline) else it.deadline }
+            ?: return
+        catchUpRetryJob = scope.launch {
+            delay(wake - time)
+            resumeCatchUpRetries()
         }
     }
 
     private fun startCatchUp(speech: List<ByteArray>, deadline: Long, attempt: Int) {
+        if (!isRunning || !networkAvailable || now() >= deadline) return
         val catchUp = makeConnection(isCatchUp = true)
         catchUp.replay = speech
         catchUp.deadline = deadline
@@ -788,9 +914,8 @@ class ResilientSocket(
             debugLog("held $held chunks")
             startCatchUp(speech, now() + CATCH_UP_DEADLINE_MS, attempt = 0)
         } else {
-            val limit = (MAX_REPLAY_S / MicCapture.CHUNK_DURATION).toInt()
-            if (held > 0) debugLog("held $held chunks, replaying ${min(speech.size, limit)}")
-            speech.takeLast(limit).forEach { enqueueAudio(it, connection) }
+            if (held > 0) debugLog("held $held chunks, replaying ${speech.size}")
+            speech.forEach { enqueueAudio(it, connection) }
         }
     }
 
@@ -803,7 +928,7 @@ class ResilientSocket(
     private fun enqueueAudio(chunk: ByteArray, connection: Connection) {
         connection.hasSentAudio = true
         if (connection.awaitingReplySince == null) connection.awaitingReplySince = now()
-        if (dialect.reportsFinalizedAudio && !connection.stream.isCatchUp && connection === primary) {
+        if (dialect.reportsFinalizedAudio && (connection.stream.isCatchUp || connection === primary)) {
             connection.unconfirmed.addLast(chunk)
             while (connection.unconfirmed.size > MAX_BACKLOG) {
                 connection.unconfirmedStart += duration(connection.unconfirmed.removeFirst())
@@ -869,8 +994,6 @@ class ResilientSocket(
         fun duration(chunk: ByteArray): Double = (chunk.size / 2).toDouble() / MicCapture.SAMPLE_RATE
         /** Backlog speech beyond this goes to a catch-up session. */
         const val CATCH_UP_THRESHOLD_S = 3.0
-        /** Without side streams, at most this much backlog speech is replayed. */
-        const val MAX_REPLAY_S = 5.0
         /** Catch-up translations later than this aren't worth showing. */
         const val CATCH_UP_DEADLINE_MS = 30_000L
         /** A handover waits at most this long for an utterance boundary. */

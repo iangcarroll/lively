@@ -57,17 +57,44 @@ class SonioxTranscriber(
 
     private val socket = ResilientSocket(this, scope, client)
 
-    /** A run of speech between endpoints, with its translation. */
+    private data class SourcePiece(val text: String, val language: Language?)
+
+    private data class PendingTranslation(val source: Language, val text: String)
+
+    /**
+     * Speech with one confirmed translation direction, within a provider turn.
+     * Every property holds an immutable value, so [copy] is an independent
+     * snapshot, like copying the Swift struct.
+     */
     private data class Segment(
         val id: Int,
         var source: String = "",
         var translation: String = "",
         var language: Language? = null,
+        var sourceLanguages: Set<Language> = emptySet(),
+        var sourcePieces: List<SourcePiece> = emptyList(),
+        /**
+         * A different language can be an embedded name or a quick reply.
+         * Only final translation metadata can confirm another direction.
+         */
+        var deferredSource: List<SourcePiece> = emptyList(),
+        /**
+         * A folded original is not receipted by a later chunk of the earlier
+         * translation. Retain its provenance until directions are resolved.
+         */
+        var unreceiptedFoldStart: Int? = null,
+        var hasAmbiguousSource: Boolean = false,
+        var pendingTranslations: List<PendingTranslation> = emptyList(),
+        var translationSource: Language? = null,
         var isClosed: Boolean = false,
+        var lastShownLanguage: Language? = null,
+        var hasProvisionalOverlay: Boolean = false,
     ) {
         /** [stableTranslation] is the final tokens' part, when non-final ones were added to [translation]. */
-        fun event(isCatchUp: Boolean, stableTranslation: String = translation) =
-            SpeechSegment(id, source, translation, stableTranslation, language, isClosed, isCatchUp)
+        fun event(isCatchUp: Boolean, stableTranslation: String? = null): SpeechSegment {
+            val stable = if (translationSource == language) stableTranslation ?: translation else ""
+            return SpeechSegment(id, source, translation, stable, language, isClosed, isCatchUp)
+        }
     }
 
     /**
@@ -77,8 +104,6 @@ class SonioxTranscriber(
     private class StreamState(val isCatchUp: Boolean) {
         /** The segment receiving spoken words. Null after an endpoint until someone speaks again. */
         var open: Segment? = null
-        /** The last closed segment. Its translation can still be arriving. */
-        var previous: Segment? = null
     }
 
     private var nextSegmentID = 0
@@ -130,7 +155,16 @@ class SonioxTranscriber(
     }
 
     override fun endTurn() {
-        for ((id, state) in streams.toList()) if (!state.isCatchUp) closeOpenSegment(id)
+        // A local silence timeout can precede the service's final tokens.
+        // Close the UI turn, but keep its ID until the provider's boundary.
+        for (state in streams.values) {
+            if (state.isCatchUp) continue
+            val segment = state.open ?: continue
+            segment.isClosed = true
+            emitConfirmedOrRetract(segment, isCatchUp = false)
+            segment.lastShownLanguage = segment.language ?: segment.lastShownLanguage
+            segment.hasProvisionalOverlay = false
+        }
     }
 
     override fun networkPathChanged() = socket.networkPathChanged()
@@ -264,8 +298,8 @@ class SonioxTranscriber(
         json.double("final_audio_proc_ms")?.let { finalized[stream.id] = it / 1000 }
 
         var endedUtterance = false
-        val tokens = (json["tokens"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
-        if (tokens.isNotEmpty()) {
+        val tokens = (json["tokens"] as? JsonArray)?.mapNotNull { it as? JsonObject }
+        if (tokens != null && (tokens.isNotEmpty() || streams[stream.id]?.open != null)) {
             val state = streams.getOrPut(stream.id) { StreamState(stream.isCatchUp) }
             endedUtterance = apply(tokens, state)
         }
@@ -285,93 +319,336 @@ class SonioxTranscriber(
      * never stored. Returns true when an utterance ended.
      */
     private fun apply(tokens: List<JsonObject>, state: StreamState): Boolean {
-        val touched = mutableSetOf<Int>()
+        var touched = false
         var endedUtterance = false
-
         for (token in tokens.filter { it.bool("is_final") == true }) {
             val text = token.string("text") ?: continue
             if (text == "<end>" || text == "<fin>") {
-                val id = state.open?.id ?: continue
-                // Report the segment this one replaces as `previous` before it's dropped.
-                state.previous?.let { older -> if (touched.remove(older.id)) onEvent(SpeechEvent.Segment(older.event(state.isCatchUp))) }
-                touched += id
-                closeOpenSegment(state, notify = false)
+                // Provider boundaries finalize the transcription and its
+                // translation. Token language changes are not speaker IDs.
+                closeOpenSegment(state, providerBoundary = true)
+                touched = false
                 endedUtterance = true
                 continue
             }
             if (token.string("translation_status") == "translation") {
-                val source = config.languages.language(token.string("source_language"))
-                if (translationTargetIsOpen(state, source, "")) {
-                    state.open?.let { it.translation += text; touched += it.id }
-                } else {
-                    state.previous?.let { it.translation += text; touched += it.id }
+                var segment = state.open ?: continue
+                if (segment.source.isEmpty()) continue
+                val pendingSource = segment.pendingTranslations.lastOrNull()?.source
+                val source = translationSource(token, fallback = pendingSource ?: segment.translationSource) ?: continue
+                if (!meaningful(text) && source != pendingSource && source != segment.translationSource) continue
+                if (segment.hasAmbiguousSource && segment.translationSource != null &&
+                    (segment.pendingTranslations.isNotEmpty() || segment.translationSource != source)
+                ) {
+                    segment.pendingTranslations = if (pendingSource == source) {
+                        val last = segment.pendingTranslations.last()
+                        segment.pendingTranslations.dropLast(1) + last.copy(text = last.text + text)
+                    } else {
+                        segment.pendingTranslations + PendingTranslation(source, text)
+                    }
+                    touched = true
+                    continue
                 }
+                val current = segment.translationSource
+                if (current != null && current != source) {
+                    val matchingDeferred = segment.deferredSource.any { it.language == source && meaningful(it.text) }
+                    if (segment.unreceiptedFoldStart != null || !matchingDeferred) {
+                        // A provider final can be certain even when caption
+                        // ownership is not. Keep its actual directed output.
+                        segment.hasAmbiguousSource = true
+                        segment.pendingTranslations += PendingTranslation(source, text)
+                        touched = true
+                        continue
+                    }
+                    val reply = segment.deferredSource
+                    segment.deferredSource = emptyList()
+                    segment.isClosed = true
+                    emitConfirmedOrRetract(segment, state.isCatchUp)
+                    segment = Segment(nextSegmentID)
+                    nextSegmentID += 1
+                    reply.forEach { appendOwnedSource(it, segment) }
+                }
+                if (segment.translationSource == null) deferTrailingSource(segment, source)
+                segment.translation += text
+                segment.translationSource = source
+                segment.language = source
+                state.open = segment
+                touched = true
             } else {
                 openSegmentIfNeeded(state)
-                val open = state.open!!
-                open.source += text
-                config.languages.language(token.string("language"))?.let { open.language = it }
-                touched += open.id
+                state.open?.let { appendSource(sourcePiece(token, text), it) }
+                touched = true
             }
         }
 
-        // Overlay this response's non-final tokens on copies of the segments.
-        var pendingSource = ""
-        var pendingLanguage: Language? = null
-        var pendingOpenTranslation = ""
-        var pendingPreviousTranslation = ""
-        for (token in tokens.filter { it.bool("is_final") != true }) {
-            val text = token.string("text") ?: continue
-            if (text == "<end>" || text == "<fin>") continue
-            if (token.string("translation_status") == "translation") {
-                val source = config.languages.language(token.string("source_language"))
-                if (translationTargetIsOpen(state, source, pendingSource)) {
-                    pendingOpenTranslation += text
-                } else {
-                    pendingPreviousTranslation += text
-                }
-            } else {
-                pendingSource += text
-                config.languages.language(token.string("language"))?.let { pendingLanguage = it }
-            }
+        // Provisional text is a replacement overlay, including embedded
+        // foreign words. It never commits a speaker or a speech prefix.
+        val provisional = tokens.filter { it.bool("is_final") != true }
+        val pendingSource = provisional.filter { it.string("translation_status") != "translation" }.mapNotNull { token ->
+            token.string("text")?.takeIf { it != "<end>" && it != "<fin>" }?.let { sourcePiece(token, it) }
         }
         if (pendingSource.isNotEmpty()) openSegmentIfNeeded(state)
-        if (pendingSource.isNotEmpty() || pendingOpenTranslation.isNotEmpty()) state.open?.let { touched += it.id }
-        if (pendingPreviousTranslation.isNotEmpty()) state.previous?.let { touched += it.id }
-
-        state.previous?.takeIf { it.id in touched }?.let { segment ->
-            onEvent(
-                SpeechEvent.Segment(
-                    segment.copy(translation = segment.translation + pendingPreviousTranslation)
-                        .event(state.isCatchUp, stableTranslation = segment.translation),
-                ),
-            )
+        val open = state.open ?: return endedUtterance
+        val segment = open.copy()
+        val stable = segment.translation
+        pendingSource.forEach { appendSource(it, segment) }
+        var pendingTranslationSource: Language? = null
+        for (token in provisional.filter { it.string("translation_status") == "translation" }) {
+            if (segment.source.isEmpty() || segment.pendingTranslations.isNotEmpty()) continue
+            val text = token.string("text")?.takeIf { it != "<end>" && it != "<fin>" } ?: continue
+            val source = translationSource(token, fallback = pendingTranslationSource ?: segment.translationSource) ?: continue
+            if (!meaningful(text) && source != pendingTranslationSource && source != segment.translationSource) continue
+            if (segment.translationSource != null && segment.translationSource != source) continue
+            if (pendingTranslationSource != null && pendingTranslationSource != source) continue
+            segment.translation += text
+            pendingTranslationSource = source
+            touched = true
         }
-        state.open?.takeIf { it.id in touched }?.let { segment ->
-            onEvent(
-                SpeechEvent.Segment(
-                    segment.copy(
-                        source = segment.source + pendingSource,
-                        translation = segment.translation + pendingOpenTranslation,
-                        language = segment.language ?: pendingLanguage,
-                    ).event(state.isCatchUp, stableTranslation = segment.translation),
-                ),
-            )
+        segment.language = segment.translationSource ?: pendingTranslationSource ?: sourceLanguage(segment.sourceLanguages)
+        if (touched || pendingSource.isNotEmpty() || segment.hasProvisionalOverlay) {
+            if (emit(segment, state.isCatchUp, stable)) {
+                open.lastShownLanguage = segment.language
+                open.hasProvisionalOverlay = pendingSource.isNotEmpty() || pendingTranslationSource != null
+            } else {
+                emitConfirmedOrRetract(open, state.isCatchUp)
+                open.lastShownLanguage = open.language ?: open.lastShownLanguage
+                open.hasProvisionalOverlay = false
+            }
         }
         return endedUtterance
     }
 
     /**
-     * Translation follows the words it translates, so it belongs to the open
-     * segment once that has words in the translation's source language, and
-     * to the previous one until then.
+     * Mixed token tags describe multilingual text, not a change of speaker.
+     * Wait for translation metadata when they disagree about the sentence.
      */
-    private fun translationTargetIsOpen(state: StreamState, sourceLanguage: Language?, extraText: String): Boolean {
-        val open = state.open ?: return false
-        if ((open.source + extraText).isEmpty()) return false
-        val language = open.language
-        if (sourceLanguage == null || language == null) return true
-        return sourceLanguage == language || state.previous == null
+    private fun sourceLanguage(languages: Set<Language>): Language? = languages.singleOrNull()
+
+    private fun sourcePiece(token: JsonObject, text: String) =
+        SourcePiece(text, if (meaningful(text)) configuredLanguage(token.string("language")) else null)
+
+    private fun appendOwnedSource(piece: SourcePiece, segment: Segment) {
+        segment.source += piece.text
+        segment.sourcePieces += piece
+        piece.language?.let { segment.sourceLanguages += it }
+        segment.language = segment.translationSource ?: sourceLanguage(segment.sourceLanguages)
+    }
+
+    private fun appendSource(piece: SourcePiece, segment: Segment) {
+        val current = segment.translationSource
+        if (current != null) {
+            if (segment.hasAmbiguousSource) {
+                segment.deferredSource += piece
+                return
+            }
+            if (piece.language == current) {
+                // A source-language continuation folds an embedded name back
+                // into an unfinished sentence. A completed reply can instead
+                // precede another original source before translations catch up.
+                if (segment.deferredSource.any { endsSentence(it.text) }) {
+                    segment.deferredSource += piece
+                    return
+                }
+                if (segment.deferredSource.isNotEmpty() && endsSentence(segment.source)) {
+                    segment.hasAmbiguousSource = true
+                    segment.deferredSource += piece
+                    return
+                }
+                if (segment.deferredSource.isNotEmpty() && segment.unreceiptedFoldStart == null) {
+                    segment.unreceiptedFoldStart = segment.sourcePieces.size
+                }
+                foldDeferredSource(segment)
+            } else if (segment.deferredSource.isNotEmpty() || (piece.language != null && piece.language != current)) {
+                segment.deferredSource += piece
+                return
+            }
+        }
+        appendOwnedSource(piece, segment)
+    }
+
+    private fun foldDeferredSource(segment: Segment) {
+        val deferred = segment.deferredSource
+        segment.deferredSource = emptyList()
+        deferred.forEach { appendOwnedSource(it, segment) }
+    }
+
+    private fun setOwnedSource(pieces: List<SourcePiece>, segment: Segment) {
+        segment.source = ""
+        segment.sourcePieces = emptyList()
+        segment.sourceLanguages = emptySet()
+        pieces.forEach { appendOwnedSource(it, segment) }
+    }
+
+    private fun deferTrailingSource(segment: Segment, source: Language) {
+        // The first translation may arrive after both sides have spoken.
+        // Preserve an opposite-language suffix until its translation either
+        // confirms a reply or the provider endpoint keeps it in this sentence.
+        val pieces = segment.sourcePieces
+        val last = pieces.indexOfLast { it.language == source }
+        val candidates = pieces.indices.filter { pieces[it].language != null && pieces[it].language != source }
+        val sentenceStart = candidates.firstOrNull { hasSentenceBoundary(it, pieces) }
+        val firstOpposite = candidates.firstOrNull()
+        val containsReturn = firstOpposite != null &&
+            pieces.indices.any { it > firstOpposite && pieces[it].language == source }
+        val ambiguous = containsReturn && last >= 0 && sentenceStart != firstOpposite
+        val start = (if (ambiguous) firstOpposite else sentenceStart ?: candidates.firstOrNull { it > last }) ?: return
+        val prefix = pieces.take(start)
+        if (prefix.none { meaningful(it.text) }) return
+        if (last < 0 && prefix.none { it.language == null && meaningful(it.text) }) return
+        segment.hasAmbiguousSource = ambiguous
+        segment.deferredSource = pieces.drop(start)
+        setOwnedSource(prefix, segment)
+    }
+
+    private fun closeAmbiguousDirections(segment: Segment, isCatchUp: Boolean) {
+        val firstSource = segment.translationSource ?: return
+        val pieces = segment.sourcePieces + segment.deferredSource
+        val directions = listOf(firstSource) + segment.pendingTranslations.map { it.source }
+        if (pieces.size > 4096 || directions.size > 32) {
+            emitUnassignedDirections(segment, isCatchUp)
+            return
+        }
+        val candidatesByLanguage = mutableMapOf<Language, MutableList<Int>>()
+        val meaningfulPrefix = mutableListOf(0)
+        var precedingLanguage: Language? = null
+        for (index in pieces.indices) {
+            meaningfulPrefix += meaningfulPrefix[index] + if (meaningful(pieces[index].text)) 1 else 0
+            val language = pieces[index].language ?: continue
+            val boundary = hasSentenceBoundary(index, pieces)
+            if (precedingLanguage != language || boundary) candidatesByLanguage.getOrPut(language) { mutableListOf() } += index
+            precedingLanguage = language
+        }
+        if (candidatesByLanguage.values.sumOf { it.size } > 256) {
+            emitUnassignedDirections(segment, isCatchUp)
+            return
+        }
+        val cache = mutableMapOf<Pair<Int, Int>, List<List<Int>>>()
+        fun match(direction: Int, previous: Int): List<List<Int>> {
+            if (direction == directions.size) {
+                val last = pieces.subList(previous, pieces.size).lastOrNull { it.language != null }?.language
+                return if (last != null && last != directions[direction - 1]) emptyList() else listOf(emptyList())
+            }
+            val key = direction to previous
+            cache[key]?.let { return it }
+            val paths = mutableListOf<List<Int>>()
+            for (start in candidatesByLanguage[directions[direction]].orEmpty().filter { it > previous }) {
+                if (meaningfulPrefix[start] <= meaningfulPrefix[previous]) continue
+                val last = pieces.subList(previous, start).lastOrNull { it.language != null }?.language
+                if (last != null && last != directions[direction - 1]) continue
+                val suffix = match(direction + 1, start)
+                paths += suffix.take(2 - paths.size).map { listOf(start) + it }
+                if (paths.size == 2) break
+            }
+            cache[key] = paths
+            return paths
+        }
+        val matches = match(1, 0)
+        if (matches.size != 1) {
+            // Untimed translation tokens cannot identify equally plausible
+            // source partitions. Preserve the original caption and emit the
+            // provider's final translations without inventing source text.
+            emitUnassignedDirections(segment, isCatchUp)
+            return
+        }
+        val starts = listOf(0) + matches[0] + pieces.size
+        for (index in directions.indices) {
+            val resolved = if (index == 0) {
+                segment.copy(deferredSource = emptyList(), pendingTranslations = emptyList(), hasAmbiguousSource = false)
+            } else {
+                Segment(nextSegmentID, translation = segment.pendingTranslations[index - 1].text).also { nextSegmentID += 1 }
+            }
+            setOwnedSource(pieces.subList(starts[index], starts[index + 1]), resolved)
+            resolved.translationSource = directions[index]
+            resolved.language = directions[index]
+            resolved.isClosed = true
+            emitConfirmedOrRetract(resolved, isCatchUp)
+        }
+    }
+
+    private fun emitUnassignedDirections(segment: Segment, isCatchUp: Boolean) {
+        val caption = segment.copy()
+        foldDeferredSource(caption)
+        caption.pendingTranslations = emptyList()
+        caption.hasAmbiguousSource = false
+        caption.isClosed = true
+        emitConfirmedOrRetract(caption, isCatchUp)
+
+        if (!meaningful(caption.source)) return
+        for (translation in segment.pendingTranslations) {
+            val translated = Segment(
+                nextSegmentID,
+                translation = translation.text,
+                language = translation.source,
+                translationSource = translation.source,
+                isClosed = true,
+            )
+            nextSegmentID += 1
+            emit(translated, isCatchUp)
+        }
+    }
+
+    private fun hasSentenceBoundary(index: Int, pieces: List<SourcePiece>): Boolean {
+        for (piece in pieces.subList(0, index).asReversed()) {
+            if (endsSentence(piece.text)) return true
+            if (meaningful(piece.text)) return false
+        }
+        return false
+    }
+
+    private fun endsSentence(text: String): Boolean {
+        val closing = "\"'”’)]}"
+        val last = text.lastOrNull { !it.isWhitespace() && it !in closing } ?: return false
+        return last in ".?!。！？"
+    }
+
+    private fun translationSource(token: JsonObject, fallback: Language?): Language? {
+        val sourceCode = token.string("source_language")
+        val targetCode = token.string("language")
+        val source = configuredLanguage(sourceCode)
+        val target = configuredLanguage(targetCode)
+        if (!sourceCode.isNullOrEmpty() && source == null) return null
+        if (!targetCode.isNullOrEmpty() && target == null) return null
+        if (source != null && target != null) return source.takeIf { it != target }
+        if (source != null) return source
+        if (target != null) return config.languages.other(target)
+        // Missing metadata is useful only for formatting in an identified
+        // translation; a new word must identify its source or target.
+        return if (meaningful(token.string("text").orEmpty())) null else fallback
+    }
+
+    private fun configuredLanguage(code: String?): Language? {
+        val base = code?.replace('_', '-')?.lowercase()?.split('-')?.firstOrNull { it.isNotEmpty() }
+        return config.languages.language(base)
+    }
+
+    /**
+     * True for text with a letter or a number in it. Code points stand in
+     * for Swift's `Character.isLetter` and `isNumber`.
+     */
+    private fun meaningful(text: String): Boolean = text.codePoints().anyMatch {
+        Character.isLetter(it) || when (Character.getType(it).toByte()) {
+            Character.DECIMAL_DIGIT_NUMBER, Character.LETTER_NUMBER, Character.OTHER_NUMBER -> true
+            else -> false
+        }
+    }
+
+    private fun emit(segment: Segment, isCatchUp: Boolean, stableTranslation: String? = null): Boolean {
+        // Wait for provider language evidence instead of letting an unknown
+        // short transcript be guessed onto one of the conversation sides.
+        if (segment.language == null) return false
+        onEvent(SpeechEvent.Segment(segment.event(isCatchUp, stableTranslation)))
+        return true
+    }
+
+    private fun emitConfirmedOrRetract(segment: Segment, isCatchUp: Boolean) {
+        var confirmed = segment
+        if (confirmed.language == null) {
+            val language = confirmed.lastShownLanguage ?: return
+            // A remembered preview direction can identify the view to clear,
+            // but must not assign unclassified confirmed words to that side.
+            confirmed = confirmed.copy(source = "", translation = "", translationSource = null, language = language)
+        }
+        emit(confirmed, isCatchUp)
     }
 
     private fun openSegmentIfNeeded(state: StreamState) {
@@ -385,12 +662,20 @@ class SonioxTranscriber(
         closeOpenSegment(state)
     }
 
-    private fun closeOpenSegment(state: StreamState, notify: Boolean = true) {
+    private fun closeOpenSegment(state: StreamState, providerBoundary: Boolean = false) {
         val segment = state.open ?: return
-        segment.isClosed = true
         state.open = null
-        state.previous = segment
-        if (notify) onEvent(SpeechEvent.Segment(segment.event(state.isCatchUp)))
+        if (segment.pendingTranslations.isNotEmpty()) {
+            if (providerBoundary) {
+                closeAmbiguousDirections(segment, state.isCatchUp)
+            } else {
+                emitUnassignedDirections(segment, state.isCatchUp)
+            }
+            return
+        }
+        foldDeferredSource(segment)
+        segment.isClosed = true
+        emitConfirmedOrRetract(segment, state.isCatchUp)
     }
 
     // endregion
