@@ -104,6 +104,8 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
+    // Google Play's in-app review prompt, like StoreKit's requestReview on iOS.
+    implementation(libs.play.review)
     implementation(libs.mlkit.translate)
     // Text recognition for photos, bundled so it works offline and without
     // Play services, like Vision on iOS. One model per script.

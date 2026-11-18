@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -39,7 +41,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.android.play.core.review.ReviewManagerFactory
+import com.google.android.play.core.ktx.launchReview
+import com.google.android.play.core.ktx.requestReview
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import sh.ian.lively.audio.SpeechPlayer
 import sh.ian.lively.audio.MicCapture
@@ -47,6 +55,7 @@ import sh.ian.lively.model.ConversationHost
 import sh.ian.lively.model.ConversationStore
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguageSide
+import sh.ian.lively.model.ReviewPrompt
 import sh.ian.lively.support.DebugFlags
 import sh.ian.lively.ui.AccountScreen
 import sh.ian.lively.ui.ConversationScreen
@@ -164,6 +173,8 @@ private object Routes {
     const val SETTINGS = "settings"
     const val ACCOUNT = "settings/account"
     const val PRO = "pro"
+    /** Lively Pro, opened because today's free time ran out. */
+    const val PRO_LIMIT = "pro/limit"
     const val LANGUAGE = "settings/language/{side}"
     fun language(side: LanguageSide) = "settings/language/${side.name}"
 }
@@ -190,10 +201,11 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
         mutableStateOf(start == Routes.CONVERSATION && !DebugFlags.demo && !prefs.bool("locationOfferDone") && !settings.usesLocationLanguages)
     }
 
-    /** The account screen was opened from the used-up alert, so signing in closes it. */
+    /** The account screen was opened from the used-up screen, so signing in closes both. */
     var accountReturnsOnSignIn by remember { mutableStateOf(false) }
 
     ForegroundEffects(graph, store)
+    ReviewPromptEffect(graph, store)
 
     NavHost(
         navController = nav,
@@ -237,13 +249,7 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
                     prefs.putString("nearLanguage", it.code)
                 },
                 onShowSettings = { nav.navigateSingle(Routes.SETTINGS) },
-                onShowPro = { nav.navigateSingle(Routes.PRO) },
-                onShowAccount = graph.account?.takeUnless { it.isSignedIn }?.let {
-                    {
-                        accountReturnsOnSignIn = true
-                        nav.navigateSingle(Routes.ACCOUNT)
-                    }
-                },
+                onShowLimit = { nav.navigateSingle(Routes.PRO_LIMIT) },
             )
             if (offersLocation) {
                 LocationOfferCard(graph.locationLanguages) { changed ->
@@ -290,17 +296,77 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
         }
         composable(Routes.ACCOUNT) {
             graph.account?.let { account ->
-                // Opened from the used-up alert: once signed in, back to the
+                // Opened from the used-up screen: once signed in, back to the
                 // conversation, where Start now works.
                 LaunchedEffect(account.isSignedIn) {
-                    if (account.isSignedIn && accountReturnsOnSignIn) nav.popBackStack()
+                    if (account.isSignedIn && accountReturnsOnSignIn) nav.popBackStack(Routes.CONVERSATION, inclusive = false)
                     if (account.isSignedIn) accountReturnsOnSignIn = false
                 }
-                AccountScreen(account, onBack = { accountReturnsOnSignIn = false; nav.popBackStack() })
+                AccountScreen(
+                    account,
+                    graph.pro,
+                    onBack = { accountReturnsOnSignIn = false; nav.popBackStack() },
+                    onPro = { nav.navigateSingle(Routes.PRO) },
+                )
             }
         }
         composable(Routes.PRO) {
             ProScreen(graph.pro, graph.account, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.PRO_LIMIT) {
+            ProScreen(
+                graph.pro,
+                graph.account,
+                onBack = { nav.popBackStack() },
+                limitReached = true,
+                onSignIn = {
+                    accountReturnsOnSignIn = true
+                    nav.navigateSingle(Routes.ACCOUNT)
+                },
+            )
+        }
+    }
+}
+
+/**
+ * Asks for a Play Store review once, after a second conversation that went
+ * well: when listening stops with enough finished turns ([ReviewPrompt]).
+ * Google Play's in-app review flow decides whether anything is shown; iOS
+ * mirrors this with StoreKit's `requestReview`. Never in demo mode.
+ */
+@Composable
+private fun ReviewPromptEffect(graph: LivelyApp.Graph, store: ConversationStore) {
+    val activity = LocalActivity.current
+    val prefs = graph.prefs
+    // This conversation has been counted. Hold-to-talk stops after every
+    // sentence, so one conversation stops many times.
+    var counted by remember { mutableStateOf(false) }
+    LaunchedEffect(store, activity) {
+        launch { snapshotFlow { store.utterances.isEmpty() }.collect { empty -> if (empty) counted = false } }
+        var wasListening = store.isListening
+        // collectLatest: starting again within the pause below calls it off.
+        snapshotFlow { store.isListening }.collectLatest { listening ->
+            val stopped = wasListening && !listening
+            wasListening = listening
+            if (!stopped || DebugFlags.demo || counted) return@collectLatest
+            val turns = store.utterances.count { it.isFinal && it.hasContent }
+            if (turns < ReviewPrompt.MIN_TURNS) return@collectLatest
+            counted = true
+            val good = prefs.int("goodConversations") + 1
+            prefs.putInt("goodConversations", good)
+            if (!ReviewPrompt.shouldAsk(turns, good, prefs.bool("reviewAsked"))) return@collectLatest
+            // Not the instant the mic stops, and not if they've started again.
+            delay(1500)
+            if (store.isListening || activity == null) return@collectLatest
+            prefs.putBool("reviewAsked", true)
+            try {
+                val reviews = ReviewManagerFactory.create(activity)
+                reviews.launchReview(activity, reviews.requestReview())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // No Play Store, or it declined; there's nothing to tell anyone.
+            }
         }
     }
 }

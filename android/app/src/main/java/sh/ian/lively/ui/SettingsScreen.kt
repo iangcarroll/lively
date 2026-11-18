@@ -170,7 +170,7 @@ fun SettingsScreen(
                 }
 
                 if (hasBroker) {
-                    Group(footer = if (!pro.isPro) "Up to 10 hours of translation a day with the Soniox engine." else null) {
+                    Group(footer = if (!pro.isPro) "Up to 10 hours of translation a day." else null) {
                         Item(
                             icon = { SettingsIcon(Icons.Rounded.Star, Orange) },
                             title = "Lively Pro",

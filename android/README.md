@@ -68,6 +68,13 @@ broker, account and Pro allowance:
   [broker's setup](../Server/key-broker/README.md#sign-in-with-apple-and-google). The
   broker checks Play purchases with the Play Developer API
   ([Server/key-broker](../Server/key-broker/README.md#google-play-subscriptions)).
+  The Pro screen keeps both plans and Subscribe in view, yearly first with
+  what it saves. A used-up free day opens it in place of an alert, with
+  sign-in offered as the free way to another hour.
+- The languages change from the conversation: tap a language tag in
+  face-to-face, or the pair button over the transcript.
+- After a couple of conversations of four turns or more, asks once for a
+  Google Play review (`model/ReviewPrompt.kt`).
 - The welcome tour, 60 languages with each reader's prompts in their own
   language, Simplified → Traditional Chinese on the device, dark mode, edge to
   edge, predictive back, themed icon, TalkBack labels, right-to-left halves for
@@ -101,6 +108,7 @@ adb shell am start -n sh.ian.lively/.MainActivity --ez LivelyDemo true --ez Live
 | `LivelyDemo` | Plays a scripted conversation through the real pipeline, without a key. Sign-in accepts any email and the code 123456, and Continue with Google signs in without Google. Pro shows sample prices. |
 | `LivelyDemoAutoPlay` | Starts the demo when the conversation appears. |
 | `LivelyOnboarding` | Shows the welcome tour on every launch. |
+| `LivelyLimit` | Opens the Lively Pro screen for a used-up free day, without the broker. |
 | `LivelyAudioFile PATH` | Debug builds: plays a 16-bit WAV into the app instead of the mic. |
 | `LivelyDropout "AT,FOR"` | Debug builds: blackholes the network FOR seconds, AT seconds in. |
 | `LivelySlowConnect SECONDS` | Debug builds: holds up each connection attempt, so a second one races it. |
@@ -121,7 +129,7 @@ adb shell am start -n sh.ian.lively/.MainActivity -e LivelyAudioFile /data/user/
 
 ```bash
 ./gradlew :app:testDebugUnitTest          # JVM: turns, translation, Soniox tokens, broker client
-./gradlew :app:connectedDebugAndroidTest  # on a device or emulator: onboarding, demo, settings, sign-in
+./gradlew :app:connectedDebugAndroidTest  # on a device or emulator: onboarding, demo, settings, sign-in, Pro, languages
 ```
 
 GitHub Actions runs the unit tests, lint and a minified release build on

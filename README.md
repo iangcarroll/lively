@@ -254,7 +254,7 @@ Signing in is optional and doubles the free hour a day: Sign in with Apple
 (`Views/AccountView.swift`; Sign in with Google on Android) or a code sent by
 email. The broker checks the token and opens the account; see
 [Server/key-broker](Server/key-broker/README.md#sign-in). When a signed-out
-day's time runs out, the alert offers signing in before Lively Pro.
+day's time runs out, the Lively Pro screen that opens offers signing in too.
 
 Lively Pro is an App Store subscription that raises the daily translation
 allowance (`Model/Pro.swift`, `Views/ProView.swift`). The key broker checks
@@ -264,6 +264,14 @@ from Xcode, pick `Config/Lively.storekit` under Edit Scheme › Run › Options 
 StoreKit Configuration. The broker doesn't accept those local test
 transactions, so this exercises only the UI. Use a TestFlight build with a
 Sandbox account for the full flow.
+
+The Pro screen draws its own plans rather than StoreKit's subscription view:
+yearly first and selected, with what it saves against twelve months, and both
+plans and Subscribe in view without scrolling. When a free day runs out, the
+same screen opens in place of an alert, and offers sign-in as the free way to
+another hour to anyone signed out. After a couple of conversations of four
+turns or more, the app asks once for an App Store review
+(`Model/ReviewPrompt.swift`).
 
 ### Apple developer account and TestFlight
 
@@ -316,7 +324,17 @@ local StoreKit tests cannot validate the broker's Apple signature checks.
 In a Debug build, to try the UI without a key, add the launch argument `-LivelyDemo YES` and tap the
 mic. It plays a scripted conversation through the real turn and translation logic.
 For unattended screenshots, also pass `-LivelyDemoAutoPlay YES` to start the demo
-when the conversation screen appears.
+when the conversation screen appears. `-LivelyOnboarding YES` shows the welcome
+tour on every launch, and `-LivelyLimit YES` opens the screen for a used-up free
+day. In demo mode the Pro screen shows sample prices and Subscribe succeeds
+without the App Store.
+
+The `LivelyTests` target holds the app's unit tests (the yearly saving and the
+review prompt's rule); run them with the `Lively` scheme's Test action:
+
+```sh
+xcodebuild test -project Lively.xcodeproj -scheme Lively -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
+```
 
 ## How it works
 

@@ -9,7 +9,7 @@ struct AccountView: View {
 
     var body: some View {
         ScrollView {
-            AccountContent(account: account)
+            AccountContent(account: account, linksToPro: true)
                 .padding(.top, 24)
                 .padding(.bottom, 32)
         }
@@ -27,12 +27,15 @@ struct AccountView: View {
 /// who's signed in.
 struct AccountContent: View {
     let account: Account
+    /// Offers Lively Pro once signed in. Only where there's a navigation
+    /// stack to push it on, which the welcome tour doesn't have.
+    var linksToPro = false
 
     var body: some View {
         VStack(spacing: 32) {
             header
             if let email = account.email {
-                SignedInCard(account: account, email: email)
+                SignedInCard(account: account, email: email, linksToPro: linksToPro)
             } else {
                 SignInForm(account: account)
                 benefits
@@ -115,6 +118,7 @@ private struct BenefitRow: View {
 private struct SignedInCard: View {
     let account: Account
     let email: String
+    let linksToPro: Bool
     @State private var confirmingSignOut = false
     @State private var confirmingDelete = false
     @State private var deleting = false
@@ -152,6 +156,28 @@ private struct SignedInCard: View {
                     Spacer(minLength: 0)
                 }
                 .padding(16)
+                .accessibilityElement(children: .combine)
+            } else if linksToPro, !Pro.shared.isPro {
+                // Someone signed in and still on the free plan is the likeliest to want more.
+                Divider().padding(.leading, 58)
+                NavigationLink {
+                    ProView()
+                } label: {
+                    HStack(spacing: 12) {
+                        SettingsIcon(systemImage: "star.fill", color: .orange)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Get 10 hours a day").font(.body)
+                            Text("Lively Pro").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(16)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
             }
             Divider().padding(.leading, 58)

@@ -31,6 +31,13 @@ import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Splitscreen
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import sh.ian.lively.support.DebugFlags
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.heightIn
@@ -81,14 +88,14 @@ fun ConversationScreen(
     nearLanguage: Language,
     onNearLanguageChange: (Language) -> Unit,
     onShowSettings: () -> Unit,
-    onShowPro: () -> Unit,
-    /** Null when the person is signed in, or the build has no accounts. */
-    onShowAccount: (() -> Unit)?,
+    /** Opens Lively Pro saying today's free time has run out. */
+    onShowLimit: () -> Unit,
 ) {
     val pair = settings.languages
     // The near side's language, kept within the current pair.
     val near = if (nearLanguage in pair) nearLanguage else pair.first
     var showsTextInput by rememberSaveable { mutableStateOf(false) }
+    var showsLanguages by rememberSaveable { mutableStateOf(false) }
     /** The turn being corrected in the text bar. */
     var editing by remember { mutableStateOf<Utterance?>(null) }
     /** The bar opened for an edit, so it closes when the edit ends. */
@@ -148,6 +155,7 @@ fun ConversationScreen(
                     onEndEditing = endEditing,
                     onShowTranscript = { onShowsTranscriptChange(true) },
                     onShowSettings = onShowSettings,
+                    onChangeLanguages = { showsLanguages = true },
                     contentPadding = WindowInsets.safeDrawing.asPaddingValues(),
                 )
             } else {
@@ -160,12 +168,42 @@ fun ConversationScreen(
                     onEndEditing = endEditing,
                     onFaceToFace = { onShowsTranscriptChange(false) },
                     onShowSettings = onShowSettings,
+                    onChangeLanguages = { showsLanguages = true },
                 )
             }
         }
     }
 
-    store.alert?.let { message ->
+    if (showsLanguages) {
+        LanguagesSheet(settings, onDismiss = {
+            showsLanguages = false
+            // Like closing Settings: a new pair starts a new conversation.
+            store.settingsDidClose()
+        })
+    }
+
+    // `LivelyLimit`: as if today's free time had just run out.
+    LaunchedEffect(Unit) {
+        if (DebugFlags.limit) {
+            DebugFlags.limit = false
+            pro.freeLimitReached = true
+            store.alert = "Today's free translation time is used up."
+        }
+    }
+
+    // Out of free time: Lively Pro itself, rather than an alert that leads to
+    // it. The alert and the flag are cleared on the way, so coming back from
+    // that screen doesn't open it again.
+    val limitReached = store.alert != null && pro.freeLimitReached && !pro.isPro
+    LaunchedEffect(limitReached) {
+        if (limitReached) {
+            store.alert = null
+            pro.freeLimitReached = false
+            onShowLimit()
+        }
+    }
+
+    store.alert?.takeIf { !limitReached }?.let { message ->
         val dismiss = {
             store.alert = null
             pro.freeLimitReached = false
@@ -178,13 +216,6 @@ fun ConversationScreen(
                 Row {
                     if (!settings.hasCredentials) {
                         TextButton(onClick = { dismiss(); onShowSettings() }) { Text("Open Settings") }
-                    }
-                    if (pro.freeLimitReached && !pro.isPro) {
-                        // Signing in is free and doubles the day, so it comes first.
-                        if (onShowAccount != null) {
-                            TextButton(onClick = { dismiss(); onShowAccount() }) { Text("Sign in for another hour") }
-                        }
-                        TextButton(onClick = { dismiss(); onShowPro() }) { Text("Get Lively Pro") }
                     }
                     TextButton(onClick = dismiss) { Text("OK") }
                 }
@@ -205,6 +236,7 @@ private fun TranscriptLayout(
     onEndEditing: () -> Unit,
     onFaceToFace: () -> Unit,
     onShowSettings: () -> Unit,
+    onChangeLanguages: () -> Unit,
 ) {
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
@@ -218,7 +250,7 @@ private fun TranscriptLayout(
             else -> ChatTranscript(utterances, settings.languages, store::retryTranslation, onEdit, store::delete, contentPadding = barSpace)
         }
 
-        // Top bar: status, then layout and settings.
+        // Top bar: status and the languages, then layout and settings.
         Row(
             Modifier
                 .fillMaxWidth()
@@ -229,7 +261,7 @@ private fun TranscriptLayout(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StatusPill(store.status, store.isListening)
-            Spacer(Modifier.weight(1f))
+            LanguagePairButton(settings.languages, onChangeLanguages, Modifier.weight(1f))
             // Turned on from the menu in face-to-face or Settings; shown while
             // on, so it can be stopped from here.
             if (store.speaksTranslations) SpeakAloudButton(store)
@@ -287,6 +319,39 @@ private fun TranscriptLayout(
     }
 }
 
+
+/**
+ * Changes the two languages without a trip to Settings: the welcome tour's
+ * cards, in a sheet over the conversation.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LanguagesSheet(settings: AppSettings, onDismiss: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.background,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Text("Languages", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            LanguagePairPicker(settings, Modifier.widthIn(max = 420.dp))
+            Text(
+                "Changing a language starts a new conversation.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
 
 /** Opens and closes [TypeToTranslateBar]. */
 @Composable

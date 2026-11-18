@@ -3,11 +3,16 @@ package sh.ian.lively
 import android.content.Context
 import android.content.Intent
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -38,6 +43,7 @@ class LivelyUiTest {
         DebugFlags.demo = false
         DebugFlags.demoAutoPlay = false
         DebugFlags.forceOnboarding = false
+        DebugFlags.limit = false
     }
 
     @After fun close() {
@@ -89,7 +95,8 @@ class LivelyUiTest {
         compose.onNodeWithContentDescription("Clear conversation").performClick()
         waitForText("Tap the mic to start")
         compose.onNodeWithContentDescription("Face-to-face mode").performClick()
-        compose.waitUntilAtLeastOneExists(hasContentDescription("Swap sides"), 5_000)
+        // Swap sides is in the More menu, which only face-to-face has.
+        compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 5_000)
     }
 
     @Test fun settingsPickALanguage() {
@@ -135,5 +142,64 @@ class LivelyUiTest {
         compose.onNodeWithText("Sign out").performClick()
         compose.onAllNodesWithText("Sign out")[1].performClick()
         waitForText("Sign in to Lively")
+    }
+
+    @Test fun tourBackButtonReturnsToThePreviousPage() {
+        launch()
+        waitForText("Get started")
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
+        compose.onNodeWithText("Get started").performClick()
+        waitForText("Continue")
+        compose.onNodeWithText("Continue").performClick()
+        waitForText("Pick your languages")
+        compose.onNodeWithContentDescription("Back").performClick()
+        // Still past the first page, whose button says "Get started".
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Page 2 of 4"), 5_000)
+        compose.onNodeWithText("Continue").assertExists()
+        compose.onNodeWithContentDescription("Back").performClick()
+        waitForText("Get started")
+        compose.waitUntilDoesNotExist(hasContentDescription("Back"), 5_000)
+    }
+
+    @Test fun proScreenOffersYearlyFirst() {
+        launch("LivelyDemo")
+        compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 10_000)
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Settings").performClick()
+        waitForText("Upgrade")
+        compose.onNodeWithText("Upgrade").performClick()
+        // Both plans and Subscribe are on screen without scrolling.
+        waitForText("Yearly")
+        compose.onNodeWithText("Yearly").assertIsDisplayed()
+        compose.onNodeWithText("Monthly").assertIsDisplayed()
+        compose.onNodeWithText("Save 33%").assertIsDisplayed()
+        compose.onNodeWithText("Subscribe").assertIsDisplayed()
+        compose.onNodeWithTag("plan-year").assertIsSelected()
+        compose.onNodeWithTag("plan-month").assertIsNotSelected()
+        compose.onNodeWithText("Restore purchases").assertIsDisplayed()
+    }
+
+    @Test fun freeLimitOpensLivelyPro() {
+        launch("LivelyDemo", "LivelyLimit")
+        waitForText("That's today's free time")
+        compose.onNodeWithText("Today's free translation time is used up.").assertDoesNotExist()
+        compose.onNodeWithText("Get Lively Pro").assertDoesNotExist()
+        compose.onNodeWithText("Sign in for another free hour").assertIsDisplayed()
+        compose.onNodeWithTag("plan-year").assertIsSelected()
+        // Going back leaves no alert behind, and doesn't open it again.
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Start listening"), 5_000)
+        compose.waitUntilDoesNotExist(hasText("That's today's free time"), 5_000)
+        compose.onNodeWithText("Today's free translation time is used up.").assertDoesNotExist()
+    }
+
+    @Test fun languagesSheetOpensFromTheFaceToFaceTag() {
+        launch("LivelyDemo")
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Change languages"), 10_000)
+        // One tag per half; the second is the near reader's.
+        compose.onAllNodesWithContentDescription("Change languages")[1].performClick()
+        waitForText("You speak")
+        compose.onNodeWithText("They speak", substring = true).assertExists()
+        compose.onNodeWithText("Changing a language starts a new conversation.").assertExists()
     }
 }

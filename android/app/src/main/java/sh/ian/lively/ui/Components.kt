@@ -3,7 +3,6 @@ package sh.ian.lively.ui
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -20,6 +19,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +37,9 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material3.Checkbox
@@ -74,6 +76,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -109,6 +112,8 @@ fun LanguageTag(
     spoken: Boolean = false,
     /** Off for labels that name a language without saying how the text got there. */
     showsIcon: Boolean = true,
+    /** Set where the tag opens the languages sheet; it then gets a chevron. */
+    onChangeLanguages: (() -> Unit)? = null,
 ) {
     val ink = language.ink(pair)
     val description = when {
@@ -116,12 +121,29 @@ fun LanguageTag(
         spoken -> "Spoken in ${language.nativeName}"
         else -> "Translated to ${language.nativeName}"
     }
+    if (onChangeLanguages != null) {
+        // The capsule is small; the space around it is part of the button.
+        Box(
+            modifier
+                .clip(RoundedCornerShape(20.dp))
+                .clickable(onClick = onChangeLanguages, role = Role.Button)
+                .clearAndSetSemantics { contentDescription = "Change languages" }
+                .padding(14.dp),
+        ) {
+            LanguageCapsule(language.tag, ink, spoken, showsIcon, chevron = true, Modifier)
+        }
+    } else {
+        LanguageCapsule(language.tag, ink, spoken, showsIcon, chevron = false, modifier.clearAndSetSemantics { contentDescription = description })
+    }
+}
+
+@Composable
+private fun LanguageCapsule(tag: String, ink: Color, spoken: Boolean, showsIcon: Boolean, chevron: Boolean, modifier: Modifier) {
     Row(
         modifier
             .clip(CircleShape)
             .background(if (spoken) ink else ink.copy(alpha = 0.12f))
-            .padding(horizontal = 7.dp, vertical = 3.dp)
-            .clearAndSetSemantics { contentDescription = description },
+            .padding(horizontal = 7.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -134,7 +156,50 @@ fun LanguageTag(
                 modifier = Modifier.size(12.dp),
             )
         }
-        Text(language.tag, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, lineHeight = 13.sp)
+        Text(tag, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, lineHeight = 13.sp)
+        if (chevron) Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
+    }
+}
+
+/**
+ * The pair in the transcript's top bar, e.g. "EN ⇄ 中文", which opens the
+ * languages sheet. Where the bar is too full for that, a round button instead.
+ */
+@Composable
+fun LanguagePairButton(pair: LanguagePair, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Layout(
+        content = {
+            Surface(
+                onClick = onClick,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.semantics { contentDescription = "Change languages" },
+            ) {
+                Row(
+                    Modifier.heightIn(min = 36.dp).padding(horizontal = 12.dp).clearAndSetSemantics {},
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Text(pair.first.tag, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = pair.first.ink(pair), maxLines = 1)
+                    Icon(Icons.Rounded.SwapHoriz, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                    Text(pair.second.tag, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = pair.second.ink(pair), maxLines = 1)
+                }
+            }
+            TonalIconButton(Icons.Rounded.Translate, "Change languages", onClick)
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val (capsule, round) = measurables
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        // Only the one that fits is measured and placed, so only it is on
+        // screen and in the accessibility tree.
+        val chosen = when {
+            capsule.maxIntrinsicWidth(constraints.maxHeight) <= constraints.maxWidth -> capsule
+            round.maxIntrinsicWidth(constraints.maxHeight) <= constraints.maxWidth -> round
+            else -> null
+        }?.measure(loose)
+        val height = maxOf(chosen?.height ?: 0, constraints.minHeight)
+        layout(constraints.maxWidth, height) { chosen?.place(0, (height - chosen.height) / 2) }
     }
 }
 
@@ -188,11 +253,9 @@ fun MicButton(
     onHoldEnd: () -> Unit = {},
 ) {
     val view = LocalView.current
+    // The primary action, so it's the accent color at rest too; listening
+    // adds the stop icon and the ring.
     val primary = MaterialTheme.colorScheme.primary
-    val container by animateColorAsState(
-        if (isListening) primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-        label = "mic container",
-    )
     val ringScale by animateFloatAsState(1f + level * 0.35f, tween(120), label = "ring")
     val ringAlpha by animateFloatAsState(if (isHearing) 0.35f else 0.12f, tween(200), label = "ring alpha")
     val interaction = remember { MutableInteractionSource() }
@@ -254,9 +317,9 @@ fun MicButton(
                 }
             },
             shape = CircleShape,
-            color = container,
-            contentColor = if (isListening) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-            shadowElevation = if (isListening) 6.dp else 2.dp,
+            color = primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            shadowElevation = if (isListening) 6.dp else 3.dp,
             interactionSource = interaction,
             modifier = Modifier
                 .size(size)

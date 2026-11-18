@@ -51,6 +51,7 @@ import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.LocationOn
@@ -217,6 +218,20 @@ fun OnboardingScreen(settings: AppSettings, account: Account?, location: Locatio
                 }
             }
         }
+        // Back to the previous page, like the system back gesture.
+        AnimatedVisibility(
+            pager.currentPage > 0,
+            Modifier
+                .align(Alignment.TopStart)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Start))
+                .padding(start = 12.dp, top = 8.dp),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            TonalIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = {
+                scope.launch { pager.animateScrollToPage((pager.currentPage - 1).coerceAtLeast(0)) }
+            })
+        }
     }
 }
 
@@ -302,32 +317,12 @@ private fun TablePage(active: Boolean) = OnboardingPage(
 
 @Composable
 private fun LanguagesPage(settings: AppSettings, location: LocationLanguages) {
-    var choosing by remember { mutableStateOf<LanguageSide?>(null) }
     val setUsesLocation = rememberLocationSwitch(location)
-    val view = LocalView.current
     OnboardingPage(
         title = "Pick your languages",
         message = "Lively listens for both and translates each into the other. You can change them any time.",
     ) {
-        Column(Modifier.padding(horizontal = 24.dp).widthIn(max = 420.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(contentAlignment = Alignment.Center) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    LanguageCard("You speak", settings.languages.first, Lively.colors.firstInk) { choosing = LanguageSide.FIRST }
-                    LanguageCard("They speak", settings.languages.second, Lively.colors.secondInk) { choosing = LanguageSide.SECOND }
-                }
-                Surface(
-                    onClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        settings.languages = settings.languages.swapped()
-                    },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    shadowElevation = 4.dp,
-                    modifier = Modifier.size(48.dp).semantics { contentDescription = "Swap languages" },
-                ) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.SwapVert, null) }
-                }
-            }
+        LanguagePairPicker(settings, Modifier.padding(horizontal = 24.dp).widthIn(max = 420.dp)) {
             // Optional: asks for location access and sets the pair for this country.
             val on = settings.usesLocationLanguages
             val tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -358,9 +353,43 @@ private fun LanguagesPage(settings: AppSettings, location: LocationLanguages) {
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }
-            AnimatedVisibility(Language.CHINESE in settings.languages) {
-                ScriptPicker(settings, Modifier.padding(top = 20.dp).widthIn(max = 320.dp))
+        }
+    }
+}
+
+/**
+ * The two languages as cards, "You speak" over "They speak", with a swap
+ * button between them and the Chinese script choice when Chinese is one of
+ * them. Tapping a card opens the language list for that side. Shared by the
+ * welcome tour and the conversation's languages sheet; [extras] go between
+ * the cards and the script choice.
+ */
+@Composable
+fun LanguagePairPicker(settings: AppSettings, modifier: Modifier = Modifier, extras: @Composable () -> Unit = {}) {
+    var choosing by remember { mutableStateOf<LanguageSide?>(null) }
+    val view = LocalView.current
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(contentAlignment = Alignment.Center) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LanguageCard("You speak", settings.languages.first, Lively.colors.firstInk) { choosing = LanguageSide.FIRST }
+                LanguageCard("They speak", settings.languages.second, Lively.colors.secondInk) { choosing = LanguageSide.SECOND }
             }
+            Surface(
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    settings.languages = settings.languages.swapped()
+                },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shadowElevation = 4.dp,
+                modifier = Modifier.size(48.dp).semantics { contentDescription = "Swap languages" },
+            ) {
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.SwapVert, null) }
+            }
+        }
+        extras()
+        AnimatedVisibility(Language.CHINESE in settings.languages) {
+            ScriptPicker(settings, Modifier.padding(top = 20.dp).widthIn(max = 320.dp))
         }
     }
     choosing?.let { side ->

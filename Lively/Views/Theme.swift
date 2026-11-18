@@ -25,6 +25,8 @@ struct LanguageTag: View {
     var spoken = false
     /// Off for labels that name a language without saying how the text got there.
     var showsIcon = true
+    /// On for a tag that's a button opening the language choice.
+    var showsChevron = false
 
     var body: some View {
         HStack(spacing: 3) {
@@ -33,6 +35,10 @@ struct LanguageTag: View {
                     .imageScale(.small)
             }
             Text(language.tag)
+            if showsChevron {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+            }
         }
         .font(.caption2.weight(.bold))
         .foregroundStyle(spoken ? AnyShapeStyle(.white) : AnyShapeStyle(language.ink))

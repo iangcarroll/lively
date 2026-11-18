@@ -89,6 +89,8 @@ fun FaceToFaceScreen(
     onEndEditing: () -> Unit,
     onShowTranscript: () -> Unit,
     onShowSettings: () -> Unit,
+    /** Opens the languages sheet, from either half's language tag. */
+    onChangeLanguages: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
@@ -109,10 +111,11 @@ fun FaceToFaceScreen(
                 .rotate(180f),
             // Rotated, its bottom edge is the top of the screen.
             edgePadding = contentPadding.calculateTopPadding(),
+            onChangeLanguages = onChangeLanguages,
         )
         ControlStrip(store, onSwap, showsTextInput, onShowsTextInputChange, onShowTranscript, onShowSettings, sides)
         val bottom = contentPadding.calculateBottomPadding()
-        FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f).then(sides), edgePadding = if (showsTextInput) 0.dp else bottom, onEdit = onEdit)
+        FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f).then(sides), edgePadding = if (showsTextInput) 0.dp else bottom, onChangeLanguages = onChangeLanguages, onEdit = onEdit)
         // The near person types; the far side reads the translation. The
         // bottom padding includes the keyboard, so the halves make room for it.
         AnimatedVisibility(showsTextInput, enter = fadeIn(), exit = fadeOut()) {
@@ -215,6 +218,7 @@ private fun FaceToFaceHalf(
     script: ChineseScript,
     modifier: Modifier,
     edgePadding: androidx.compose.ui.unit.Dp,
+    onChangeLanguages: () -> Unit,
     /** Set on the near half, whose reader can correct their own turns. */
     onEdit: ((Utterance) -> Unit)? = null,
 ) {
@@ -278,7 +282,8 @@ private fun FaceToFaceHalf(
                     .height(48.dp)
                     .background(Brush.verticalGradient(0.55f to MaterialTheme.colorScheme.background, 1f to Color.Transparent)),
             )
-            LanguageTag(language, pair, showsIcon = false, modifier = Modifier.padding(14.dp).align(Alignment.TopStart))
+            // The tag pads itself, so the whole corner is the button.
+            LanguageTag(language, pair, showsIcon = false, onChangeLanguages = onChangeLanguages, modifier = Modifier.align(Alignment.TopStart))
         }
     }
 }

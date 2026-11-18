@@ -23,7 +23,28 @@ final class Pro {
     /// Set when a free day's allowance runs out, so the app can offer Pro.
     var freeLimitReached = false
 
-    var isSubscribed: Bool { subscription != nil }
+    /// One way to pay, as the store shows it.
+    struct Offer: Identifiable {
+        let id: String
+        let title: String
+        let price: String
+        let period: String
+        /// What the yearly plan saves against twelve months, e.g. "Save 33%".
+        let badge: String?
+        let product: Product?
+    }
+
+    enum StoreState {
+        case loading
+        case ready([Offer])
+        case unavailable(String)
+    }
+
+    private(set) var store = StoreState.loading
+    /// A demo-mode purchase, so screenshots can show the subscribed state.
+    private var demoSubscribed = false
+
+    var isSubscribed: Bool { subscription != nil || demoSubscribed }
     var isPro: Bool { isSubscribed || Account.shared?.hasFreePro == true }
 
     @ObservationIgnored private var updates: Task<Void, Never>?
@@ -63,4 +84,82 @@ final class Pro {
         // A spare key minted on the old plan carries the old plan's limits.
         if changed { SonioxKeyProvider.shared?.dropSpare() }
     }
+
+    /// Reads the plans and their prices from the App Store.
+    func loadOffers() async {
+        if Self.isDemo {
+            store = .ready(Self.demoOffers)
+            return
+        }
+        do {
+            let products = try await Product.products(for: Self.productIDs)
+            store = products.isEmpty
+                ? .unavailable("Lively Pro isn't available from the App Store on this device yet.")
+                : .ready(Self.offers(products))
+        } catch {
+            store = .unavailable("Couldn't reach the App Store. Check your connection and try again.")
+        }
+    }
+
+    /// Records a finished purchase. In demo mode, which has no store, any
+    /// purchase succeeds.
+    func didBuy(_ offer: Offer, transaction: StoreKit.Transaction?) async {
+        if Self.isDemo {
+            demoSubscribed = true
+            freeLimitReached = false
+            return
+        }
+        await transaction?.finish()
+        await refresh()
+    }
+
+    /// Asks the App Store again for what this Apple Account owns.
+    func restore() async {
+        try? await AppStore.sync()
+        await refresh()
+    }
+
+    /// Yearly first, which is also the plan that starts selected.
+    static func offers(_ products: [Product]) -> [Offer] {
+        let monthly = products.first { $0.subscription?.subscriptionPeriod.unit == .month }?.price
+        return products
+            .sorted { ($0.subscription?.subscriptionPeriod.unit == .year ? 0 : 1) < ($1.subscription?.subscriptionPeriod.unit == .year ? 0 : 1) }
+            .map { product in
+                let yearly = product.subscription?.subscriptionPeriod.unit == .year
+                return Offer(
+                    id: product.id,
+                    title: yearly ? "Yearly" : "Monthly",
+                    price: product.displayPrice,
+                    period: yearly ? "year" : "month",
+                    badge: yearly ? monthly.flatMap { savingBadge(yearly: product.price, monthly: $0) } : nil,
+                    product: product
+                )
+            }
+    }
+
+    /// What a year costs less than twelve months, rounded down so it never
+    /// overstates. Nothing under 5%, which isn't worth a badge.
+    static func savingBadge(yearly: Decimal, monthly: Decimal) -> String? {
+        let twelveMonths = monthly * 12
+        guard twelveMonths > 0, yearly < twelveMonths else { return nil }
+        var fraction = (twelveMonths - yearly) * 100 / twelveMonths
+        var floored = Decimal()
+        NSDecimalRound(&floored, &fraction, 0, .down)
+        let saving = NSDecimalNumber(decimal: floored).intValue
+        return saving >= 5 ? "Save \(saving)%" : nil
+    }
+
+    private static var isDemo: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "LivelyDemo")
+        #else
+        false
+        #endif
+    }
+
+    /// `Config/Lively.storekit`'s local test prices, for demo mode.
+    private static let demoOffers = [
+        Offer(id: "hk.cautela.lively.pro.yearly", title: "Yearly", price: "$39.99", period: "year", badge: "Save 33%", product: nil),
+        Offer(id: "hk.cautela.lively.pro.monthly", title: "Monthly", price: "$4.99", period: "month", badge: nil, product: nil),
+    ]
 }

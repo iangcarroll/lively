@@ -46,6 +46,15 @@ struct OnboardingView: View {
             .ignoresSafeArea(edges: statusColumn?.edges ?? [])
             .environment(\.statusColumn, statusColumn)
         }
+        // Swiping back works too, but nothing on the page says so.
+        .overlay(alignment: .topLeading) {
+            if step != steps.first {
+                GlassIconButton(systemImage: "chevron.left", label: "Back", action: goBack)
+                    .padding(.leading, 16)
+                    .padding(.top, 8)
+                    .transition(.opacity)
+            }
+        }
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets = $0 }
         .onGeometryChange(for: StatusColumn?.self) { StatusColumn(size: $0.size, insets: $0.safeAreaInsets) } action: { statusColumn = $0 }
         // The sign-in field sits high enough to clear the keyboard; the
@@ -229,15 +238,7 @@ private struct LanguagesPage: View {
             message: "Lively listens for both and translates each into the other. You can change them any time."
         ) {
             VStack(spacing: 16) {
-                VStack(spacing: -14) {
-                    LanguageCard(caption: "You speak", language: settings.languages.first, ink: Color(.firstLanguageInk)) {
-                        choosing = .first
-                    }
-                    swapButton.zIndex(1)
-                    LanguageCard(caption: "They speak", language: settings.languages.second, ink: Color(.secondLanguageInk)) {
-                        choosing = .second
-                    }
-                }
+                LanguagePairPicker(settings: settings) { choosing = $0 }
                 locationButton
             }
             .padding(.horizontal, 24)
@@ -297,6 +298,26 @@ private struct LanguagesPage: View {
         .animation(.snappy, value: location.status)
     }
 
+}
+
+/// The pair as two cards with a swap button between them. Tapping a card
+/// asks to choose that side's language.
+struct LanguagePairPicker: View {
+    @Bindable var settings: AppSettings
+    var onChoose: (LanguageSide) -> Void
+
+    var body: some View {
+        VStack(spacing: -14) {
+            LanguageCard(caption: "You speak", language: settings.languages.first, ink: Color(.firstLanguageInk)) {
+                onChoose(.first)
+            }
+            swapButton.zIndex(1)
+            LanguageCard(caption: "They speak", language: settings.languages.second, ink: Color(.secondLanguageInk)) {
+                onChoose(.second)
+            }
+        }
+    }
+
     private var swapButton: some View {
         Button {
             settings.languages = LanguagePair(first: settings.languages.second, second: settings.languages.first)
@@ -310,6 +331,63 @@ private struct LanguagesPage: View {
         .glassEffect(.regular.interactive(), in: .circle)
         .sensoryFeedback(.selection, trigger: settings.languages)
         .accessibilityLabel("Swap languages")
+    }
+}
+
+/// The two languages, changed from the conversation itself: opened from a
+/// language tag in face-to-face, or the pair button over the transcript.
+struct LanguagesSheet: View {
+    @Bindable var settings: AppSettings
+    @State private var choosing: LanguageSide?
+    /// Half height for the two cards; full height for the list of languages.
+    @State private var detent = PresentationDetent.medium
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    LanguagePairPicker(settings: settings) {
+                        detent = .large
+                        choosing = $0
+                    }
+                    if settings.languages.contains(.chinese) {
+                        Picker("Chinese script", selection: $settings.chineseScript) {
+                            ForEach(ChineseScript.allCases) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 280)
+                    }
+                    Text("Changing a language starts a new conversation.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .frame(maxWidth: 460)
+                .frame(maxWidth: .infinity)
+                .animation(.snappy, value: settings.languages)
+            }
+            .background(Color(.canvas))
+            .navigationTitle("Languages")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+            .navigationDestination(item: $choosing) { side in
+                LanguageList(settings: settings, side: side, title: side == .first ? "You Speak" : "They Speak")
+            }
+        }
+        .presentationDetents([.medium, .large], selection: $detent)
+        .onChange(of: choosing) { _, side in
+            if side == nil { detent = .medium }
+        }
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 460)
+        #endif
     }
 }
 

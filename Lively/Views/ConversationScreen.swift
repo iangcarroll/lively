@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import Translation
 
@@ -7,8 +8,13 @@ struct ConversationScreen: View {
 
     @State private var showSettings = false
     @State private var showOnboarding = false
-    @State private var showPro = false
-    @State private var showAccount = false
+    @State private var showLanguages = false
+    /// Conversations long enough to have been worth having, for `ReviewPrompt`.
+    @AppStorage("goodConversations") private var goodConversations = 0
+    @AppStorage("reviewAsked") private var reviewAsked = false
+    /// This conversation has been counted; cleared with the conversation.
+    @State private var countedConversation = false
+    @Environment(\.requestReview) private var requestReview
     @AppStorage("onboardingDone") private var onboardingDone = false
     /// The card offering "Set from location", shown once on an open after the welcome tour.
     @State private var showLocationOffer = false
@@ -49,6 +55,7 @@ struct ConversationScreen: View {
                         onEdit: startEditing,
                         onShowTranscript: { withAnimation(.snappy) { phoneShowsTranscript = true } },
                         onShowSettings: { showSettings = true },
+                        onShowLanguages: { showLanguages = true },
                         statusColumn: column
                     )
                     // Below its status icons, the iPhone Duo's column is free.
@@ -170,46 +177,46 @@ struct ConversationScreen: View {
                              store.speechRoutingDidChange()
                          })
         }
+        .sheet(isPresented: $showLanguages, onDismiss: { store.settingsDidClose() }) {
+            LanguagesSheet(settings: settings)
+        }
+        .onChange(of: store.isListening) { was, now in
+            if was && !now { conversationPaused() }
+        }
+        .onChange(of: hitFreeLimit) { was, now in
+            // Subscribing ends the limit without closing the sheet by hand;
+            // its message mustn't come back as an alert.
+            if was && !now {
+                store.alert = nil
+                Pro.shared.freeLimitReached = false
+            }
+        }
+        .onChange(of: store.utterances.isEmpty) { _, empty in
+            if empty { countedConversation = false }
+        }
         #if os(iOS)
         .fullScreenCover(isPresented: $showOnboarding) { onboarding }
         #else
         .sheet(isPresented: $showOnboarding) { onboarding.frame(width: 520, height: 760) }
         #endif
-        .sheet(isPresented: $showPro) {
+        // A used-up free day opens Lively Pro itself, which also offers the
+        // free way on, rather than an alert that only names it.
+        .sheet(isPresented: limitBinding) {
             NavigationStack {
-                ProView().toolbar {
-                    ToolbarItem(placement: .confirmationAction) { Button("Done") { showPro = false } }
+                ProView(limitReached: true).toolbar {
+                    ToolbarItem(placement: .confirmationAction) { Button("Done") { limitBinding.wrappedValue = false } }
                 }
+            }
+            // Signed in from here: back to the conversation, where Start now works.
+            .onChange(of: Account.shared?.isSignedIn) { _, signedIn in
+                if signedIn == true { limitBinding.wrappedValue = false }
             }
             #if os(macOS)
             .frame(minWidth: 460, minHeight: 640)
             #endif
         }
-        .sheet(isPresented: $showAccount) {
-            if let account = Account.shared {
-                NavigationStack {
-                    AccountView(account: account).toolbar {
-                        ToolbarItem(placement: .confirmationAction) { Button("Done") { showAccount = false } }
-                    }
-                }
-                // Signed in: back to the conversation, where Start now works.
-                .onChange(of: account.isSignedIn) { _, signedIn in
-                    if signedIn { showAccount = false }
-                }
-                #if os(macOS)
-                .frame(minWidth: 460, minHeight: 640)
-                #endif
-            }
-        }
         .alert("Lively", isPresented: alertBinding) {
             if !settings.hasCredentials { Button("Open Settings") { showSettings = true } }
-            if Pro.shared.freeLimitReached && !Pro.shared.isPro {
-                // Signing in is free and doubles the day, so it comes first.
-                if let account = Account.shared, !account.isSignedIn {
-                    Button("Sign In for Another Hour") { showAccount = true }
-                }
-                Button("Get Lively Pro") { showPro = true }
-            }
             Button("OK", role: .cancel) {}
         } message: {
             Text(store.alert ?? "")
@@ -246,6 +253,10 @@ struct ConversationScreen: View {
                 return
             }
             #if DEBUG
+            if showsDemoLimit {
+                Pro.shared.freeLimitReached = true
+                store.alert = "Today's free translation time is used up."
+            }
             if isDemo {
                 if isDemoAutoPlay && !didStartDemoAutomatically {
                     didStartDemoAutomatically = true
@@ -339,12 +350,32 @@ struct ConversationScreen: View {
     private var isDemoAutoPlay: Bool {
         UserDefaults.standard.bool(forKey: "LivelyDemoAutoPlay")
     }
+
+    /// Launch with `-LivelyLimit YES` to see a used-up free day without the broker.
+    private var showsDemoLimit: Bool {
+        UserDefaults.standard.bool(forKey: "LivelyLimit")
+    }
     #endif
 
     private func topBar(wide: Bool, column: StatusColumn?) -> some View {
+        // The pair names both languages where there's room, and is a plain
+        // button where there isn't.
+        ViewThatFits(in: .horizontal) {
+            topBarRow(wide: wide, column: column) {
+                LanguagePairButton(languages: settings.languages) { showLanguages = true }
+            }
+            topBarRow(wide: wide, column: column) {
+                GlassIconButton(systemImage: "globe", label: "Change languages") { showLanguages = true }
+            }
+        }
+    }
+
+    private func topBarRow(wide: Bool, column: StatusColumn?, @ViewBuilder languages: () -> some View) -> some View {
         HStack(spacing: 10) {
             StatusPill(status: store.status, isListening: store.isListening, onDevice: store.isUsingOnDevice)
-            Spacer()
+                .fixedSize()
+            Spacer(minLength: 0)
+            languages()
             if column == nil { trailingButtons(wide: wide) }
         }
         .padding(.horizontal, 16)
@@ -441,6 +472,25 @@ struct ConversationScreen: View {
         .padding(.bottom, 12)
     }
 
+    /// Listening stopped. After a couple of conversations long enough to
+    /// have been useful, asks once for an App Store review; iOS decides
+    /// whether to show it. Android asks Google Play the same way.
+    private func conversationPaused() {
+        guard !isDemo, !countedConversation else { return }
+        let turns = store.utterances.count(where: \.isFinal)
+        guard turns >= ReviewPrompt.minTurns else { return }
+        countedConversation = true
+        goodConversations += 1
+        guard ReviewPrompt.shouldAsk(turns: turns, goodConversations: goodConversations, alreadyAsked: reviewAsked) else { return }
+        Task {
+            // Not on top of the last line being read.
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard !store.isListening else { return }
+            reviewAsked = true
+            requestReview()
+        }
+    }
+
     /// Opens the text bar on a turn's transcript to correct it.
     private func startEditing(_ utterance: Utterance) {
         textInputOpenedForEdit = !showsTextInput
@@ -464,8 +514,23 @@ struct ConversationScreen: View {
         }
     }
 
+    /// Today's free time ran out and there's no Pro: the alert's message is
+    /// the limit, which the Lively Pro sheet shows instead.
+    private var hitFreeLimit: Bool {
+        store.alert != nil && Pro.shared.freeLimitReached && !Pro.shared.isPro
+    }
+
     private var alertBinding: Binding<Bool> {
-        Binding(get: { store.alert != nil }, set: {
+        Binding(get: { store.alert != nil && !hitFreeLimit }, set: {
+            if !$0 {
+                store.alert = nil
+                Pro.shared.freeLimitReached = false
+            }
+        })
+    }
+
+    private var limitBinding: Binding<Bool> {
+        Binding(get: { hitFreeLimit }, set: {
             if !$0 {
                 store.alert = nil
                 Pro.shared.freeLimitReached = false

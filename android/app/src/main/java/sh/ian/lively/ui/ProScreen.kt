@@ -6,13 +6,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,7 +51,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,88 +64,167 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 import sh.ian.lively.model.Account
 import sh.ian.lively.model.Pro
 
 /**
  * Lively Pro: subscribe, restore, or see what you have. Pushed from
- * Settings, and shown when a free day's translation time runs out.
+ * Settings and the account screen, and shown with [limitReached] when a
+ * free day's translation time runs out.
  *
  * The allowances here match the key broker's limits in `wrangler.jsonc`.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProScreen(pro: Pro, account: Account?, onBack: () -> Unit) {
+fun ProScreen(
+    pro: Pro,
+    account: Account?,
+    onBack: () -> Unit,
+    /** Opened because today's free time ran out, which the header then says. */
+    limitReached: Boolean = false,
+    /** Opens the account screen, for the free hour signing in adds. */
+    onSignIn: () -> Unit = {},
+) {
     val uri = LocalUriHandler.current
     LaunchedEffect(Unit) { pro.start() }
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Lively Pro") },
-                navigationIcon = { BackButton(onBack) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
-    ) { padding ->
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
-            contentAlignment = Alignment.TopCenter,
-        ) {
+    val hasPro = pro.isSubscribed || account?.hasFreePro == true
+    // Signing in is the free way to keep going, where there's an account service.
+    val offersSignIn = limitReached && account != null && !account.isSignedIn
+    BoxWithConstraints {
+        // The plans and Subscribe stay on screen under a header that scrolls.
+        // A landscape phone is too short for both; there it all scrolls.
+        val pinsStore = !hasPro && maxHeight >= 600.dp
+        val store: @Composable () -> Unit = {
             Column(
-                Modifier
-                    .widthIn(max = 460.dp)
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(28.dp),
+                Modifier.widthIn(max = 460.dp).padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                when {
-                    pro.isSubscribed -> {
-                        ProHeader("You have Lively Pro", "It renews through Google Play until you cancel.")
-                        PillButton("Manage subscription", onClick = { uri.openUri(pro.manageURL) })
-                    }
-                    account?.hasFreePro == true -> ProHeader("You have Lively Pro", "It's included free with your account.")
-                    else -> {
-                        ProHeader()
-                        Store(pro)
+                Store(pro, if (offersSignIn) onSignIn else null)
+                Links()
+            }
+        }
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Lively Pro") },
+                    navigationIcon = { BackButton(onBack) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                )
+            },
+            bottomBar = {
+                if (pinsStore) {
+                    // The same background as the screen, with no edge: the header
+                    // fades out as it scrolls under.
+                    val background = MaterialTheme.colorScheme.background
+                    Column(Modifier.fillMaxWidth()) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(StoreFade)
+                                .background(Brush.verticalGradient(listOf(background.copy(alpha = 0f), background))),
+                        )
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(background)
+                                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)),
+                            contentAlignment = Alignment.TopCenter,
+                        ) { store() }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { uri.openUri(TERMS) }) { Text("Terms of Use") }
-                    TextButton(onClick = { uri.openUri(PRIVACY) }) { Text("Privacy Policy") }
+            },
+        ) { padding ->
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(top = padding.calculateTopPadding())
+                    // Up to the store itself, so the header scrolls under its fade.
+                    .padding(bottom = (padding.calculateBottomPadding() - if (pinsStore) StoreFade else 0.dp).coerceAtLeast(0.dp))
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        Modifier
+                            .widthIn(max = 460.dp)
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 8.dp, bottom = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        when {
+                            pro.isSubscribed -> {
+                                ProHeader("You have Lively Pro", "It renews through Google Play until you cancel.")
+                                PillButton("Manage subscription", onClick = { uri.openUri(pro.manageURL) })
+                            }
+                            account?.hasFreePro == true -> ProHeader("You have Lively Pro", "It's included free with your account.")
+                            // The subtitle says what Pro adds, so the list of
+                            // benefits is left out and the plans stay close.
+                            limitReached -> ProHeader(
+                                "That's today's free time",
+                                if (offersSignIn) {
+                                    "Free translation is back tomorrow. Sign in for another hour today, or get 10 hours a day with Pro."
+                                } else {
+                                    "Free translation is back tomorrow. Lively Pro gives you 10 hours a day."
+                                },
+                                showsBenefits = false,
+                            )
+                            else -> ProHeader()
+                        }
+                    }
+                    if (hasPro) {
+                        Links()
+                    } else if (!pinsStore) {
+                        store()
+                    }
+                    if (!pinsStore) Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
                 }
-                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
         }
     }
 }
 
 @Composable
-private fun Store(pro: Pro) {
+private fun Links() {
+    val uri = LocalUriHandler.current
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        QuietButton("Terms of Use") { uri.openUri(TERMS) }
+        QuietButton("Privacy Policy") { uri.openUri(PRIVACY) }
+    }
+}
+
+/** A small text button for the things under Subscribe, which shouldn't compete with it. */
+@Composable
+private fun QuietButton(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.heightIn(min = 40.dp), contentPadding = PaddingValues(horizontal = 12.dp)) {
+        Text(text, style = MaterialTheme.typography.labelLarge, color = color)
+    }
+}
+
+/** The plans, Subscribe and what's under it. [onSignIn] is set when signing in is offered instead. */
+@Composable
+private fun Store(pro: Pro, onSignIn: (() -> Unit)?) {
     val activity = LocalActivity.current
-    val scope = rememberCoroutineScope()
-    when (val store = pro.store) {
-        Pro.StoreState.Loading -> CircularProgressIndicator()
-        is Pro.StoreState.Unavailable -> Text(
-            store.message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        is Pro.StoreState.Ready -> {
-            // Yearly first, as on the App Store.
-            val offers = store.offers.sortedByDescending { it.period == "year" }
-            var selected by rememberSaveable { mutableStateOf(offers.firstOrNull()?.productID) }
-            Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                for (offer in offers) {
-                    PlanCard(offer, offer.productID == selected) { selected = offer.productID }
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        when (val store = pro.store) {
+            Pro.StoreState.Loading -> CircularProgressIndicator(Modifier.padding(vertical = 24.dp))
+            is Pro.StoreState.Unavailable -> Text(
+                store.message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(vertical = 16.dp),
+            )
+            is Pro.StoreState.Ready -> {
+                // Yearly first, as on the App Store.
+                val offers = store.offers.sortedByDescending { it.period == "year" }
+                var selected by rememberSaveable { mutableStateOf(offers.firstOrNull()?.productID) }
+                Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    for (offer in offers) {
+                        PlanCard(offer, offer.productID == selected) { selected = offer.productID }
+                    }
                 }
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 PillButton("Subscribe", onClick = {
                     val offer = offers.firstOrNull { it.productID == selected } ?: return@PillButton
                     activity?.let { pro.buy(it, offer) }
@@ -149,8 +235,14 @@ private fun Store(pro: Pro) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
-                TextButton(onClick = { scope.launch { pro.refresh() } }) { Text("Restore purchases") }
             }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (onSignIn != null) {
+                QuietButton("Sign in for another free hour", MaterialTheme.colorScheme.primary, onSignIn)
+            }
+            // Play may only have been slow, so this is offered whatever the store said.
+            QuietButton("Restore purchases") { pro.start() }
         }
     }
 }
@@ -168,7 +260,9 @@ private fun PlanCard(offer: Pro.Offer, selected: Boolean, onClick: () -> Unit) {
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .border(if (selected) 2.dp else 1.dp, border, RoundedCornerShape(20.dp))
             .selectable(selected, onClick = onClick, role = Role.RadioButton)
-            .padding(horizontal = 12.dp, vertical = 14.dp),
+            // "plan-year" and "plan-month", for the UI tests.
+            .testTag("plan-${offer.period}")
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -195,7 +289,7 @@ private fun PlanCard(offer: Pro.Offer, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ProHeader(title: String = "Lively Pro", subtitle: String = "Translate for hours, every day.") {
+private fun ProHeader(title: String = "Lively Pro", subtitle: String = "Translate for hours, every day.", showsBenefits: Boolean = true) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(
@@ -211,14 +305,16 @@ private fun ProHeader(title: String = "Lively Pro", subtitle: String = "Translat
             Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (showsBenefits) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Benefit(Icons.Rounded.Timer, Color(0xFFFF9500), "10 hours a day", "Free gives you an hour a day, or two when you're signed in.")
             Benefit(Icons.Rounded.Devices, Color(0xFF007AFF), "On all your devices", "Pro comes with your Google account. No sign-in needed.")
             Benefit(Icons.AutoMirrored.Rounded.Undo, Color(0xFF34C759), "Cancel anytime", "Manage it in Google Play's Payments & subscriptions.")
         }
-        Spacer(Modifier.height(0.dp))
     }
 }
+
+/** How far the header fades before it reaches the pinned plans. */
+private val StoreFade = 20.dp
 
 private const val TERMS = "https://lively.cautela.hk/terms"
 private const val PRIVACY = "https://lively.cautela.hk/privacy"

@@ -40,7 +40,7 @@ struct SettingsView: View {
                         }
                     } footer: {
                         if !Pro.shared.isPro {
-                            Text("Up to 10 hours of translation a day with the Soniox engine.")
+                            Text("Up to 10 hours of translation a day.")
                         }
                     }
                 }

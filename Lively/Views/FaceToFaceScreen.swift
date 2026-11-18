@@ -17,6 +17,8 @@ struct FaceToFaceScreen: View {
     var onEdit: (Utterance) -> Void
     var onShowTranscript: () -> Void
     var onShowSettings: () -> Void
+    /// Opens the language choice, from either half's language tag.
+    var onShowLanguages: () -> Void
     /// The iPhone Duo's status column, which this screen spans: only the far
     /// half, beside its status icons, keeps clear of it.
     var statusColumn: StatusColumn?
@@ -25,11 +27,11 @@ struct FaceToFaceScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            FaceToFaceHalf(store: store, language: languages.other(than: nearLanguage))
+            FaceToFaceHalf(store: store, language: languages.other(than: nearLanguage), onShowLanguages: onShowLanguages)
                 .rotationEffect(.degrees(180))
                 .padding(statusColumn?.edges ?? [], statusColumn?.width ?? 0)
             controlStrip
-            FaceToFaceHalf(store: store, language: nearLanguage, onEdit: onEdit)
+            FaceToFaceHalf(store: store, language: nearLanguage, onShowLanguages: onShowLanguages, onEdit: onEdit)
                 .safeAreaBar(edge: .bottom) {
                     if showsTextInput {
                         // The near person types; the far side reads the translation.
@@ -114,6 +116,7 @@ struct FaceToFaceScreen: View {
 private struct FaceToFaceHalf: View {
     let store: ConversationStore
     let language: Language
+    var onShowLanguages: () -> Void
     /// Set on the near half, whose reader can correct their own turns.
     var onEdit: ((Utterance) -> Void)?
     /// The newest line's size and the size older lines settle to.
@@ -143,8 +146,17 @@ private struct FaceToFaceHalf: View {
         }
         // Older lines scroll away under a fade, clear of the tag.
         .safeAreaBar(edge: .top, alignment: .leading, spacing: 0) {
-            LanguageTag(language: language, showsIcon: false)
-                .padding([.horizontal, .top], 14)
+            // The tag is the way to the languages, so nobody has to find
+            // them in Settings. The padding inside makes it easy to hit.
+            Button(action: onShowLanguages) {
+                LanguageTag(language: language, showsIcon: false, showsChevron: true)
+                    .padding(10)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Change languages")
+            .accessibilityValue(language.nativeName)
+            .padding([.horizontal, .top], 4)
         }
         .environment(\.locale, language.locale)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

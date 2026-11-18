@@ -19,6 +19,8 @@ import com.android.billingclient.api.acknowledgePurchase
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -80,6 +82,8 @@ class Pro(
         .build()
 
     private var connecting = false
+    /** Gives up on a store that never answers; see [start]. */
+    private var loadingTimeout: Job? = null
 
     /**
      * Connects to Play and reads what this Google account owns. Call at
@@ -87,6 +91,18 @@ class Pro(
      * be refunded meanwhile, or be bought on another device.
      */
     fun start() {
+        // Before the early returns: demo mode can be turned on after the
+        // first call, and the plans screen must never be left on its spinner.
+        if (isDemo()) {
+            store = StoreState.Ready(DEMO_OFFERS)
+        } else if (store == StoreState.Loading && loadingTimeout?.isActive != true) {
+            // Play can take forever to answer, or never call back at all.
+            // A later answer still replaces this.
+            loadingTimeout = scope.launch {
+                delay(LOADING_TIMEOUT_MS)
+                if (store == StoreState.Loading) store = StoreState.Unavailable(UNREACHABLE)
+            }
+        }
         if (client.isReady) {
             scope.launch { refresh() }
             return
@@ -109,7 +125,6 @@ class Pro(
                 scope.launch { connecting = false }
             }
         })
-        if (isDemo()) store = StoreState.Ready(DEMO_OFFERS)
     }
 
     suspend fun refresh() {
@@ -200,17 +215,12 @@ class Pro(
         val monthly = raw.firstOrNull { it.third.billingPeriod == "P1M" }?.third?.priceAmountMicros
         return raw.map { (product, token, phase) ->
             val yearly = phase.billingPeriod == "P1Y"
-            val saving = if (yearly && monthly != null && monthly > 0) {
-                100 - (phase.priceAmountMicros * 100 / (monthly * 12)).toInt()
-            } else {
-                0
-            }
             Offer(
                 productID = product.productId,
                 title = if (yearly) "Yearly" else "Monthly",
                 price = phase.formattedPrice,
                 period = if (yearly) "year" else "month",
-                badge = if (saving >= 5) "Save $saving%" else null,
+                badge = if (yearly && monthly != null) savingBadge(phase.priceAmountMicros, monthly) else null,
                 details = product,
                 offerToken = token,
             )
@@ -221,7 +231,7 @@ class Pro(
         BillingClient.BillingResponseCode.BILLING_UNAVAILABLE ->
             "Google Play Billing isn't available. Sign in to the Play Store on this device to subscribe."
         BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE, BillingClient.BillingResponseCode.NETWORK_ERROR ->
-            "Couldn't reach Google Play. Check your connection and try again."
+            UNREACHABLE
         else -> "Lively Pro isn't available from Google Play on this device yet."
     }
 
@@ -229,9 +239,26 @@ class Pro(
         /** The Play subscriptions, monthly first. They must match the broker's `PLAY_PRODUCT_IDS`. */
         val PRODUCT_IDS = listOf("sh.ian.lively.pro.monthly", "sh.ian.lively.pro.yearly")
 
+        /** How long the plans screen waits for Google Play before saying it can't be reached. */
+        private const val LOADING_TIMEOUT_MS = 10_000L
+        private const val UNREACHABLE = "Couldn't reach Google Play. Check your connection and try again."
+
+        /**
+         * What a year saves against twelve months, e.g. "Save 33%". The
+         * percentage is rounded down, so it never overstates the saving, and
+         * a saving under 5% isn't worth a badge. Prices are in micros.
+         */
+        fun savingBadge(yearlyMicros: Long, monthlyMicros: Long): String? {
+            if (monthlyMicros <= 0) return null
+            val twelveMonths = monthlyMicros * 12
+            if (yearlyMicros >= twelveMonths) return null
+            val saving = ((twelveMonths - yearlyMicros) * 100 / twelveMonths).toInt()
+            return if (saving >= 5) "Save $saving%" else null
+        }
+
         /** `Config/Lively.storekit`'s local test prices, for demo mode. */
         private val DEMO_OFFERS = listOf(
-            Offer("sh.ian.lively.pro.yearly", "Yearly", "$39.99", "year", "Save 33%", null, null),
+            Offer("sh.ian.lively.pro.yearly", "Yearly", "$39.99", "year", savingBadge(39_990_000, 4_990_000), null, null),
             Offer("sh.ian.lively.pro.monthly", "Monthly", "$4.99", "month", null, null, null),
         )
     }

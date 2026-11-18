@@ -46,6 +46,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AlternateEmail
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Email
@@ -110,13 +111,14 @@ import kotlinx.coroutines.launch
 import sh.ian.lively.R
 import sh.ian.lively.model.Account
 import sh.ian.lively.support.GoogleSignIn
+import sh.ian.lively.model.Pro
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Sign in with Google or an emailed code, or see who's signed in. Pushed from Settings. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountScreen(account: Account, onBack: () -> Unit) {
+fun AccountScreen(account: Account, pro: Pro, onBack: () -> Unit, onPro: () -> Unit) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -135,15 +137,18 @@ fun AccountScreen(account: Account, onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(top = 24.dp, bottom = 32.dp),
         ) {
-            AccountContent(account)
+            AccountContent(account, pro = pro, onPro = onPro)
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
     }
 }
 
-/** The account screen's body: a header, then either the sign-in steps or who's signed in. */
+/**
+ * The account screen's body: a header, then either the sign-in steps or who's
+ * signed in. With [pro], someone signed in without Pro is offered it.
+ */
 @Composable
-fun AccountContent(account: Account, modifier: Modifier = Modifier) {
+fun AccountContent(account: Account, modifier: Modifier = Modifier, pro: Pro? = null, onPro: () -> Unit = {}) {
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier
@@ -157,7 +162,7 @@ fun AccountContent(account: Account, modifier: Modifier = Modifier) {
             val email = account.email
             AnimatedContent(targetState = email, label = "account", transitionSpec = { fadeIn() togetherWith fadeOut() }) { signedIn ->
                 if (signedIn != null) {
-                    SignedInCard(account, signedIn)
+                    SignedInCard(account, signedIn, pro, onPro)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(32.dp)) {
                         SignInForm(account)
@@ -230,7 +235,7 @@ fun Benefit(icon: ImageVector, color: Color, title: String, detail: String) {
 }
 
 @Composable
-private fun SignedInCard(account: Account, email: String) {
+private fun SignedInCard(account: Account, email: String, pro: Pro?, onPro: () -> Unit) {
     var confirmingSignOut by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
@@ -264,6 +269,25 @@ private fun SignedInCard(account: Account, email: String) {
                         Text("Lively Pro", style = MaterialTheme.typography.bodyLarge)
                         Text("Included free with your account", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+            }
+            // Signed in is two hours a day; Pro is the next step up.
+            if (pro != null && !pro.isPro) {
+                HorizontalDivider(Modifier.padding(start = 66.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onPro, role = Role.Button)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    SettingsIcon(Icons.Rounded.Star, Color(0xFFFF9500))
+                    Column(Modifier.weight(1f)) {
+                        Text("Get 10 hours a day", style = MaterialTheme.typography.bodyLarge)
+                        Text("Lively Pro", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

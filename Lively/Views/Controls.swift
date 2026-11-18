@@ -36,17 +36,16 @@ struct MicButton: View {
                 }
                 Image(systemName: isListening ? "stop.fill" : "mic.fill")
                     .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(isListening ? .white : .primary)
+                    .foregroundStyle(.white)
                     .contentTransition(.symbolEffect(.replace))
             }
             .frame(width: 76, height: 76)
             .contentShape(.circle)
         }
         .buttonStyle(PressReportingStyle(onChange: pressChanged))
-        .glassEffect(
-            isListening ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
-            in: .circle
-        )
+        // The one thing to press on the screen, so it's the accent colour at
+        // rest too; listening shows in the stop symbol and the level ring.
+        .glassEffect(.regular.tint(.accentColor).interactive(), in: .circle)
         .sensoryFeedback(.impact(weight: .medium), trigger: isListening)
         .keyboardShortcut(.space, modifiers: [])
         .accessibilityLabel(isListening ? "Stop listening" : "Start listening")
@@ -492,3 +491,31 @@ enum CameraPicker {
     static let isAvailable = false
 }
 #endif
+
+/// Both languages' tags on one button, which opens the language choice.
+struct LanguagePairButton: View {
+    let languages: LanguagePair
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(languages.first.tag).foregroundStyle(languages.first.ink)
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+                Text(languages.second.tag).foregroundStyle(languages.second.ink)
+            }
+            .font(.subheadline.weight(.bold))
+            .lineLimit(1)
+            .padding(.horizontal, 14)
+            .frame(height: GlassIconButton.size)
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .accessibilityLabel("Change languages")
+        .accessibilityValue("\(languages.first.englishName) and \(languages.second.englishName)")
+        .help("Change languages")
+    }
+}
