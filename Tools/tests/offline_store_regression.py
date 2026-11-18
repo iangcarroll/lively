@@ -28,7 +28,7 @@ def main():
     args = parser.parse_args()
     store = (ROOT / "Lively/Model/ConversationStore.swift").read_text()
     methods = "\n".join(block(store, declaration) for declaration in [
-        r"private var textTranslator:", r"private var usesOnDeviceServices:", r"private var isDemo:",
+        r"private var textTranslator:", r"private var onlineTextTranslator:", r"private var usesOnDeviceServices:", r"private var isDemo:",
         r"var translatesTypedTextOnDevice:",
         r"var canSpeakTranslations:", r"func speechRoutingDidChange\(",
         r"func submitTyped\(", r"private func translate\(", r"private func activeSpeaker\(",
@@ -44,6 +44,9 @@ def main():
     variants = [("offline-store", methods, True)]
     if args.negative_controls:
         mutations = [
+            ("native-recovery-keeps-local-translator", "translator = self.onlineTextTranslator",
+             "if let current = utterance.isTyped ? self.textTranslator : self.translator { translator = current }"),
+            ("recovery-reuses-local-speech-phase", "translator = self.onlineTextTranslator", "translator = self.textTranslator"),
             ("typed-local-selection-removed", "if usesOnDeviceServices { return AppleTranslator() }", ""),
             ("spoken-local-selection-removed", "!resumedOnline && self?.isDemo != true && self?.usesOnDeviceServices == true ? AppleTranslator() : translator", "translator"),
             ("offline-original-network-guard-removed", "guard settings.speechSource == .downloaded || isOnline else {", "guard true else {"),

@@ -47,9 +47,34 @@ def main():
         run_variant(work, "hybrid", source, True)
         if args.negative_controls:
             mutations = [
-                ("delayed-local-handoff", "if active == .cloud {\n                    switchToLocal()", "if active == .cloud {\n                    // delayed local handoff"),
-                ("cloud-ready-while-offline", "guard self.networkAvailable else { return }", "// accepted stale cloud readiness"),
-                ("cloud-start-while-offline", "if networkAvailable { cloud.start() }", "cloud.start()"),
+                ("offline-settings-captured-before-outage", "if let makeLocal { local = makeLocal() }", ""),
+                ("raw-tail-capability-hidden", "var drainsTextOnPause: Bool { active == .cloud ? cloud.drainsTextOnPause : local.drainsTextOnPause }", "var drainsTextOnPause: Bool { false }"),
+                ("raw-tail-capability-wrong-source", "var drainsTextOnPause: Bool { active == .cloud ? cloud.drainsTextOnPause : local.drainsTextOnPause }", "var drainsTextOnPause: Bool { cloud.drainsTextOnPause }"),
+                ("online-starts-fixed-locale", "let source: Source = pathAvailable ? .cloud : .local", "let source: Source = .local"),
+                ("offline-starts-cloud", "let source: Source = pathAvailable ? .cloud : .local", "let source: Source = .cloud"),
+                ("retained-cloud-session-rebuilt", "if cloudOwned, cloudStarted {", "if false {"),
+                ("paused-cloud-final-ignored", "cloud.onEvent = { [weak self] event in\n            guard let self, self.cloudSession == session, self.active == .cloud,\n                  self.phase != .stopped else { return }", "cloud.onEvent = { [weak self] event in\n            guard let self, self.cloudSession == session, self.active == .cloud,\n                  self.phase == .listening else { return }"),
+                ("paused-pcm-uploaded", "guard phase == .listening, !chunk.isEmpty else { return }", "guard phase != .stopped, !chunk.isEmpty else { return }"),
+                ("paused-reconnect-started", "case .paused, .prewarmed:\n", "case .paused, .prewarmed:\n                if newValue { cloud.start() }\n"),
+                ("old-cloud-callback-accepted", "guard let self, self.cloudSession == session, self.active == .cloud,\n                  self.phase != .stopped else { return }\n            self.onEvent(event)", "guard let self, self.active == .cloud,\n                  self.phase != .stopped else { return }\n            self.onEvent(event)"),
+                ("old-local-callback-accepted", "guard let self, self.localSession == session, self.active == .local,\n                  self.phase != .stopped else { return }\n            self.onEvent(event)", "guard let self, self.active == .local,\n                  self.phase != .stopped else { return }\n            self.onEvent(event)"),
+                ("old-cloud-failure-accepted", "guard let self, self.cloudSession == session, self.phase != .stopped else { return }", "guard let self, self.phase != .stopped else { return }"),
+                ("old-local-failure-accepted", "local.onStatus = { [weak self] status in\n            guard let self, self.localSession == session, self.active == .local,", "local.onStatus = { [weak self] status in\n            guard let self, self.active == .local,"),
+                ("failed-cloud-replay-continues", "case .failed:\n                self.tearDown()", "case .failed:\n                self.stopCloud()"),
+                ("path-loss-discards-cloud-audio", "if source != active {\n            if active == .local", "if source != active {\n            if active == .cloud { stopCloud() }\n            if active == .local"),
+                ("unpaused-cloud-resume-clears-backlog", "if cloudPaused {", "if true {"),
+                ("local-assets-failure-ends-online-turn", "if self.phase == .listening, !self.pathAvailable, self.cloudOwned {", "if false {"),
+                ("paused-retry-discards-accepted-audio", "switch status {\n            case .failed:", "switch status {\n            case .reconnecting where self.phase != .listening:\n                self.stopCloud()\n                self.onStatus(.idle)\n            case .failed:"),
+                ("failed-local-gets-pending-input", "seconds: &bufferedSeconds)\n                if localStarted { local.send(chunk) }", "seconds: &bufferedSeconds)\n                local.send(chunk)"),
+                ("retained-cloud-idle-ignored", "if status == .idle { self.cloudStarted = false }", ""),
+                ("suspension-correction-dropped", "self.phase != .stopped else { return }\n            self.onEvent(event)\n        }\n        cloud.onStatus", "self.phase != .stopped, self.pathAvailable else { return }\n            self.onEvent(event)\n        }\n        cloud.onStatus"),
+                ("suspension-hard-stop-restarts-local", "let token = generation\n                    cloud.networkAvailable = false\n                    guard generation == token, phase == .listening, !pathAvailable else { return }", "cloud.networkAvailable = false"),
+                ("offline-replay-reordered", "for chunk in replay {", "for chunk in replay.reversed() {"),
+                ("translator-source-not-published", "onSourceChange?(source, replayed)", ""),
+                ("paused-offline-replay-retained", "buffer.removeAll()\n        bufferedSeconds = 0\n        // Keep this callback epoch:", "// Keep this callback epoch:"),
+                ("online-failure-starts-local", "case .failed:\n                self.tearDown()", "case .failed:\n                self.local.start()\n                self.tearDown()"),
+                ("offline-replay-unbounded", "while seconds > maxBufferSeconds, !chunks.isEmpty {", "while false, !chunks.isEmpty {"),
+                ("used-idle-cloud-not-cleaned", "guard cloudOwned else { return }", "guard cloudStarted else { return }"),
             ]
             for name, old, new in mutations:
                 run_variant(work, name, replace_once(source, old, new), False)

@@ -165,12 +165,12 @@ struct StatusPill: View {
     }
 }
 
-/// Stays beside the transcript controls after the empty-state guidance is gone.
-/// Both readers can see that they can speak without touching the microphone.
+/// A bilingual reminder beside the transcript controls, briefly shown when
+/// listening starts or the phone is handed to another reader.
 struct TranscriptListeningStatus: View {
-    let status: ConversationStore.ConnectionStatus
-    let isListening: Bool
-    let languages: LanguagePair
+    let store: ConversationStore
+    private var status: ConversationStore.ConnectionStatus { store.status }
+    private var isListening: Bool { store.isListening }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -179,10 +179,21 @@ struct TranscriptListeningStatus: View {
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(prompt(in: languages.first))
+                Text(prompt(in: store.isAutomaticLanguageMode ? store.listenerLanguage : AppSettings.shared.languages.first))
                     .foregroundStyle(.primary)
-                Text(prompt(in: languages.second))
-                    .foregroundStyle(languages.second.ink)
+                if store.isAutomaticLanguageMode {
+                    if !store.isOnline {
+                        Text("Automatic detection needs internet").foregroundStyle(.secondary)
+                    } else if let partner = store.detectedPartnerLanguage {
+                        Text(prompt(in: partner)).foregroundStyle(partner.ink)
+                    } else {
+                        Text(isListening ? "Listening for another language" : "Other language · Automatic")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(prompt(in: AppSettings.shared.languages.second))
+                        .foregroundStyle(AppSettings.shared.languages.second.ink)
+                }
             }
             .font(.headline)
             .fixedSize(horizontal: false, vertical: true)
@@ -286,7 +297,7 @@ struct SpeakAloudButton: View {
 /// text in a photo, such as a sign or a menu, and translates it the same way.
 struct TypeToTranslateBar: View {
     let store: ConversationStore
-    let languages: LanguagePair
+    let languages: LanguagePair?
     /// The typist's language, for text that could be either.
     let language: Language
     var script: ChineseScript = AppSettings.shared.chineseScript
@@ -297,7 +308,7 @@ struct TypeToTranslateBar: View {
     var onClose: () -> Void
 
     init(
-        store: ConversationStore, languages: LanguagePair, language: Language,
+        store: ConversationStore, languages: LanguagePair?, language: Language,
         editing: Binding<Utterance?> = .constant(nil), focused: FocusState<Bool>.Binding,
         onClose: @escaping () -> Void
     ) {
@@ -494,17 +505,23 @@ enum CameraPicker {
 
 /// Both languages' tags on one button, which opens the language choice.
 struct LanguagePairButton: View {
-    let languages: LanguagePair
+    let first: Language
+    /// Nil in an automatic conversation until the other person has spoken.
+    let second: Language?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Text(languages.first.tag).foregroundStyle(languages.first.ink)
+                Text(first.tag).foregroundStyle(first.ink)
                 Image(systemName: "arrow.left.arrow.right")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
-                Text(languages.second.tag).foregroundStyle(languages.second.ink)
+                if let second {
+                    Text(second.tag).foregroundStyle(second.ink)
+                } else {
+                    Text("Auto").foregroundStyle(.secondary)
+                }
             }
             .font(.subheadline.weight(.bold))
             .lineLimit(1)
@@ -515,7 +532,7 @@ struct LanguagePairButton: View {
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .capsule)
         .accessibilityLabel("Change languages")
-        .accessibilityValue("\(languages.first.englishName) and \(languages.second.englishName)")
+        .accessibilityValue("\(first.englishName) and \(second?.englishName ?? "automatic")")
         .help("Change languages")
     }
 }

@@ -484,6 +484,10 @@ nonisolated enum AudioSessionUsers {
     private static let sessionQueue = DispatchQueue(label: "lively.audio-session", qos: .userInitiated)
     private static let directionalSpeech = OSAllocatedUnfairLock(initialState: false)
 
+    /// A preview can use the ordinary session while spoken translations are
+    /// disabled, without treating that choice as a hardware routing failure.
+    static var directionalSpeechEnabled: Bool { directionalSpeech.withLock { $0 } }
+
     /// The next activation must establish this configuration successfully;
     /// a failed asynchronous update never counts as a prepared speech route.
     static func setDirectionalSpeechEnabled(_ enabled: Bool) {

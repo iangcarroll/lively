@@ -86,6 +86,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -112,6 +113,8 @@ fun LanguageTag(
     spoken: Boolean = false,
     /** Off for labels that name a language without saying how the text got there. */
     showsIcon: Boolean = true,
+    /** On for a tag inside a button that opens the language choice. */
+    showsChevron: Boolean = false,
     /** Set where the tag opens the languages sheet; it then gets a chevron. */
     onChangeLanguages: (() -> Unit)? = null,
 ) {
@@ -133,7 +136,7 @@ fun LanguageTag(
             LanguageCapsule(language.tag, ink, spoken, showsIcon, chevron = true, Modifier)
         }
     } else {
-        LanguageCapsule(language.tag, ink, spoken, showsIcon, chevron = false, modifier.clearAndSetSemantics { contentDescription = description })
+        LanguageCapsule(language.tag, ink, spoken, showsIcon, chevron = showsChevron, modifier.clearAndSetSemantics { contentDescription = description })
     }
 }
 
@@ -162,27 +165,44 @@ private fun LanguageCapsule(tag: String, ink: Color, spoken: Boolean, showsIcon:
 }
 
 /**
- * The pair in the transcript's top bar, e.g. "EN ⇄ 中文", which opens the
- * languages sheet. Where the bar is too full for that, a round button instead.
+ * Both languages' tags on one button, e.g. "EN ⇄ 中文", in the transcript's
+ * top bar, which opens the languages sheet. Where the bar is too full for
+ * that, a round button instead.
  */
 @Composable
-fun LanguagePairButton(pair: LanguagePair, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun LanguagePairButton(
+    first: Language,
+    /** Null in an automatic conversation until the other person has spoken. */
+    second: Language?,
+    pair: LanguagePair,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Layout(
         content = {
             Surface(
                 onClick = onClick,
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.semantics { contentDescription = "Change languages" },
+                modifier = Modifier.semantics {
+                    contentDescription = "Change languages"
+                    stateDescription = "${first.englishName} and ${second?.englishName ?: "automatic"}"
+                },
             ) {
                 Row(
                     Modifier.heightIn(min = 36.dp).padding(horizontal = 12.dp).clearAndSetSemantics {},
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Text(pair.first.tag, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = pair.first.ink(pair), maxLines = 1)
+                    Text(first.tag, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = first.ink(pair), maxLines = 1)
                     Icon(Icons.Rounded.SwapHoriz, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-                    Text(pair.second.tag, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = pair.second.ink(pair), maxLines = 1)
+                    Text(
+                        second?.tag ?: "Auto",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = second?.ink(pair) ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
                 }
             }
             TonalIconButton(Icons.Rounded.Translate, "Change languages", onClick)
@@ -344,17 +364,18 @@ fun MicButton(
 }
 
 /**
- * Stays beside the transcript controls after the empty-state guidance is gone.
- * Both readers can see that they can speak without touching the microphone.
+ * A bilingual reminder beside the transcript controls. Both readers can see
+ * that they can speak without touching the microphone.
  */
 @Composable
 fun TranscriptListeningStatus(
-    status: ConnectionStatus,
-    isListening: Boolean,
+    store: ConversationStore,
     pair: LanguagePair,
     script: ChineseScript,
     modifier: Modifier = Modifier,
 ) {
+    val status = store.status
+    val isListening = store.isListening
     val offline = isListening && status == ConnectionStatus.Offline
     val tint = when {
         !isListening -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -382,19 +403,38 @@ fun TranscriptListeningStatus(
         Icon(symbol, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
         Spacer(Modifier.width(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            for (language in pair.all) {
+            @Composable
+            fun Line(text: String, color: Color, language: Language? = null) = Text(
+                text,
+                style = MaterialTheme.typography.titleMedium.inLanguage(language),
+                fontWeight = FontWeight.SemiBold,
+                color = color,
+            )
+            @Composable
+            fun Prompt(language: Language, color: Color) {
                 val phrases = language.phrases(script)
-                Text(
+                Line(
                     when {
                         !isListening -> phrases.tapToStart
                         status == ConnectionStatus.Live -> phrases.listening
                         offline -> phrases.waitingForConnection
                         else -> phrases.connecting
                     },
-                    style = MaterialTheme.typography.titleMedium.copy(localeList = language.localeList()),
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (language == pair.second) language.ink(pair) else MaterialTheme.colorScheme.onSurface,
+                    color,
+                    language,
                 )
+            }
+            val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+            Prompt(if (store.isAutomaticLanguageMode) store.listenerLanguage else pair.first, MaterialTheme.colorScheme.onSurface)
+            if (store.isAutomaticLanguageMode) {
+                val partner = store.detectedPartnerLanguage
+                when {
+                    !store.isOnline -> Line("Automatic detection needs internet", secondary)
+                    partner != null -> Prompt(partner, partner.ink(pair))
+                    else -> Line(if (isListening) "Listening for another language" else "Other language · Automatic", secondary)
+                }
+            } else {
+                Prompt(pair.second, pair.second.ink(pair))
             }
         }
     }

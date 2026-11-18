@@ -13,6 +13,12 @@ object LanguageDetector {
     /** Picks one of the pair for same-script text, or null. Set by the app. */
     var fallback: (String, LanguagePair) -> Language? = { _, _ -> null }
 
+    /**
+     * Picks a clearly dominant language for text in a script several of the
+     * candidates share, or null. Set by the app.
+     */
+    var amongFallback: (String, List<Language>) -> Language? = { _, _ -> null }
+
     private enum class Script { HAN, KANA, HANGUL, LATIN, CYRILLIC, GREEK, ARABIC, HEBREW, DEVANAGARI, BENGALI, GURMUKHI, GUJARATI, TAMIL, TELUGU, KANNADA, MALAYALAM, THAI }
 
     private fun script(language: Language): Script = when (language.code) {
@@ -87,4 +93,37 @@ object LanguageDetector {
             else -> languages.first
         }
     }
+
+    /**
+     * Typed text and OCR have no audio metadata. Accept a clear supported
+     * language rather than constraining the guess to an unrelated pair.
+     *
+     * iOS asks `NLLanguageRecognizer` for a hypothesis of at least 0.75. Here
+     * a script only one candidate is written in decides at once when it makes
+     * up that share of the letters, and shared scripts go to [amongFallback],
+     * which the app points at Android's on-device `TextClassifier`.
+     */
+    fun detect(text: String, among: List<Language>): Language? {
+        val counts = mutableMapOf<Script, Int>()
+        var i = 0
+        while (i < text.length) {
+            val cp = text.codePointAt(i)
+            i += Character.charCount(cp)
+            val s = scriptOf(cp) ?: continue
+            counts[s] = (counts[s] ?: 0) + 1
+        }
+        val total = counts.values.sum()
+        if (total == 0) return null
+        // Japanese is written with kanji as well as kana.
+        if ((counts[Script.KANA] ?: 0) > 0) {
+            counts[Script.KANA] = (counts[Script.KANA] ?: 0) + (counts.remove(Script.HAN) ?: 0)
+        }
+        val (dominant, count) = counts.maxBy { it.value }
+        if (count < total * CLEAR_SHARE) return null
+        val writers = among.filter { script(it) == dominant }
+        return writers.singleOrNull() ?: if (writers.isEmpty()) null else amongFallback(text, writers)
+    }
+
+    /** The share of the evidence a language needs to be accepted, as on iOS. */
+    const val CLEAR_SHARE = 0.75
 }

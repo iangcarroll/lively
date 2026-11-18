@@ -65,11 +65,13 @@ final class LocationLanguages {
     }
 
     /// Looks up the country and sets the pair if it's a new one (or `force`).
-    /// Pass `canChange: false` while a conversation is under way; the lookup
-    /// then waits for a later call. Returns true when the pair changed.
+    /// `canChange` is false while a conversation is under way; the lookup
+    /// then waits for a later call. It's asked again once the country is
+    /// known, since finding it takes long enough to start talking.
+    /// Returns true when the pair changed.
     @discardableResult
-    func update(force: Bool = false, canChange: Bool = true) async -> Bool {
-        guard settings.usesLocationLanguages, canChange, !isUpdating else { return false }
+    func update(force: Bool = false, canChange: () -> Bool = { true }) async -> Bool {
+        guard settings.usesLocationLanguages, canChange(), !isUpdating else { return false }
         guard locator.isAuthorized else {
             // Access was taken away in the system settings.
             settings.usesLocationLanguages = false
@@ -83,7 +85,7 @@ final class LocationLanguages {
             if force { status = .failed }
             return false
         }
-        guard settings.usesLocationLanguages, force || region != settings.locationLanguageRegion else { return false }
+        guard settings.usesLocationLanguages, canChange(), force || region != settings.locationLanguageRegion else { return false }
         settings.locationLanguageRegion = region
         let system = Self.systemLanguage
         guard let suggestion = Self.suggestion(

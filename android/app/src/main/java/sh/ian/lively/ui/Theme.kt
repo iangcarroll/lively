@@ -1,18 +1,42 @@
 package sh.ian.lively.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Language as LanguageGlobe
+import androidx.compose.material.icons.rounded.Translate
+import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguagePair
+import sh.ian.lively.model.TranslationState
+import sh.ian.lively.model.Utterance
 
 /**
  * Lively's colors, the same as the iOS asset catalog's. English (the pair's
@@ -101,21 +125,127 @@ private val DarkScheme = darkColorScheme(
 
 private val LocalLivelyColors = staticCompositionLocalOf { Light }
 
+/**
+ * The listener's language in an Automatic conversation, and null with a pair.
+ * The Swift app reads this from its shared settings; here the theme carries it.
+ */
+private val LocalAutomaticListener = compositionLocalOf<Language?> { null }
+
 object Lively {
     val colors: LivelyColors
         @Composable @ReadOnlyComposable get() = LocalLivelyColors.current
 }
 
 @Composable
-fun LivelyTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun LivelyTheme(
+    dark: Boolean = isSystemInDarkTheme(),
+    /** Set while the conversation detects the other language; see [ink]. */
+    automaticListener: Language? = null,
+    content: @Composable () -> Unit,
+) {
     val scheme: ColorScheme = if (dark) DarkScheme else LightScheme
-    CompositionLocalProvider(LocalLivelyColors provides if (dark) Dark else Light) {
+    CompositionLocalProvider(
+        LocalLivelyColors provides if (dark) Dark else Light,
+        LocalAutomaticListener provides automaticListener,
+    ) {
         MaterialTheme(colorScheme = scheme, content = content)
     }
 }
 
-/** Every piece of text in this language uses this color, whoever said it. */
+/**
+ * Every piece of text in this language uses this color, whoever said it,
+ * so each reader can find their side at a glance. Automatic conversations
+ * keep the listener's ink fixed while partner languages can change.
+ */
 @Composable
 @ReadOnlyComposable
-fun Language.ink(pair: LanguagePair): Color =
-    if (this == pair.second) Lively.colors.secondInk else Lively.colors.firstInk
+fun Language.ink(pair: LanguagePair): Color {
+    val listener = LocalAutomaticListener.current
+    val second = if (listener != null) this != listener else this == pair.second
+    return if (second) Lively.colors.secondInk else Lively.colors.firstInk
+}
+
+/**
+ * Screen orientation follows readers, while every historical turn keeps its
+ * own language. A newly detected partner must not relabel older text.
+ */
+enum class TranscriptRole {
+    LISTENER, PARTNER;
+
+    fun language(utterance: Utterance): Language? {
+        if (utterance.sourceLanguage == null && utterance.target == null) return null
+        return if (this == LISTENER) utterance.listenerLanguage else utterance.otherLanguage
+    }
+
+    fun text(utterance: Utterance): String {
+        if (utterance.sourceLanguage == null && utterance.target == null) return utterance.trimmedSource
+        return if (this == LISTENER) utterance.listenerText else utterance.partnerText
+    }
+
+    fun isSource(utterance: Utterance): Boolean {
+        val source = utterance.sourceLanguage ?: return false
+        return if (this == LISTENER) source == utterance.listenerLanguage else source != utterance.listenerLanguage
+    }
+}
+
+val Utterance.unidentifiedLanguageTitle: String
+    get() = if (isFinal) "Language not identified" else "Identifying language"
+
+val Utterance.showsLanguagePrompt: Boolean
+    get() {
+        if (isSourceOnly) return false
+        return isAwaitingLanguage || translationState == TranslationState.AwaitingPartner ||
+            (isFinal && target != null && translation.isEmpty() && translationState == TranslationState.Idle)
+    }
+
+val Utterance.hasTranslationProblem: Boolean
+    get() = translationState is TranslationState.Failed || translationState == TranslationState.WaitingForNetwork
+
+/** A [LanguageTag], or a neutral capsule while the language isn't known. */
+@Composable
+fun OptionalLanguageTag(
+    language: Language?,
+    pair: LanguagePair,
+    modifier: Modifier = Modifier,
+    spoken: Boolean = false,
+    showsIcon: Boolean = true,
+    /** On for a tag that's a button opening the language choice. */
+    showsChevron: Boolean = false,
+    unknownTitle: String = "Automatic",
+) {
+    if (language != null) {
+        LanguageTag(language, pair, modifier, spoken = spoken, showsIcon = showsIcon, showsChevron = showsChevron)
+        return
+    }
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier
+            .clip(CircleShape)
+            .background(color.copy(alpha = 0.08f))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Icon(Icons.Rounded.LanguageGlobe, contentDescription = null, tint = color, modifier = Modifier.size(12.dp))
+        Text(unknownTitle, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, lineHeight = 13.sp)
+        if (showsChevron) Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
+    }
+}
+
+/** Waiting for a destination is separate from translating or a network error. */
+@Composable
+fun PendingLanguageLabel(utterance: Utterance, onTranslate: (() -> Unit)? = null) {
+    val state = utterance.translationState
+    when {
+        utterance.isSourceOnly -> {}
+        state is TranslationState.Failed ->
+            if (onTranslate != null) RetryButton("Retry translation", onTranslate)
+            else Caption(Icons.Rounded.ErrorOutline, "Translation failed", color = Lively.colors.warning)
+        state == TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, "Waiting for connection")
+        utterance.sourceLanguage == null -> Caption(Icons.Rounded.LanguageGlobe, utterance.unidentifiedLanguageTitle)
+        utterance.waitsForAutomaticPartner -> Caption(Icons.Rounded.LanguageGlobe, "Waiting for other language")
+        utterance.target == null -> Caption(Icons.Rounded.GraphicEq, if (utterance.isFinal) "Finishing transcript" else "Listening")
+        onTranslate != null -> CaptionButton(Icons.Rounded.Translate, "Translate", MaterialTheme.colorScheme.primary, onTranslate)
+        else -> Text("Ready to translate", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}

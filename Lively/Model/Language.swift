@@ -74,6 +74,17 @@ struct Language: Hashable, Identifiable, RawRepresentable, Sendable {
         return languages.all.first { $0.recognizerLanguages.contains(dominant) }
     }
 
+    /// Typed text and OCR have no audio metadata. Accept a clear supported
+    /// language rather than constraining the recognizer to an unrelated pair.
+    static func detect(_ text: String, among languages: [Language]) -> Language? {
+        let recognizer = NLLanguageRecognizer()
+        recognizer.languageConstraints = languages.flatMap(\.recognizerLanguages)
+        recognizer.processString(text)
+        guard let dominant = recognizer.dominantLanguage,
+              (recognizer.languageHypotheses(withMaximum: 1)[dominant] ?? 0) >= 0.75 else { return nil }
+        return languages.first { $0.recognizerLanguages.contains(dominant) }
+    }
+
     var usesLatinScript: Bool { Self.latinScript.contains(rawValue) }
 
     private static let latinScript: Set<String> = [

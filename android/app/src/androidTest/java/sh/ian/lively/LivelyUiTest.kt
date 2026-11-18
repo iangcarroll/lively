@@ -7,7 +7,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -25,6 +27,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import sh.ian.lively.model.ConversationMode
+import sh.ian.lively.model.Language
 import sh.ian.lively.support.DebugFlags
 
 /**
@@ -44,6 +48,24 @@ class LivelyUiTest {
         DebugFlags.demoAutoPlay = false
         DebugFlags.forceOnboarding = false
         DebugFlags.limit = false
+        // Settings outlive each test's activity. Tests start from a chosen
+        // pair, as before automatic conversations, and say when they want otherwise.
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            settings.conversationMode = ConversationMode.AUTOMATIC
+            settings.speechListenerLanguage = Language.ENGLISH
+            settings.conversationMode = ConversationMode.PAIR
+        }
+    }
+
+    private val settings get() = (context as LivelyApp).graph.settings
+
+    private fun setConversationMode(mode: ConversationMode) =
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { settings.conversationMode = mode }
+
+    /** As on an install that has been through the welcome tour and answered the location card. */
+    private fun finishWelcomeTour() {
+        context.getSharedPreferences("lively", Context.MODE_PRIVATE).edit()
+            .putBoolean("onboardingDone", true).putBoolean("locationOfferDone", true).commit()
     }
 
     @After fun close() {
@@ -95,8 +117,24 @@ class LivelyUiTest {
         compose.onNodeWithContentDescription("Clear conversation").performClick()
         waitForText("Tap the mic to start")
         compose.onNodeWithContentDescription("Face-to-face mode").performClick()
-        // Swap sides is in the More menu, which only face-to-face has.
+        // Back in face-to-face, which has no button for itself.
+        compose.waitUntilDoesNotExist(hasContentDescription("Face-to-face mode"), 5_000)
+    }
+
+    @Test fun addressOpensFromBothLayouts() {
+        launch("LivelyDemo")
+        compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 10_000)
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Address").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("address-query"), 5_000)
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 5_000)
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Transcript view").performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Face-to-face mode"), 5_000)
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Address").performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag("address-query"), 5_000)
     }
 
     @Test fun settingsPickALanguage() {
@@ -201,5 +239,76 @@ class LivelyUiTest {
         waitForText("You speak")
         compose.onNodeWithText("They speak", substring = true).assertExists()
         compose.onNodeWithText("Changing a language starts a new conversation.").assertExists()
+    }
+
+    @Test fun onboardingOffersAutomaticLanguages() {
+        setConversationMode(ConversationMode.AUTOMATIC)
+        launch()
+        waitForText("Get started")
+        compose.onNodeWithText("Get started").performClick()
+        waitForText("Lay it flat between you")
+        compose.onNodeWithText("Continue").performClick()
+        waitForText("Choose your language")
+        compose.onNodeWithText("Detected when they speak", substring = true).assertExists()
+        // Swapping and location are for a pair.
+        compose.onNodeWithContentDescription("Swap languages").assertDoesNotExist()
+        compose.onNodeWithText("Use my location").assertDoesNotExist()
+    }
+
+    @Test fun settingsConversationPickerSwitchesTheLanguageRows() {
+        finishWelcomeTour()
+        launch()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 10_000)
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Settings").performClick()
+        waitForText("First language")
+        compose.onNodeWithText("Second language").assertExists()
+        compose.onNodeWithText("Set from location").assertExists()
+        compose.onNodeWithText("Conversation").performClick()
+        compose.onNodeWithText("Automatic").performClick()
+        waitForText("Your language")
+        compose.onNodeWithText("Other language").assertExists()
+        compose.onNodeWithText("First language").assertDoesNotExist()
+        compose.onNodeWithText("Second language").assertDoesNotExist()
+        // Location chooses a pair.
+        compose.onNodeWithText("Set from location").assertDoesNotExist()
+        // The reader's own language is any language, not one of a pair.
+        compose.onNodeWithText("Your language").performClick()
+        waitForText("Search languages")
+        compose.onNodeWithText("Search languages").performTextInput("japan")
+        waitForText("日本語")
+        compose.onNodeWithText("日本語").performClick()
+        waitForText("Other language")
+        compose.onNodeWithText("日本語").assertExists()
+        compose.onNodeWithText("Conversation").performClick()
+        compose.onNodeWithText("Choose a pair").performClick()
+        waitForText("First language")
+        compose.onNodeWithText("Second language").assertExists()
+        compose.onNodeWithText("Your language").assertDoesNotExist()
+        compose.onNodeWithText("Set from location").assertExists()
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        val prefs = context.getSharedPreferences("lively", Context.MODE_PRIVATE)
+        assert(prefs.getString("conversationMode", null) == "pair") { "the mode should be saved" }
+        assert(prefs.getString("speechListenerLanguage", null) == "ja") { "the reader's language should be saved" }
+    }
+
+    @Test fun languagesSheetInAutomaticMode() {
+        setConversationMode(ConversationMode.AUTOMATIC)
+        finishWelcomeTour()
+        launch()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Change languages"), 10_000)
+        // One tag per half; the second is the near reader's.
+        compose.onAllNodesWithContentDescription("Change languages")[1].performClick()
+        waitForText("Detected when they speak")
+        compose.onNodeWithText("Your language", substring = true).assertExists()
+        compose.onNodeWithText("You speak", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Changing a language starts a new conversation.").assertExists()
+        compose.onNode(hasText("Automatic") and isSelectable()).assertIsSelected()
+        compose.onNodeWithText("Choose a pair").performClick()
+        waitForText("You speak")
+        compose.onNodeWithText("They speak", substring = true).assertExists()
+        compose.onNodeWithText("Detected when they speak", substring = true).assertDoesNotExist()
+        compose.onNode(hasText("Automatic") and isSelectable()).performClick()
+        waitForText("Detected when they speak")
     }
 }

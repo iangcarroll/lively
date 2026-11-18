@@ -44,11 +44,14 @@ class RealtimeTranscriber(
      * trailing words in their turn without swallowing the next speaker's first.
      */
     override val textLagMs: Long get() = max(60, config.streamingDelayMs - 250).toLong()
+    override val drainsTextOnPause: Boolean get() = true
 
     private val socket = ResilientSocket(this, scope, client)
 
     override fun start() = socket.start()
     override fun stop() = socket.stop()
+    override fun pause() = socket.pause()
+    override fun resume() = socket.resume()
     override fun send(chunk: ByteArray) = socket.send(chunk)
 
     // region SocketDialect

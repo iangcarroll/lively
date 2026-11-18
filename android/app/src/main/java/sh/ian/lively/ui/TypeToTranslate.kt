@@ -58,6 +58,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import sh.ian.lively.model.ConversationStore
 import sh.ian.lively.model.Language
+import sh.ian.lively.model.LanguagePair
 import sh.ian.lively.model.Utterance
 
 /**
@@ -69,6 +70,8 @@ import sh.ian.lively.model.Utterance
 @Composable
 fun TypeToTranslateBar(
     store: ConversationStore,
+    /** The conversation's pair, or null in an automatic conversation. */
+    languages: LanguagePair?,
     /** The typist's language, for text that could be either. */
     language: Language,
     onClose: () -> Unit,
@@ -123,7 +126,7 @@ fun TypeToTranslateBar(
                     modifier = Modifier.padding(start = 16.dp).size(20.dp),
                 )
             } else {
-                PhotoButton(store, language)
+                PhotoButton(store, languages, language)
             }
             TextField(
                 value = field,
@@ -173,7 +176,7 @@ fun TypeToTranslateBar(
  * Chromebooks, it goes straight to the photo picker.
  */
 @Composable
-private fun PhotoButton(store: ConversationStore, language: Language) {
+private fun PhotoButton(store: ConversationStore, languages: LanguagePair?, language: Language) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var readsPhoto by remember { mutableStateOf(false) }
@@ -183,7 +186,7 @@ private fun PhotoButton(store: ConversationStore, language: Language) {
         scope.launch {
             readsPhoto = true
             try {
-                val text = TextRecognizer.text(context, photo, store.languages)
+                val text = TextRecognizer.text(context, photo, languages)
                 if (text.isEmpty()) {
                     store.alert = "Lively couldn't find any text in that photo."
                 } else {

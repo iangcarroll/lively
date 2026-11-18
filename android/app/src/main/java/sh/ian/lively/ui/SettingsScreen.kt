@@ -33,9 +33,11 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Hearing
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Language as LanguageGlobe
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Person
@@ -78,6 +80,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -92,6 +95,7 @@ import sh.ian.lively.audio.PickupRange
 import sh.ian.lively.model.Account
 import sh.ian.lively.model.AppSettings
 import sh.ian.lively.model.ChineseScript
+import sh.ian.lively.model.ConversationMode
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguageSide
 import sh.ian.lively.model.Latency
@@ -122,6 +126,8 @@ fun SettingsScreen(
     onAccount: () -> Unit,
     onPro: () -> Unit,
     onLanguage: (LanguageSide) -> Unit,
+    /** Opens the list for the reader's own language, in an automatic conversation. */
+    onOwnLanguage: () -> Unit,
     onWelcome: () -> Unit,
     onClear: () -> Unit,
 ) {
@@ -137,6 +143,8 @@ fun SettingsScreen(
     }
     DisposableEffect(Unit) { onDispose { save() } }
     var choosingEngine by remember { mutableStateOf(false) }
+    var choosingConversation by remember { mutableStateOf(false) }
+    val automatic = settings.usesAutomaticLanguageDetection
     var choosingPickupRange by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -184,14 +192,38 @@ fun SettingsScreen(
                     }
                 }
 
-                Group(
-                    header = "Languages",
-                    footer = "Lively listens for both languages and translates each into the other.",
-                ) {
-                    LanguageItem("First language", settings.languages.first, settings, onClick = { onLanguage(LanguageSide.FIRST) })
-                    Divider()
-                    LanguageItem("Second language", settings.languages.second, settings, onClick = { onLanguage(LanguageSide.SECOND) })
-                    if (Language.CHINESE in settings.languages) {
+                Group(header = "Languages", footer = languagesFooter(settings)) {
+                    // Automatic detection is the online engine's; other engines only take a pair.
+                    if (settings.providerID == SpeechProviders.SONIOX_ID) {
+                        Item(
+                            icon = { SettingsIcon(Icons.Rounded.Forum, Indigo) },
+                            title = "Conversation",
+                            value = settings.conversationMode.label,
+                            onClick = { choosingConversation = true },
+                        )
+                        Divider()
+                    }
+                    if (automatic) {
+                        LanguageItem("Your language", settings.speechListenerLanguage, settings, onClick = onOwnLanguage)
+                        Divider()
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                                .semantics(mergeDescendants = true) {},
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            SettingsIcon(Icons.Rounded.LanguageGlobe, Gray)
+                            Text("Other language", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Text("Automatic", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                    } else {
+                        LanguageItem("First language", settings.languages.first, settings, onClick = { onLanguage(LanguageSide.FIRST) })
+                        Divider()
+                        LanguageItem("Second language", settings.languages.second, settings, onClick = { onLanguage(LanguageSide.SECOND) })
+                    }
+                    if (automatic || Language.CHINESE in settings.languages) {
                         Divider()
                         Row(
                             Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -205,23 +237,26 @@ fun SettingsScreen(
                     }
                 }
 
-                val setUsesLocation = rememberLocationSwitch(location)
-                Group(footer = listOfNotNull(LocationLanguages.SUMMARY, location.status.message).joinToString(" ")) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .toggleable(
-                                value = settings.usesLocationLanguages,
-                                role = Role.Switch,
-                                onValueChange = setUsesLocation,
-                            )
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        SettingsIcon(Icons.Rounded.LocationOn, Blue)
-                        Text("Set from location", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                        Switch(checked = settings.usesLocationLanguages, onCheckedChange = null)
+                // Location chooses a pair, which automatic detection doesn't use.
+                if (!automatic) {
+                    val setUsesLocation = rememberLocationSwitch(location)
+                    Group(footer = listOfNotNull(LocationLanguages.SUMMARY, location.status.message).joinToString(" ")) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .toggleable(
+                                    value = settings.usesLocationLanguages,
+                                    role = Role.Switch,
+                                    onValueChange = setUsesLocation,
+                                )
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            SettingsIcon(Icons.Rounded.LocationOn, Blue)
+                            Text("Set from location", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Switch(checked = settings.usesLocationLanguages, onCheckedChange = null)
+                        }
                     }
                 }
 
@@ -347,6 +382,16 @@ fun SettingsScreen(
         )
     }
 
+    if (choosingConversation) {
+        ChoiceDialog(
+            title = "Conversation",
+            options = ConversationMode.entries.map { it to it.label },
+            selected = settings.conversationMode,
+            onSelect = { settings.conversationMode = it; choosingConversation = false },
+            onDismiss = { choosingConversation = false },
+        )
+    }
+
     if (choosingEngine) {
         ChoiceDialog(
             title = "Engine",
@@ -358,9 +403,18 @@ fun SettingsScreen(
     }
 }
 
+private fun languagesFooter(settings: AppSettings) = when {
+    settings.usesAutomaticLanguageDetection ->
+        "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection needs internet."
+    settings.providerID == SpeechProviders.SONIOX_ID -> "Lively listens for this pair and translates both ways."
+    else -> "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine."
+}
+
 private fun speechFooter(settings: AppSettings, canSpeak: Boolean): String {
     if (!canSpeak) return "Speaking translations aloud needs a Soniox API key."
-    return "Translations into ${settings.languages.second.englishName} are read aloud through the speaker as they arrive. " +
+    // Android speaks only the outgoing direction: away from the listener's language in Automatic.
+    val spoken = if (settings.usesAutomaticLanguageDetection) "Translations into the detected other language" else "Translations into ${settings.languages.second.englishName}"
+    return "$spoken are read aloud through the speaker as they arrive. " +
         "Lively doesn't listen while it speaks, so it won't translate itself, unless you're using headphones. " +
         "You can also turn it on and off from the ⋮ menu in face-to-face."
 }

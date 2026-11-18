@@ -46,9 +46,27 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    languageLink("First language", side: .first)
-                    languageLink("Second language", side: .second)
-                    if settings.languages.contains(.chinese) {
+                    if settings.providerID == SpeechProvider.soniox.id {
+                        Picker("Conversation", selection: $settings.conversationMode) {
+                            ForEach(ConversationMode.allCases) { Text($0.label).tag($0) }
+                        }
+                    }
+                    if settings.usesAutomaticLanguageDetection {
+                        NavigationLink {
+                            OwnLanguageList(settings: settings)
+                        } label: {
+                            LabeledContent {
+                                Text(settings.speechListenerLanguage.nativeName)
+                            } label: {
+                                Label { Text("Your language") } icon: { LanguageIcon(language: settings.speechListenerLanguage) }
+                            }
+                        }
+                        LabeledContent("Other language", value: "Automatic")
+                    } else {
+                        languageLink("First language", side: .first)
+                        languageLink("Second language", side: .second)
+                    }
+                    if settings.usesAutomaticLanguageDetection || settings.languages.contains(.chinese) {
                         Picker(selection: $settings.chineseScript) {
                             ForEach(ChineseScript.allCases) { Text($0.label).tag($0) }
                         } label: {
@@ -58,15 +76,22 @@ struct SettingsView: View {
                 } header: {
                     Text("Languages")
                 } footer: {
-                    Text("Lively listens for both languages and translates each into the other.")
+                    Text(settings.usesAutomaticLanguageDetection
+                         ? "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection needs internet."
+                         : settings.providerID == SpeechProvider.soniox.id
+                             ? "Lively listens for this pair and translates both ways."
+                             : "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine.")
                 }
 
-                Section {
-                    Toggle(isOn: usesLocation) {
-                        Label { Text("Set from location") } icon: { SettingsIcon(systemImage: "location.fill", color: .blue) }
+                // Location chooses a pair, which automatic detection doesn't use.
+                if !settings.usesAutomaticLanguageDetection {
+                    Section {
+                        Toggle(isOn: usesLocation) {
+                            Label { Text("Set from location") } icon: { SettingsIcon(systemImage: "location.fill", color: .blue) }
+                        }
+                    } footer: {
+                        Text([LocationLanguages.summary, LocationLanguages.shared.status.message].compactMap(\.self).joined(separator: " "))
                     }
-                } footer: {
-                    Text([LocationLanguages.summary, LocationLanguages.shared.status.message].compactMap(\.self).joined(separator: " "))
                 }
 
                 Section {
@@ -77,7 +102,7 @@ struct SettingsView: View {
                         Label { Text("Offline Languages") } icon: { SettingsIcon(systemImage: "arrow.down.circle.fill", color: .indigo) }
                     }
                 } footer: {
-                    Text("Prepare speech and translation downloads for conversations without an internet connection.")
+                    Text("Prepare a language pair for conversations without internet. These downloads are used with Choose a pair and the On-device engine.")
                 }
 
                 Section {
@@ -135,7 +160,7 @@ struct SettingsView: View {
                     }
                     // One small request to the key service, and only with a pack installed.
                     .task { await NeuralVoicePacks.shared.checkForUpdate() }
-                    if SpeechPlayer.supportsDirectionalOutput {
+                    if SpeechPlayer.supportsDirectionalOutput && !settings.usesAutomaticLanguageDetection {
                         Picker("Your language", selection: $settings.speechListenerLanguage) {
                             ForEach(settings.languages.all) { language in
                                 Text(language.englishName).tag(language)
@@ -280,6 +305,12 @@ struct SettingsView: View {
         let voice = settings.speechSource == .original
             ? "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. "
             : "Downloaded voices speak on this device after installation. Previews pause listening. "
+        if settings.usesAutomaticLanguageDetection {
+            if SpeechPlayer.supportsDirectionalOutput {
+                return voice + "Translations into \(settings.speechListenerLanguage.englishName) play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback."
+            }
+            return voice + "Translations play through your current audio output. Listening pauses during speaker playback."
+        }
         if SpeechPlayer.supportsDirectionalOutput {
             let incoming = settings.speechListenerLanguage.englishName
             let outgoing = settings.languages.other(than: settings.speechListenerLanguage).englishName
@@ -358,6 +389,58 @@ struct SettingsView: View {
         }
         if settings.translationModel.trimmingCharacters(in: .whitespaces).isEmpty {
             settings.translationModel = AppSettings.defaultTranslationModel
+        }
+    }
+}
+
+/// The reader's saved language is independent of any conversation partner.
+struct OwnLanguageList: View {
+    @Bindable var settings: AppSettings
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+
+    var body: some View {
+        List(languages) { language in
+            Button {
+                settings.speechListenerLanguage = language
+                dismiss()
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(language.nativeName).environment(\.locale, language.locale)
+                        if language.nativeName != language.englishName {
+                            Text(language.englishName).font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    if language == settings.speechListenerLanguage {
+                        Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                    }
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(language == settings.speechListenerLanguage ? .isSelected : [])
+        }
+        #if os(iOS)
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search languages")
+        #else
+        .searchable(text: $query, prompt: "Search languages")
+        #endif
+        .navigationTitle("Your Language")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .overlay { if languages.isEmpty { ContentUnavailableView.search(text: query) } }
+    }
+
+    private var languages: [Language] {
+        let all = Language.soniox.sorted { $0.englishName < $1.englishName }
+        let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !search.isEmpty else { return all }
+        return all.filter {
+            $0.englishName.localizedStandardContains(search) || $0.nativeName.localizedStandardContains(search)
+                || $0.rawValue == search.lowercased()
         }
     }
 }
@@ -445,7 +528,11 @@ struct LanguageList: View {
                 ForEach(languages) { button($0) }
             }
         }
+        #if os(iOS)
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search languages")
+        #else
         .searchable(text: $query, prompt: "Search languages")
+        #endif
         .navigationTitle(title ?? (side == .first ? "First Language" : "Second Language"))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

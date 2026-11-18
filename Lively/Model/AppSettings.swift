@@ -7,11 +7,29 @@ final class AppSettings {
 
     private let defaults = UserDefaults.standard
 
+    /// Online discovery keeps the headphone wearer's language fixed and learns
+    /// the other language from speech. The saved pair is for manual/offline use.
+    var conversationMode: ConversationMode {
+        didSet {
+            defaults.set(conversationMode.rawValue, forKey: "conversationMode")
+            publishWidgetLanguages()
+        }
+    }
+
+    var usesAutomaticLanguageDetection: Bool {
+        #if DEBUG
+        // The demo is a scripted conversation in the saved pair.
+        if defaults.bool(forKey: "LivelyDemo") { return false }
+        #endif
+        return conversationMode == .automatic && providerID == SpeechProvider.soniox.id
+    }
+
     /// `SpeechProvider.id` of the chosen engine.
     var providerID: String {
         didSet {
             defaults.set(providerID, forKey: "speechProvider")
             if !provider.supports(languages) { languages = .default }
+            publishWidgetLanguages()
         }
     }
 
@@ -29,9 +47,7 @@ final class AppSettings {
         didSet {
             defaults.set(languages.first.rawValue, forKey: "firstLanguage")
             defaults.set(languages.second.rawValue, forKey: "secondLanguage")
-            #if os(iOS)
-            WidgetLanguages.publish(languages)
-            #endif
+            publishWidgetLanguages()
         }
     }
 
@@ -80,17 +96,24 @@ final class AppSettings {
     }
 
     private var speechListenerLanguageCode: String {
-        didSet { defaults.set(speechListenerLanguageCode, forKey: "speechListenerLanguage") }
+        didSet {
+            defaults.set(speechListenerLanguageCode, forKey: "speechListenerLanguage")
+            publishWidgetLanguages()
+        }
     }
 
     /// The headset wearer's language, independent of the face-to-face layout.
     var speechListenerLanguage: Language {
         get {
             let language = Language(speechListenerLanguageCode)
+            if usesAutomaticLanguageDetection {
+                return Language.soniox.contains(language) ? language : .english
+            }
             return languages.contains(language) ? language : languages.first
         }
         set {
-            guard languages.contains(newValue) else { return }
+            guard usesAutomaticLanguageDetection
+                ? Language.soniox.contains(newValue) : languages.contains(newValue) else { return }
             speechListenerLanguageCode = newValue.rawValue
         }
     }
@@ -131,6 +154,11 @@ final class AppSettings {
     }
 
     private init() {
+        let mode = ConversationMode.initial(
+            saved: defaults.string(forKey: "conversationMode"), onboardingDone: defaults.bool(forKey: "onboardingDone"))
+        // Saved at once, so finishing the welcome tour doesn't change it.
+        defaults.set(mode.rawValue, forKey: "conversationMode")
+        conversationMode = mode
         let providerID = defaults.string(forKey: "speechProvider") ?? SpeechProvider.fallback.id
         self.providerID = providerID
         let stored = LanguagePair(
@@ -153,10 +181,36 @@ final class AppSettings {
         for credential in SpeechProvider.allCredentials {
             credentials[credential.id] = Keychain.read(account: credential.id) ?? ""
         }
-        #if os(iOS)
         // didSet doesn't run here; the widgets may not have this pair yet.
-        WidgetLanguages.publish(languages)
+        publishWidgetLanguages()
+    }
+
+    private func publishWidgetLanguages() {
+        #if os(iOS)
+        if usesAutomaticLanguageDetection {
+            WidgetLanguages.publishAutomatic(listener: speechListenerLanguage)
+        } else {
+            WidgetLanguages.publish(languages)
+        }
         #endif
+    }
+}
+
+enum ConversationMode: String, CaseIterable, Identifiable, Sendable {
+    case automatic, pair
+    var id: String { rawValue }
+
+    /// The mode at launch. Automatic is for new installs; someone who set
+    /// Lively up before it existed keeps their pair, which also works offline.
+    static func initial(saved: String?, onboardingDone: Bool) -> ConversationMode {
+        saved.flatMap(ConversationMode.init) ?? (onboardingDone ? .pair : .automatic)
+    }
+
+    var label: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .pair: "Choose a pair"
+        }
     }
 }
 

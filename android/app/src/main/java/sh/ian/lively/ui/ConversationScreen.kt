@@ -28,11 +28,24 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.KeyboardHide
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import sh.ian.lively.model.ConnectionStatus
 import androidx.compose.material.icons.rounded.Splitscreen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -69,6 +82,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import sh.ian.lively.model.AppSettings
+import sh.ian.lively.model.ConversationMode
+import sh.ian.lively.model.SpeechProviders
 import sh.ian.lively.model.ConversationStore
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.Pro
@@ -87,15 +102,34 @@ fun ConversationScreen(
     onShowsTranscriptChange: (Boolean) -> Unit,
     nearLanguage: Language,
     onNearLanguageChange: (Language) -> Unit,
+    /** In an automatic conversation, whether the listener has the near side. */
+    listenerNear: Boolean,
+    onListenerNearChange: (Boolean) -> Unit,
     onShowSettings: () -> Unit,
+    /** Opens the address lookup, which is separate from the conversation. */
+    onShowAddress: () -> Unit,
     /** Opens Lively Pro saying today's free time has run out. */
     onShowLimit: () -> Unit,
 ) {
     val pair = settings.languages
     // The near side's language, kept within the current pair.
-    val near = if (nearLanguage in pair) nearLanguage else pair.first
+    val near = when {
+        store.isAutomaticLanguageMode -> store.listenerLanguage
+        nearLanguage in pair -> nearLanguage
+        else -> pair.first
+    }
+    val automaticOffline = store.isAutomaticLanguageMode && !store.isOnline
+    // The banner below takes the top inset when it's shown.
+    val insets = if (automaticOffline) WindowInsets.safeDrawing.exclude(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)) else WindowInsets.safeDrawing
     var showsTextInput by rememberSaveable { mutableStateOf(false) }
     var showsLanguages by rememberSaveable { mutableStateOf(false) }
+    // The listening guidance fades once a live conversation is under way and
+    // returns when the phone is handed over. Settings, Pro and the address
+    // lookup are other destinations, which pause it by leaving this one.
+    val listeningPrompt = rememberListeningPromptVisibility(
+        isLive = store.isListening && store.status == ConnectionStatus.Live,
+        isCovered = showsLanguages,
+    )
     /** The turn being corrected in the text bar. */
     var editing by remember { mutableStateOf<Utterance?>(null) }
     /** The bar opened for an edit, so it closes when the edit ends. */
@@ -130,46 +164,67 @@ fun ConversationScreen(
         editing = null
         if (textInputOpenedForEdit) setShowsTextInput(false)
     }
-    BoxWithConstraints(
+    Column(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        val wide = maxWidth >= WideBreakpoint
-        AnimatedContent(
-            targetState = !wide && !showsTranscript,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = "layout",
-        ) { faceToFace ->
-            if (faceToFace) {
-                FaceToFaceScreen(
-                    store = store,
-                    pair = pair,
-                    script = settings.chineseScript,
-                    nearLanguage = near,
-                    onSwap = { onNearLanguageChange(pair.other(near)) },
-                    showsTextInput = showsTextInput,
-                    onShowsTextInputChange = setShowsTextInput,
-                    editing = editing,
-                    onEdit = startEditing,
-                    onEndEditing = endEditing,
-                    onShowTranscript = { onShowsTranscriptChange(true) },
-                    onShowSettings = onShowSettings,
-                    onChangeLanguages = { showsLanguages = true },
-                    contentPadding = WindowInsets.safeDrawing.asPaddingValues(),
-                )
-            } else {
-                TranscriptLayout(
-                    store, settings, wide,
-                    showsTextInput = showsTextInput,
-                    onShowsTextInputChange = setShowsTextInput,
-                    editing = editing,
-                    onEdit = startEditing,
-                    onEndEditing = endEditing,
-                    onFaceToFace = { onShowsTranscriptChange(false) },
-                    onShowSettings = onShowSettings,
-                    onChangeLanguages = { showsLanguages = true },
-                )
+        if (automaticOffline) {
+            Text(
+                // iOS goes on to offer on-device translation with a pair, which Android doesn't have.
+                "Automatic detection needs internet.",
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val wide = maxWidth >= WideBreakpoint
+            AnimatedContent(
+                targetState = !wide && !showsTranscript,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "layout",
+            ) { faceToFace ->
+                if (faceToFace) {
+                    FaceToFaceScreen(
+                        store = store,
+                        pair = pair,
+                        script = settings.chineseScript,
+                        nearLanguage = near,
+                        listenerNear = listenerNear,
+                        onSwap = {
+                            if (store.isAutomaticLanguageMode) onListenerNearChange(!listenerNear) else onNearLanguageChange(pair.other(near))
+                        },
+                        showsTextInput = showsTextInput,
+                        onShowsTextInputChange = setShowsTextInput,
+                        editing = editing,
+                        onEdit = startEditing,
+                        onEndEditing = endEditing,
+                        onShowTranscript = { onShowsTranscriptChange(true) },
+                        onShowSettings = onShowSettings,
+                        onShowAddress = onShowAddress,
+                        onChangeLanguages = { showsLanguages = true },
+                        contentPadding = insets.asPaddingValues(),
+                        showsListeningPrompt = listeningPrompt.showsListeningPrompt,
+                    )
+                } else {
+                    TranscriptLayout(
+                        store, settings, wide, insets,
+                        showsTextInput = showsTextInput,
+                        onShowsTextInputChange = setShowsTextInput,
+                        editing = editing,
+                        onEdit = startEditing,
+                        onEndEditing = endEditing,
+                        onFaceToFace = { onShowsTranscriptChange(false) },
+                        onShowSettings = onShowSettings,
+                        onShowAddress = onShowAddress,
+                        onChangeLanguages = { showsLanguages = true },
+                        showsListeningPrompt = listeningPrompt.showsListeningPrompt,
+                    )
+                }
             }
         }
     }
@@ -229,6 +284,8 @@ private fun TranscriptLayout(
     store: ConversationStore,
     settings: AppSettings,
     wide: Boolean,
+    /** The safe area, less whatever a banner above has taken. */
+    safeArea: WindowInsets,
     showsTextInput: Boolean,
     onShowsTextInputChange: (Boolean) -> Unit,
     editing: Utterance?,
@@ -236,18 +293,20 @@ private fun TranscriptLayout(
     onEndEditing: () -> Unit,
     onFaceToFace: () -> Unit,
     onShowSettings: () -> Unit,
+    onShowAddress: () -> Unit,
     onChangeLanguages: () -> Unit,
+    showsListeningPrompt: Boolean = true,
 ) {
-    val insets = WindowInsets.safeDrawing.asPaddingValues()
+    val insets = safeArea.asPaddingValues()
+    val automatic = store.isAutomaticLanguageMode
     Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
         val barSpace = PaddingValues(top = insets.calculateTopPadding() + 64.dp, bottom = insets.calculateBottomPadding() + (if (showsTextInput) 176.dp else 104.dp)
             // The Start/Stop caption, and the listening prompt once there are turns.
-            + 22.dp + if (store.visibleUtterances.isEmpty()) 0.dp else 84.dp)
-        val utterances = store.visibleUtterances
+            + 22.dp + if (store.visibleUtterances.isEmpty() || !showsListeningPrompt) 0.dp else 84.dp)
         when {
-            utterances.isEmpty() -> EmptyConversation(store.isListening, store.isConnecting, settings.languages, settings.chineseScript, Modifier.padding(barSpace))
-            wide -> ParallelTranscript(utterances, settings.languages, store::retryTranslation, onEdit, store::delete, contentPadding = barSpace)
-            else -> ChatTranscript(utterances, settings.languages, store::retryTranslation, onEdit, store::delete, contentPadding = barSpace)
+            store.visibleUtterances.isEmpty() -> EmptyConversation(store, settings.languages, settings.chineseScript, Modifier.padding(barSpace), showsListeningPrompt)
+            wide -> ParallelTranscript(store, settings.languages, onEdit, contentPadding = barSpace)
+            else -> ChatTranscript(store, settings.languages, onEdit, contentPadding = barSpace)
         }
 
         // Top bar: status and the languages, then layout and settings.
@@ -261,12 +320,34 @@ private fun TranscriptLayout(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StatusPill(store.status, store.isListening)
-            LanguagePairButton(settings.languages, onChangeLanguages, Modifier.weight(1f))
+            LanguagePairButton(
+                first = if (automatic) store.listenerLanguage else settings.languages.first,
+                second = if (automatic) store.detectedPartnerLanguage else settings.languages.second,
+                pair = settings.languages,
+                onClick = onChangeLanguages,
+                modifier = Modifier.weight(1f),
+            )
             // Turned on from the menu in face-to-face or Settings; shown while
             // on, so it can be stopped from here.
             if (store.speaksTranslations) SpeakAloudButton(store)
             if (!wide) TonalIconButton(Icons.Rounded.Splitscreen, "Face-to-face mode", onFaceToFace)
-            TonalIconButton(Icons.Rounded.Settings, "Settings", onShowSettings)
+            Box {
+                var menu by remember { mutableStateOf(false) }
+                TonalIconButton(Icons.Rounded.MoreVert, "More", onClick = { menu = true })
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
+                    DropdownMenuItem(
+                        text = { Text("Address") },
+                        leadingIcon = { Icon(Icons.Rounded.Place, null) },
+                        onClick = { menu = false; onShowAddress() },
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Settings") },
+                        leadingIcon = { Icon(Icons.Rounded.Settings, null) },
+                        onClick = { menu = false; onShowSettings() },
+                    )
+                }
+            }
         }
 
         // Bottom controls: clear, the mic in the middle, and text input.
@@ -280,16 +361,17 @@ private fun TranscriptLayout(
         ) {
             AnimatedVisibility(showsTextInput, enter = fadeIn(), exit = fadeOut()) {
                 TypeToTranslateBar(
-                    store, settings.languages.first,
+                    store, if (automatic) null else settings.languages,
+                    if (automatic) store.listenerLanguage else settings.languages.first,
                     onClose = { onShowsTextInputChange(false) },
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                     editing = editing,
                     onEndEditing = onEndEditing,
                 )
             }
-            if (store.visibleUtterances.isNotEmpty()) {
+            if (store.visibleUtterances.isNotEmpty() && showsListeningPrompt) {
                 TranscriptListeningStatus(
-                    store.status, store.isListening, settings.languages, settings.chineseScript,
+                    store, settings.languages, settings.chineseScript,
                     Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 )
             }
@@ -321,7 +403,7 @@ private fun TranscriptLayout(
 
 
 /**
- * Changes the two languages without a trip to Settings: the welcome tour's
+ * Changes the languages without a trip to Settings: the welcome tour's
  * cards, in a sheet over the conversation.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -342,12 +424,36 @@ fun LanguagesSheet(settings: AppSettings, onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Text("Languages", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            LanguagePairPicker(settings, Modifier.widthIn(max = 420.dp))
+            // Automatic detection is the online engine's; other engines only take a pair.
+            if (settings.providerID == SpeechProviders.SONIOX_ID) {
+                ConversationModePicker(settings, Modifier.widthIn(max = 420.dp))
+            }
+            if (settings.usesAutomaticLanguageDetection) {
+                AutomaticLanguagePicker(settings, Modifier.widthIn(max = 420.dp))
+                ScriptPicker(settings, Modifier.widthIn(max = 320.dp))
+            } else {
+                LanguagePairPicker(settings, Modifier.widthIn(max = 420.dp))
+            }
             Text(
                 "Changing a language starts a new conversation.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/** Automatic or a chosen pair, as a segmented control. */
+@Composable
+fun ConversationModePicker(settings: AppSettings, modifier: Modifier = Modifier) {
+    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth().semantics { contentDescription = "Conversation" }) {
+        ConversationMode.entries.forEachIndexed { index, mode ->
+            SegmentedButton(
+                selected = settings.conversationMode == mode,
+                onClick = { settings.conversationMode = mode },
+                shape = SegmentedButtonDefaults.itemShape(index, ConversationMode.entries.size),
+                label = { Text(mode.label, maxLines = 1) },
             )
         }
     }

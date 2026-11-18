@@ -54,6 +54,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.UnfoldMore
@@ -318,12 +319,22 @@ private fun TablePage(active: Boolean) = OnboardingPage(
 @Composable
 private fun LanguagesPage(settings: AppSettings, location: LocationLanguages) {
     val setUsesLocation = rememberLocationSwitch(location)
+    val automatic = settings.usesAutomaticLanguageDetection
     OnboardingPage(
-        title = "Pick your languages",
-        message = "Lively listens for both and translates each into the other. You can change them any time.",
+        title = if (automatic) "Choose your language" else "Pick your languages",
+        message = if (automatic) {
+            "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection uses internet."
+        } else {
+            "Lively listens for both and translates each into the other. You can change them any time."
+        },
     ) {
+        if (automatic) {
+            AutomaticLanguagePicker(settings, Modifier.padding(horizontal = 24.dp).widthIn(max = 420.dp))
+            return@OnboardingPage
+        }
         LanguagePairPicker(settings, Modifier.padding(horizontal = 24.dp).widthIn(max = 420.dp)) {
             // Optional: asks for location access and sets the pair for this country.
+            // Location chooses a pair, which automatic detection doesn't use.
             val on = settings.usesLocationLanguages
             val tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             Surface(
@@ -353,6 +364,43 @@ private fun LanguagesPage(settings: AppSettings, location: LocationLanguages) {
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * Automatic conversations: the reader's own language as a card, and a
+ * plain card saying the other language is found from speech. Tapping the
+ * first opens the list of languages. Shared by the welcome tour and the
+ * conversation's languages sheet.
+ */
+@Composable
+fun AutomaticLanguagePicker(settings: AppSettings, modifier: Modifier = Modifier) {
+    var choosingOwn by remember { mutableStateOf(false) }
+    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        LanguageCard("Your language", settings.speechListenerLanguage, Lively.colors.firstInk) { choosingOwn = true }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 112.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(Lively.colors.card)
+                .semantics(mergeDescendants = true) {}
+                .padding(horizontal = 22.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Other language", style = MaterialTheme.typography.titleSmall, color = secondary)
+                Text("Automatic", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = secondary)
+                Text("Detected when they speak", style = MaterialTheme.typography.bodyMedium, color = secondary)
+            }
+            Icon(Icons.Rounded.Language, null, tint = secondary)
+        }
+    }
+    if (choosingOwn) {
+        Dialog(onDismissRequest = { choosingOwn = false }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+            OwnLanguageListScreen(settings, onDone = { choosingOwn = false }, closeIcon = true)
         }
     }
 }

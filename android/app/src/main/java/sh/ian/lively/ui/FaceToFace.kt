@@ -18,13 +18,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.WifiOff
@@ -47,6 +48,13 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -60,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.view.HapticFeedbackConstants
 import sh.ian.lively.model.ChineseScript
+import sh.ian.lively.model.ConnectionStatus
 import sh.ian.lively.model.ConversationStore
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguagePair
@@ -80,6 +89,8 @@ fun FaceToFaceScreen(
     script: ChineseScript,
     /** Language of the person on the near (bottom) side. */
     nearLanguage: Language,
+    /** In an automatic conversation, whether the listener has the near side. */
+    listenerNear: Boolean,
     onSwap: () -> Unit,
     showsTextInput: Boolean,
     onShowsTextInputChange: (Boolean) -> Unit,
@@ -89,12 +100,26 @@ fun FaceToFaceScreen(
     onEndEditing: () -> Unit,
     onShowTranscript: () -> Unit,
     onShowSettings: () -> Unit,
+    onShowAddress: () -> Unit,
     /** Opens the languages sheet, from either half's language tag. */
     onChangeLanguages: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
+    showsListeningPrompt: Boolean = true,
 ) {
-    val far = pair.other(nearLanguage)
+    val automatic = store.isAutomaticLanguageMode
+    val nearRole = if (automatic) (if (listenerNear) TranscriptRole.LISTENER else TranscriptRole.PARTNER) else null
+    val farRole = if (automatic) (if (listenerNear) TranscriptRole.PARTNER else TranscriptRole.LISTENER) else null
+    val nearDisplayLanguage = when {
+        !automatic -> nearLanguage
+        listenerNear -> store.listenerLanguage
+        else -> store.detectedPartnerLanguage
+    }
+    val farDisplayLanguage = when {
+        !automatic -> pair.other(nearLanguage)
+        listenerNear -> store.detectedPartnerLanguage
+        else -> store.listenerLanguage
+    }
     // Side insets (a display cutout in landscape) pad the content, but not
     // the hairlines, which run edge to edge.
     val direction = LocalLayoutDirection.current
@@ -104,7 +129,7 @@ fun FaceToFaceScreen(
     )
     Column(modifier.fillMaxSize()) {
         FaceToFaceHalf(
-            store, far, pair, script,
+            store, farDisplayLanguage, farRole, pair, script,
             Modifier
                 .weight(1f)
                 .then(sides)
@@ -112,15 +137,23 @@ fun FaceToFaceScreen(
             // Rotated, its bottom edge is the top of the screen.
             edgePadding = contentPadding.calculateTopPadding(),
             onChangeLanguages = onChangeLanguages,
+            showsListeningPrompt = showsListeningPrompt,
         )
-        ControlStrip(store, onSwap, showsTextInput, onShowsTextInputChange, onShowTranscript, onShowSettings, sides)
+        ControlStrip(store, onSwap, showsTextInput, onShowsTextInputChange, onShowTranscript, onShowSettings, onShowAddress, sides)
         val bottom = contentPadding.calculateBottomPadding()
-        FaceToFaceHalf(store, nearLanguage, pair, script, Modifier.weight(1f).then(sides), edgePadding = if (showsTextInput) 0.dp else bottom, onChangeLanguages = onChangeLanguages, onEdit = onEdit)
+        FaceToFaceHalf(
+            store, nearDisplayLanguage, nearRole, pair, script,
+            Modifier.weight(1f).then(sides),
+            edgePadding = if (showsTextInput) 0.dp else bottom,
+            onChangeLanguages = onChangeLanguages,
+            onEdit = onEdit,
+            showsListeningPrompt = showsListeningPrompt,
+        )
         // The near person types; the far side reads the translation. The
         // bottom padding includes the keyboard, so the halves make room for it.
         AnimatedVisibility(showsTextInput, enter = fadeIn(), exit = fadeOut()) {
             TypeToTranslateBar(
-                store, nearLanguage,
+                store, if (automatic) null else pair, nearDisplayLanguage ?: store.listenerLanguage,
                 onClose = { onShowsTextInputChange(false) },
                 modifier = sides.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottom + 8.dp),
                 editing = editing,
@@ -138,6 +171,7 @@ private fun ControlStrip(
     onShowsTextInputChange: (Boolean) -> Unit,
     onShowTranscript: () -> Unit,
     onShowSettings: () -> Unit,
+    onShowAddress: () -> Unit,
     /** Side insets for the controls; the hairlines ignore them. */
     sides: Modifier,
 ) {
@@ -177,6 +211,12 @@ private fun ControlStrip(
                         TonalIconButton(Icons.Rounded.MoreVert, "More", size = buttonSize, onClick = { menu = true })
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
                             DropdownMenuItem(
+                                text = { Text("Address") },
+                                leadingIcon = { Icon(Icons.Rounded.Place, null) },
+                                onClick = { menu = false; onShowAddress() },
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
                                 text = { Text("Transcript view") },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ViewList, null) },
                                 onClick = { menu = false; onShowTranscript() },
@@ -213,7 +253,10 @@ private fun ControlStrip(
 @Composable
 private fun FaceToFaceHalf(
     store: ConversationStore,
-    language: Language,
+    /** Null while an automatic conversation hasn't heard the other language. */
+    language: Language?,
+    /** Whose half this is in an automatic conversation, and null with a pair. */
+    role: TranscriptRole?,
     pair: LanguagePair,
     script: ChineseScript,
     modifier: Modifier,
@@ -221,11 +264,15 @@ private fun FaceToFaceHalf(
     onChangeLanguages: () -> Unit,
     /** Set on the near half, whose reader can correct their own turns. */
     onEdit: ((Utterance) -> Unit)? = null,
+    showsListeningPrompt: Boolean = true,
 ) {
-    val phrases = language.phrases(script)
+    val phrases = language?.phrases(script)
     val recent = store.visibleUtterances.takeLast(12)
+    // Each turn with its age, newest first. Source-only turns have no listener line.
+    val lines = recent.asReversed().withIndex().filterNot { (_, utterance) -> utterance.isSourceOnly && role == TranscriptRole.LISTENER }
+    val ink = language?.ink(pair) ?: MaterialTheme.colorScheme.onSurfaceVariant
     val state = rememberLazyListState()
-    LaunchedEffect(recent.lastOrNull()?.id, recent.size) { if (recent.isNotEmpty()) state.animateScrollToItem(0) }
+    LaunchedEffect(lines.firstOrNull()?.value?.id, lines.size) { if (lines.isNotEmpty()) state.animateScrollToItem(0) }
     InLanguage(language) {
         BoxWithConstraints(modifier.fillMaxWidth()) {
             // A half of a small phone holds a few lines; keep the newest one whole.
@@ -234,23 +281,31 @@ private fun FaceToFaceHalf(
                 state = state,
                 reverseLayout = true,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 44.dp, bottom = 20.dp + edgePadding),
+                // An automatic half's header also says whose side it is, so it's taller.
+                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = if (role == null) 44.dp else 76.dp, bottom = 20.dp + edgePadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Bottom),
             ) {
-                itemsIndexed(recent.asReversed(), key = { _, it -> it.id }) { age, utterance ->
-                    Line(utterance, language, pair, phrases.waitingForConnection, phrases.translationFailed, age = age, compact = compact, onRetry = { store.retryTranslation(utterance) }, onEdit = onEdit, modifier = Modifier.animateItem())
+                items(lines, key = { it.value.id }) { (age, utterance) ->
+                    Line(utterance, language, role, pair, script, age = age, compact = compact, onRetry = { store.retryTranslation(utterance) }, onEdit = onEdit, modifier = Modifier.animateItem())
                 }
             }
             if (recent.isEmpty()) {
+                val automaticOffline = store.isAutomaticLanguageMode && !store.isOnline
+                val shown by animateFloatAsState(if (showsListeningPrompt) 1f else 0f, label = "prompt")
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .padding(32.dp),
+                        .padding(32.dp)
+                        .alpha(shown)
+                        .then(if (showsListeningPrompt) Modifier else Modifier.clearAndSetSemantics {}),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
                     AnimatedContent(
                         targetState = when {
+                            automaticOffline -> "Automatic detection needs internet"
+                            phrases == null -> if (store.isListening) "Listening for another language" else "Automatic"
+                            store.isListening && store.status == ConnectionStatus.Offline -> phrases.waitingForConnection
                             store.isConnecting -> phrases.connecting
                             store.isListening -> phrases.listening
                             else -> phrases.tapToStart
@@ -260,15 +315,16 @@ private fun FaceToFaceHalf(
                     ) { prompt ->
                         Text(
                             prompt,
-                            style = MaterialTheme.typography.headlineSmall.copy(localeList = language.localeList()),
+                            style = MaterialTheme.typography.headlineSmall.inLanguage(language),
                             fontWeight = FontWeight.SemiBold,
-                            color = language.ink(pair),
+                            color = ink,
                             textAlign = TextAlign.Center,
                         )
                     }
                     Text(
-                        phrases.speakHint,
-                        style = MaterialTheme.typography.bodyMedium.copy(localeList = language.localeList()),
+                        // Offline, iOS points at its on-device translation here; Android has none to offer.
+                        phrases?.speakHint ?: "The other language will appear when they speak.",
+                        style = MaterialTheme.typography.bodyMedium.inLanguage(language),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(top = 8.dp),
@@ -279,35 +335,80 @@ private fun FaceToFaceHalf(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
-                    .background(Brush.verticalGradient(0.55f to MaterialTheme.colorScheme.background, 1f to Color.Transparent)),
+                    .height(if (role == null) 48.dp else 84.dp)
+                    .background(Brush.verticalGradient((if (role == null) 0.55f else 0.8f) to MaterialTheme.colorScheme.background, 1f to Color.Transparent)),
             )
-            // The tag pads itself, so the whole corner is the button.
-            LanguageTag(language, pair, showsIcon = false, onChangeLanguages = onChangeLanguages, modifier = Modifier.align(Alignment.TopStart))
+            if (role == null && language != null) {
+                // The tag pads itself, so the whole corner is the button.
+                LanguageTag(language, pair, showsIcon = false, onChangeLanguages = onChangeLanguages, modifier = Modifier.align(Alignment.TopStart))
+            } else {
+                RoleHeader(language, role, pair, onChangeLanguages, Modifier.align(Alignment.TopStart))
+            }
         }
+    }
+}
+
+/**
+ * An automatic half's way to the languages: whose side it is, over the
+ * language's tag. The padding inside makes it easy to hit.
+ */
+@Composable
+private fun RoleHeader(language: Language?, role: TranscriptRole?, pair: LanguagePair, onChangeLanguages: () -> Unit, modifier: Modifier) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onChangeLanguages, role = Role.Button)
+            .clearAndSetSemantics {
+                contentDescription = "Change languages"
+                stateDescription = language?.nativeName ?: "Automatic"
+            }
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (role != null) {
+            Text(
+                if (role == TranscriptRole.LISTENER) "Your language" else "Other language",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        OptionalLanguageTag(language, pair, showsIcon = false, showsChevron = true)
     }
 }
 
 @Composable
 private fun Line(
     utterance: Utterance,
-    language: Language,
+    /** The half's language; a turn in an automatic conversation keeps its own. */
+    language: Language?,
+    role: TranscriptRole?,
     pair: LanguagePair,
-    waitingText: String,
-    failedText: String,
+    script: ChineseScript,
     age: Int,
     compact: Boolean,
     onRetry: () -> Unit,
     onEdit: ((Utterance) -> Unit)?,
     modifier: Modifier,
 ) {
-    val text = utterance.text(language)
+    val rowLanguage = if (role != null) role.language(utterance) else language
+    val neutral = utterance.isAutomatic && utterance.sourceLanguage == null && utterance.target == null
+    val text = role?.text(utterance) ?: language?.let(utterance::text).orEmpty()
     // Your own words are quiet; what the other person said is prominent.
-    val ownWords = utterance.language == language
+    val ownWords = role?.isSource(utterance) ?: (utterance.sourceLanguage == language)
+    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val ink = if (neutral) secondary else rowLanguage?.ink(pair) ?: secondary
     // Lines shrink and fade over a few turns rather than all at once, so a
     // line still being read stays legible when a stray turn lands below it.
     val prominence by animateFloatAsState((1f - age / 3f).coerceAtLeast(0f), label = "age")
     val alpha = 0.55f + 0.45f * prominence
+    val type = MaterialTheme.typography
+    // The newest line's size and the size older lines settle to.
+    val style = if (compact) {
+        lerp(type.titleMedium, type.titleLarge, prominence)
+    } else {
+        lerp(type.titleLarge, type.headlineMedium, prominence)
+    }.inLanguage(rowLanguage)
+    val weight = if (age < 2 && !ownWords) FontWeight.SemiBold else FontWeight.Normal
     // Long-press to correct a finished turn's transcript, where editing is offered.
     val editable = onEdit != null && ownWords && utterance.isFinal
     var menu by remember { mutableStateOf(false) }
@@ -333,33 +434,43 @@ private fun Line(
                 ),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            if (role != null && (neutral || rowLanguage != language)) {
+                OptionalLanguageTag(
+                    if (neutral) null else rowLanguage, pair,
+                    spoken = ownWords,
+                    unknownTitle = if (neutral) utterance.unidentifiedLanguageTitle else "Automatic",
+                )
+            }
             if (text.isEmpty()) {
-                TypingDots(language.ink(pair), Modifier.padding(vertical = 8.dp), dotSize = 8.dp)
+                if (!ownWords && !neutral && utterance.hasTranslationProblem) {
+                    StatusLine(utterance, rowLanguage, script, onRetry)
+                } else if (utterance.showsLanguagePrompt) {
+                    PendingLanguageLabel(utterance, onTranslate = onRetry)
+                } else if (utterance.isFinal && ((ownWords && utterance.source.isEmpty()) || rowLanguage == null)) {
+                    Text(
+                        "—",
+                        style = style,
+                        fontWeight = weight,
+                        color = secondary.copy(alpha = 0.5f),
+                        modifier = Modifier.semantics { contentDescription = "Original transcript unavailable" },
+                    )
+                } else {
+                    TypingDots(ink, Modifier.padding(vertical = 8.dp), dotSize = 8.dp)
+                }
             } else {
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val type = MaterialTheme.typography
-                    // The newest line's size and the size older lines settle to.
-                    val style = if (compact) {
-                        lerp(type.titleMedium, type.titleLarge, prominence)
-                    } else {
-                        lerp(type.titleLarge, type.headlineMedium, prominence)
-                    }
                     Text(
                         text,
-                        style = style.copy(localeList = language.localeList()),
-                        fontWeight = if (age < 2 && !ownWords) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (ownWords) MaterialTheme.colorScheme.onSurfaceVariant else language.ink(pair),
+                        style = style,
+                        fontWeight = weight,
+                        color = if (ownWords) secondary else ink,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (ownWords && !utterance.isFinal) TypingDots(language.ink(pair), Modifier.padding(bottom = 10.dp))
+                    if (ownWords && !utterance.isFinal) TypingDots(ink, Modifier.padding(bottom = 10.dp))
                 }
             }
-            if (!ownWords) {
-                when (utterance.translationState) {
-                    TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, waitingText)
-                    is TranslationState.Failed -> RetryButton(failedText, onRetry)
-                    else -> {}
-                }
+            if (!utterance.isSourceOnly && !neutral && text.isNotEmpty() && (!ownWords || utterance.hasTranslationProblem)) {
+                StatusLine(utterance, rowLanguage, script, onRetry)
             }
         }
         if (editable) {
@@ -367,10 +478,21 @@ private fun Line(
                 DropdownMenuItem(
                     text = { Text("Edit") },
                     leadingIcon = { Icon(Icons.Rounded.Edit, null) },
-                    onClick = { menu = false; onEdit?.invoke(utterance) },
+                    onClick = { menu = false; onEdit(utterance) },
                 )
             }
         }
     }
 }
 
+/** What's holding a line's translation up, in the reader's language where it's known. */
+@Composable
+private fun StatusLine(utterance: Utterance, language: Language?, script: ChineseScript, onRetry: () -> Unit) {
+    val phrases = language?.phrases(script)
+    when (utterance.translationState) {
+        TranslationState.AwaitingPartner -> PendingLanguageLabel(utterance, onTranslate = onRetry)
+        TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, phrases?.waitingForConnection ?: "Waiting for connection")
+        is TranslationState.Failed -> RetryButton(phrases?.translationFailed ?: "Translation failed", onRetry)
+        else -> {}
+    }
+}

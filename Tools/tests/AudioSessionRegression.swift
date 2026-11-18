@@ -102,6 +102,7 @@ extension AudioSessionUsers {
         sessionQueue.sync {
             users.withLock { $0.removeAll() }
             directionalSpeech.withLock { $0 = false }
+            directionalFailed.withLock { $0 = false }
         }
         AVAudioSession.sharedInstance().reset()
     }
@@ -152,6 +153,7 @@ struct AudioSessionRegression {
         configuration()
         restoration()
         failuresAndRecovery()
+        directionalFallbackRecovery()
         ownership()
         overlappingPlayersAndReactivation()
         concurrency()
@@ -230,6 +232,48 @@ struct AudioSessionRegression {
             flush()
             check(isLegacy(), "failed asynchronous policy update leaves old category observable")
             check(begin(.speech) && isDual(), "activation retries a failed asynchronous policy update")
+        }
+        reset()
+    }
+
+    static func directionalFallbackRecovery() {
+        reset()
+        check(!AudioSessionUsers.directionalSpeechEnabled, "ordinary preview policy is observable without disabling routing capability")
+        var attempts = 0
+        let ordinaryRetry = AudioSessionUsers.retryWithoutDirectionalSpeech { attempts += 1 }
+        check(!ordinaryRetry && attempts == 0 && !AudioSessionUsers.directionalSpeechUnavailable,
+              "intentionally ordinary sessions cannot latch directional playback unavailable")
+        check(begin(.speech) && isLegacy(), "ordinary preview activation uses the legacy session")
+        AudioSessionUsers.end(.speech)
+        flush()
+        AudioSessionUsers.setDirectionalSpeechEnabled(true)
+        check(AudioSessionUsers.directionalSpeechEnabled, "later directional request is visible through the locked policy getter")
+        check(begin(.speech) && (dualSupported ? isDual() : isLegacy()), "enabling directional speech after preview uses the supported configuration")
+        AudioSessionUsers.end(.speech)
+        flush()
+        if dualSupported {
+            reset()
+            AudioSessionUsers.setDirectionalSpeechEnabled(true)
+            session.update { $0.activationFailures = 2 }
+            check(!begin(.speech), "transient failure rejects initial dual activation")
+            let fallbackFailed = AudioSessionUsers.retryWithoutDirectionalSpeech { try AudioSessionUsers.begin(.speech) }
+            flush()
+            check(!fallbackFailed && !AudioSessionUsers.directionalSpeechUnavailable && AudioSessionUsers.current.isEmpty,
+                  "failed ordinary retry rolls back routing capability and releases both failed claims")
+            check(begin(.speech) && isDual(), "healthy activation retries directional output after both configurations failed")
+            AudioSessionUsers.end(.speech)
+            flush()
+
+            reset()
+            AudioSessionUsers.setDirectionalSpeechEnabled(true)
+            session.update { $0.activationFailures = 1 }
+            check(!begin(.speech), "unsupported dual activation fails before the ordinary control")
+            let fallbackWorked = AudioSessionUsers.retryWithoutDirectionalSpeech { try AudioSessionUsers.begin(.speech) }
+            check(fallbackWorked && AudioSessionUsers.directionalSpeechUnavailable && isLegacy()
+                  && AudioSessionUsers.current == [.speech] && session.read().active,
+                  "routing fallback latches only after ordinary activation succeeds and keeps its real session claim")
+            AudioSessionUsers.end(.speech)
+            flush()
         }
         reset()
     }

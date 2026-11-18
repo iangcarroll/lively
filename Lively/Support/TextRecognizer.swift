@@ -7,11 +7,11 @@ import Vision
 /// recognition on Android.
 enum TextRecognizer {
     /// The photo's text, one line per line of text found, or "" when there's none.
-    static func text(in image: Data, languages: LanguagePair) async throws -> String {
+    static func text(in image: Data, languages: LanguagePair? = nil) async throws -> String {
         var request = RecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
-        let wanted = recognitionLanguages(for: languages, supported: request.supportedRecognitionLanguages)
+        let wanted = languages.map { recognitionLanguages(for: $0, supported: request.supportedRecognitionLanguages) } ?? []
         if wanted.isEmpty {
             request.automaticallyDetectsLanguage = true
         } else {

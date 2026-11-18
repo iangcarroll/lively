@@ -2,6 +2,8 @@ package sh.ian.lively.ui
 
 import android.content.ClipData
 import android.content.Intent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9,8 +11,10 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,8 +66,10 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextAlign
@@ -71,6 +77,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import sh.ian.lively.model.ConnectionStatus
+import sh.ian.lively.model.ConversationStore
 import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguagePair
 import sh.ian.lively.model.TranslationState
@@ -78,9 +86,13 @@ import sh.ian.lively.model.Utterance
 import sh.ian.lively.model.phrases
 import sh.ian.lively.model.ChineseScript
 
-/** Lays out [content] the way [language] is written, and tags its text for the right glyphs. */
+/**
+ * Lays out [content] the way [language] is written, and tags its text for the
+ * right glyphs. A language that isn't known yet keeps the layout it's in.
+ */
 @Composable
-fun InLanguage(language: Language, content: @Composable () -> Unit) {
+fun InLanguage(language: Language?, content: @Composable () -> Unit) {
+    if (language == null) return content()
     CompositionLocalProvider(
         LocalLayoutDirection provides if (language.isRightToLeft) LayoutDirection.Rtl else LayoutDirection.Ltr,
         content = content,
@@ -89,6 +101,9 @@ fun InLanguage(language: Language, content: @Composable () -> Unit) {
 
 /** For text styles, so Han characters get Chinese rather than Japanese glyphs, and so on. */
 fun Language.localeList() = LocaleList(locale.toLanguageTag())
+
+/** This style for text in [language], or as it is while the language isn't known. */
+fun TextStyle.inLanguage(language: Language?) = if (language == null) this else copy(localeList = language.localeList())
 
 /** Keeps a reversed list pinned to the newest item as items arrive. */
 @Composable
@@ -99,14 +114,13 @@ private fun rememberPinnedListState(count: Int) = rememberLazyListState().also {
 /** Narrow layout: a single chat-style feed. */
 @Composable
 fun ChatTranscript(
-    utterances: List<Utterance>,
+    store: ConversationStore,
     pair: LanguagePair,
-    onRetry: (Utterance) -> Unit,
     onEdit: (Utterance) -> Unit,
-    onDelete: (Utterance) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
+    val utterances = store.visibleUtterances
     val state = rememberPinnedListState(utterances.size)
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -120,8 +134,8 @@ fun ChatTranscript(
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
     ) {
         items(utterances.asReversed(), key = { it.id }) { utterance ->
-            SwipeToDelete(onDelete = { onDelete(utterance) }, modifier = Modifier.animateItem()) {
-                UtteranceBubble(utterance, pair, onRetry = { onRetry(utterance) }, onEdit = { onEdit(utterance) }, onDelete = { onDelete(utterance) })
+            SwipeToDelete(onDelete = { store.delete(utterance) }, modifier = Modifier.animateItem()) {
+                UtteranceBubble(utterance, pair, onRetry = { store.retryTranslation(utterance) }, onEdit = { onEdit(utterance) }, onDelete = { store.delete(utterance) })
             }
         }
     }
@@ -144,18 +158,21 @@ fun UtteranceBubble(
     onDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val spoken = utterance.language
-    val leading = spoken == utterance.languages.first
-    val ink = spoken.ink(pair)
+    val spoken = utterance.sourceLanguage
+    val unclassified = utterance.isAutomatic && spoken == null && utterance.target == null
+    val leading = if (utterance.isAutomatic) spoken == utterance.listenerLanguage else spoken == utterance.languages.first
+    val ink = spoken?.ink(pair) ?: MaterialTheme.colorScheme.onSurfaceVariant
     var menu by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     val shape = RoundedCornerShape(24.dp)
-    Row(modifier.fillMaxWidth(), horizontalArrangement = if (leading) Arrangement.Start else Arrangement.End) {
+    // A turn in a language nobody has claimed yet takes neither side.
+    val inset = if (unclassified) 0.dp else 40.dp
+    Row(modifier.fillMaxWidth(), horizontalArrangement = if (leading || unclassified) Arrangement.Start else Arrangement.End) {
         Box {
             Column(
                 Modifier
                     .widthIn(max = 520.dp)
-                    .padding(start = if (leading) 0.dp else 40.dp, end = if (leading) 40.dp else 0.dp)
+                    .padding(start = if (leading) 0.dp else inset, end = if (leading) inset else 0.dp)
                     .shadow(2.dp, shape, ambientColor = Color.Black.copy(alpha = 0.2f), spotColor = Color.Black.copy(alpha = 0.2f))
                     .clip(shape)
                     .background(Lively.colors.card)
@@ -172,22 +189,10 @@ fun UtteranceBubble(
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Block(spoken, pair, utterance.trimmedSource, spoken = true, typing = !utterance.isFinal)
-                HorizontalDivider(color = ink.copy(alpha = 0.2f))
-                val target = utterance.target
-                if (utterance.translation.isNotEmpty()) {
-                    val settled = utterance.translationState == TranslationState.Current || utterance.isFinal
-                    Column(Modifier.alpha(if (settled) 1f else 0.75f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Block(target, pair, utterance.translation, spoken = false, typing = false)
-                    }
-                    StatusLine(utterance, onRetry)
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        LanguageTag(target, pair)
-                        StatusLine(utterance, onRetry)
-                        val state = utterance.translationState
-                        if (state == TranslationState.Working || state == TranslationState.Idle) TypingDots(target.ink(pair))
-                    }
+                Block(utterance, spoken, pair, utterance.trimmedSource, spoken = true)
+                if (!utterance.isSourceOnly) {
+                    HorizontalDivider(color = ink.copy(alpha = 0.2f))
+                    Translation(utterance, pair, onRetry)
                 }
             }
             CopyMenu(menu, onDismiss = { menu = false }, utterance, onEdit, onDelete)
@@ -196,31 +201,57 @@ fun UtteranceBubble(
 }
 
 @Composable
-private fun Block(language: Language, pair: LanguagePair, text: String, spoken: Boolean, typing: Boolean) {
-    InLanguage(language) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            LanguageTag(language, pair, spoken = spoken)
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text,
-                    style = (if (spoken) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleLarge)
-                        .copy(localeList = language.localeList()),
-                    fontWeight = if (spoken) FontWeight.Normal else FontWeight.Medium,
-                    color = if (spoken) MaterialTheme.colorScheme.onSurface else language.ink(pair),
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (spoken && typing) TypingDots(language.ink(pair), Modifier.padding(bottom = 6.dp))
-            }
+private fun ColumnScope.Translation(utterance: Utterance, pair: LanguagePair, onRetry: () -> Unit) {
+    val target = utterance.target
+    if (utterance.translation.isNotEmpty()) {
+        val settled = utterance.translationState == TranslationState.Current || utterance.isFinal
+        Column(Modifier.alpha(if (settled) 1f else 0.75f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Block(utterance, target, pair, utterance.translation, spoken = false)
+        }
+        StatusLine(utterance, onRetry)
+    } else if (utterance.showsLanguagePrompt || target == null) {
+        PendingLanguageLabel(utterance, onTranslate = onRetry)
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            LanguageTag(target, pair)
+            StatusLine(utterance, onRetry)
+            val state = utterance.translationState
+            if (state == TranslationState.Working || state == TranslationState.Idle) TypingDots(target.ink(pair))
         }
     }
 }
 
 @Composable
+private fun Block(utterance: Utterance, language: Language?, pair: LanguagePair, text: String, spoken: Boolean) {
+    val missingSource = spoken && text.isEmpty() && utterance.isFinal
+    val ink = language?.ink(pair) ?: MaterialTheme.colorScheme.onSurfaceVariant
+    InLanguage(language) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            OptionalLanguageTag(language, pair, spoken = spoken, unknownTitle = if (spoken) utterance.unidentifiedLanguageTitle else "Automatic")
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    if (missingSource) "—" else text,
+                    style = (if (spoken) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleLarge).inLanguage(language),
+                    fontWeight = if (spoken) FontWeight.Normal else FontWeight.Medium,
+                    color = if (spoken) MaterialTheme.colorScheme.onSurface else ink,
+                    modifier = Modifier.weight(1f, fill = false).then(MissingSourceLabel.takeIf { missingSource } ?: Modifier),
+                )
+                if (spoken && !utterance.isFinal) TypingDots(ink, Modifier.padding(bottom = 6.dp))
+            }
+        }
+    }
+}
+
+/** Read out for the dash that stands in for a turn whose own words never arrived. */
+private val MissingSourceLabel = Modifier.semantics { contentDescription = "Original transcript unavailable" }
+
+@Composable
 private fun StatusLine(utterance: Utterance, onRetry: () -> Unit) {
     when (val state = utterance.translationState) {
+        TranslationState.AwaitingPartner -> PendingLanguageLabel(utterance, onTranslate = onRetry)
         TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, "Waiting for connection")
         is TranslationState.Failed -> RetryButton("${state.message} · Retry", onRetry)
-        else -> if (utterance.isLate) Caption(Icons.Rounded.History, "Caught up after a dropout")
+        else -> if (utterance.isLate) Caption(Icons.Rounded.History, "Delayed transcription")
     }
 }
 
@@ -232,12 +263,16 @@ fun Caption(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String,
     }
 }
 
+/** A [Caption] that's a borderless button. */
 @Composable
-fun RetryButton(text: String, onClick: () -> Unit) {
+fun CaptionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, color: Color, onClick: () -> Unit) {
     TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
-        Caption(Icons.Rounded.Refresh, text, color = Lively.colors.warning)
+        Caption(icon, text, color = color)
     }
 }
+
+@Composable
+fun RetryButton(text: String, onClick: () -> Unit) = CaptionButton(Icons.Rounded.Refresh, text, Lively.colors.warning, onClick)
 
 @Composable
 private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Utterance, onEdit: (() -> Unit)?, onDelete: (() -> Unit)?) {
@@ -249,14 +284,16 @@ private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Uttera
         onDismiss()
     }
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, shape = RoundedCornerShape(16.dp)) {
-        DropdownMenuItem(
-            text = { Text("Copy ${utterance.language.nativeName}") },
-            leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) },
-            onClick = { copy(utterance.trimmedSource) },
-        )
+        if (utterance.trimmedSource.isNotEmpty()) {
+            DropdownMenuItem(
+                text = { Text(utterance.sourceLanguage?.let { "Copy ${it.nativeName}" } ?: "Copy original") },
+                leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) },
+                onClick = { copy(utterance.trimmedSource) },
+            )
+        }
         if (utterance.translation.isNotEmpty()) {
             DropdownMenuItem(
-                text = { Text("Copy ${utterance.target.nativeName}") },
+                text = { Text(utterance.target?.let { "Copy ${it.nativeName}" } ?: "Copy translation") },
                 leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) },
                 onClick = { copy(utterance.translation) },
             )
@@ -336,18 +373,22 @@ private fun SwipeToDelete(onDelete: () -> Unit, modifier: Modifier = Modifier, c
  */
 @Composable
 fun ParallelTranscript(
-    utterances: List<Utterance>,
+    store: ConversationStore,
     pair: LanguagePair,
-    onRetry: (Utterance) -> Unit,
     onEdit: (Utterance) -> Unit,
-    onDelete: (Utterance) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
+    val utterances = store.visibleUtterances
     Column(modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
         Row(Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp)) {
-            Header(pair.first, pair, Modifier.weight(1f))
-            Header(pair.second, pair, Modifier.weight(1f))
+            if (store.isAutomaticLanguageMode) {
+                Header(store.listenerLanguage, pair, Modifier.weight(1f), role = "Your language")
+                Header(store.detectedPartnerLanguage, pair, Modifier.weight(1f), role = "Other language")
+            } else {
+                Header(pair.first, pair, Modifier.weight(1f))
+                Header(pair.second, pair, Modifier.weight(1f))
+            }
         }
         val state = rememberPinnedListState(utterances.size)
         LazyColumn(
@@ -358,8 +399,8 @@ fun ParallelTranscript(
         ) {
             items(utterances.asReversed(), key = { it.id }) { utterance ->
                 Column(Modifier.animateItem()) {
-                    SwipeToDelete(onDelete = { onDelete(utterance) }) {
-                        ParallelRow(utterance, pair, onRetry = { onRetry(utterance) }, onEdit = { onEdit(utterance) }, onDelete = { onDelete(utterance) })
+                    SwipeToDelete(onDelete = { store.delete(utterance) }) {
+                        ParallelRow(utterance, pair, onRetry = { store.retryTranslation(utterance) }, onEdit = { onEdit(utterance) }, onDelete = { store.delete(utterance) })
                     }
                     HorizontalDivider(Modifier.alpha(0.4f))
                 }
@@ -369,10 +410,14 @@ fun ParallelTranscript(
 }
 
 @Composable
-private fun Header(language: Language, pair: LanguagePair, modifier: Modifier) {
+private fun Header(language: Language?, pair: LanguagePair, modifier: Modifier, role: String? = null) {
+    val ink = language?.ink(pair) ?: MaterialTheme.colorScheme.onSurfaceVariant
     Row(modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.size(width = 18.dp, height = 4.dp).background(language.ink(pair), CircleShape))
-        Text(language.nativeName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = language.ink(pair))
+        Box(Modifier.size(width = 18.dp, height = 4.dp).background(ink, CircleShape))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            if (role != null) Text(role, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(language?.nativeName ?: "Automatic", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
+        }
     }
 }
 
@@ -394,40 +439,15 @@ private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () ->
                 )
                 .padding(vertical = 14.dp),
         ) {
-            for (language in utterance.languages.all) {
-                val spoken = utterance.language == language
-                val text = utterance.text(language)
-                InLanguage(language) {
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .padding(horizontal = 4.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (spoken) language.ink(pair).copy(alpha = 0.06f) else Color.Transparent)
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        LanguageTag(language, pair, spoken = spoken)
-                        if (text.isEmpty()) {
-                            when (utterance.translationState) {
-                                TranslationState.WaitingForNetwork, is TranslationState.Failed -> StatusLine(utterance, onRetry)
-                                else -> TypingDots(language.ink(pair), Modifier.padding(top = 6.dp))
-                            }
-                        } else {
-                            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text,
-                                    style = MaterialTheme.typography.titleLarge.copy(localeList = language.localeList()),
-                                    fontWeight = if (spoken) FontWeight.Normal else FontWeight.Medium,
-                                    color = if (spoken) MaterialTheme.colorScheme.onSurface else language.ink(pair),
-                                    modifier = Modifier.weight(1f, fill = false),
-                                )
-                                if (spoken && !utterance.isFinal) TypingDots(language.ink(pair), Modifier.padding(bottom = 8.dp))
-                            }
-                            if (!spoken) StatusLine(utterance, onRetry)
-                        }
-                    }
-                }
+            if (!utterance.isAutomatic) {
+                for (language in utterance.languages.all) ParallelCell(utterance, language, pair, onRetry)
+            } else if (utterance.isSourceOnly) {
+                Spacer(Modifier.weight(1f))
+                ParallelCell(utterance, utterance.sourceLanguage, pair, onRetry, TranscriptRole.PARTNER)
+            } else if (utterance.sourceLanguage == null && utterance.target == null) {
+                NeutralCaption(utterance, pair, onRetry)
+            } else {
+                for (role in TranscriptRole.entries) ParallelCell(utterance, role.language(utterance), pair, onRetry, role)
             }
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
@@ -438,9 +458,75 @@ private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () ->
 }
 
 @Composable
-fun EmptyConversation(isListening: Boolean, isConnecting: Boolean, pair: LanguagePair, script: ChineseScript, modifier: Modifier = Modifier) {
+private fun RowScope.ParallelCell(utterance: Utterance, language: Language?, pair: LanguagePair, onRetry: () -> Unit, role: TranscriptRole? = null) {
+    val spoken = role?.isSource(utterance) ?: (utterance.sourceLanguage == language)
+    val text = role?.text(utterance) ?: language?.let(utterance::text).orEmpty()
+    val ink = language?.ink(pair) ?: MaterialTheme.colorScheme.onSurfaceVariant
+    InLanguage(language) {
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(horizontal = 4.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (spoken) ink.copy(alpha = 0.06f) else Color.Transparent)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            OptionalLanguageTag(language, pair, spoken = spoken)
+            if (text.isEmpty()) {
+                if (utterance.isFinal && !utterance.showsLanguagePrompt && ((spoken && utterance.source.isEmpty()) || language == null)) {
+                    Text("—", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = MissingSourceLabel)
+                } else if (utterance.showsLanguagePrompt) {
+                    PendingLanguageLabel(utterance, onTranslate = onRetry)
+                } else if (utterance.hasTranslationProblem) {
+                    StatusLine(utterance, onRetry)
+                } else {
+                    TypingDots(ink, Modifier.padding(top = 6.dp))
+                }
+            } else {
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text,
+                        style = MaterialTheme.typography.titleLarge.inLanguage(language),
+                        fontWeight = if (spoken) FontWeight.Normal else FontWeight.Medium,
+                        color = if (spoken) MaterialTheme.colorScheme.onSurface else ink,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (spoken && !utterance.isFinal) TypingDots(ink, Modifier.padding(bottom = 8.dp))
+                }
+                if (!spoken) StatusLine(utterance, onRetry)
+            }
+        }
+    }
+}
+
+/** A turn whose language isn't known yet belongs to neither column. */
+@Composable
+private fun RowScope.NeutralCaption(utterance: Utterance, pair: LanguagePair, onRetry: () -> Unit) {
+    Column(Modifier.weight(1f).padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OptionalLanguageTag(null, pair, unknownTitle = utterance.unidentifiedLanguageTitle)
+        Text(utterance.trimmedSource, style = MaterialTheme.typography.titleLarge)
+        PendingLanguageLabel(utterance, onTranslate = onRetry)
+    }
+}
+
+@Composable
+fun EmptyConversation(
+    store: ConversationStore,
+    pair: LanguagePair,
+    script: ChineseScript,
+    modifier: Modifier = Modifier,
+    showsListeningPrompt: Boolean = true,
+) {
+    val isListening = store.isListening
+    val automatic = store.isAutomaticLanguageMode
+    val shown by animateFloatAsState(if (showsListeningPrompt) 1f else 0f, tween(250), label = "prompt")
     Column(
-        modifier.fillMaxSize().padding(32.dp),
+        modifier
+            .fillMaxSize()
+            .padding(32.dp)
+            .alpha(shown)
+            .then(if (showsListeningPrompt) Modifier else Modifier.clearAndSetSemantics {}),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -451,24 +537,42 @@ fun EmptyConversation(isListening: Boolean, isConnecting: Boolean, pair: Languag
             modifier = Modifier.size(52.dp),
         )
         Spacer(Modifier.height(18.dp))
-        for (language in pair.all) {
-            val phrases = language.phrases(script)
+        @Composable
+        fun Prompt(text: String, color: Color, language: Language? = null) {
             Text(
-                when {
-                    isConnecting -> phrases.connecting
-                    isListening -> phrases.listening
-                    else -> phrases.tapToStart
-                },
-                style = MaterialTheme.typography.titleLarge.copy(localeList = language.localeList()),
+                text,
+                style = MaterialTheme.typography.titleLarge.inLanguage(language),
                 fontWeight = FontWeight.SemiBold,
-                color = if (language == pair.second) language.ink(pair) else MaterialTheme.colorScheme.onSurface,
+                color = color,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(6.dp))
         }
+        fun prompt(language: Language): String {
+            val phrases = language.phrases(script)
+            return when {
+                isListening && store.status == ConnectionStatus.Offline -> phrases.waitingForConnection
+                store.isConnecting -> phrases.connecting
+                isListening -> phrases.listening
+                else -> phrases.tapToStart
+            }
+        }
+        val own = if (automatic) store.listenerLanguage else pair.first
+        Prompt(prompt(own), MaterialTheme.colorScheme.onSurface, own)
+        val partner = if (automatic) store.detectedPartnerLanguage else pair.second
+        if (partner != null) {
+            Prompt(prompt(partner), partner.ink(pair), partner)
+        } else {
+            Prompt(if (isListening) "Listening for another language" else "Other language · Automatic", MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Spacer(Modifier.height(12.dp))
         Text(
-            "Lively hears ${pair.first.englishName} and ${pair.second.englishName} and translates both ways. No need to say who's speaking.",
+            when {
+                !automatic -> "Lively hears ${pair.first.englishName} and ${pair.second.englishName} and translates both ways. No need to say who's speaking."
+                store.isOnline -> "Just talk. Lively detects the other language and translates both ways. Your side stays in ${store.listenerLanguage.englishName}."
+                // iOS goes on to point at its On-device engine, which Android doesn't have.
+                else -> "Automatic detection needs internet."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

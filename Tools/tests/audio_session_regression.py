@@ -17,6 +17,7 @@ import tempfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--negative-controls", action="store_true")
+    parser.add_argument("--thread-sanitizer", action="store_true")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     mic_source = (root / "Lively/Audio/MicCapture.swift").read_text()
@@ -54,6 +55,10 @@ def main():
                 raise RuntimeError("Review the input-metadata mutation for the updated production source")
             unchecked_mapping = unchecked_mapping.replace(check, "true")
         jobs.append(("missing-input-validation", source, unchecked_mapping, True))
+        old = "directionalFailed.withLock { $0 = false }\n            return false"
+        if source.count(old) != 1:
+            raise RuntimeError("Review the directional fallback rollback mutation")
+        jobs.append(("failed-fallback-latched", source.replace(old, "return false"), input_mapping, True))
     status = 0
     with tempfile.TemporaryDirectory(prefix="lively-audio-session-") as directory:
         work = Path(directory)
@@ -68,7 +73,8 @@ def main():
             subprocess.run([
                 "xcrun", "swiftc", "-swift-version", "6", "-default-isolation", "MainActor",
                 "-D", "LIVELY_IOS_SESSION_TEST", "-module-cache-path", str(work / "modules"),
-                "-parse-as-library", str(combined), "-o", str(executable),
+                "-parse-as-library", *(["-sanitize=thread"] if args.thread_sanitizer else []),
+                str(combined), "-o", str(executable),
             ], check=True, timeout=60)
             result = subprocess.run(
                 [str(executable), "legacy-ios" if variant == "legacy-ios" else "ios26"],

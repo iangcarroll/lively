@@ -22,12 +22,21 @@ import sh.ian.lively.net.await
  * Vision on iOS.
  */
 object TextRecognizer {
-    /** The photo's text, one line per line of text found, or "" when there's none. */
-    suspend fun text(context: Context, image: Uri, languages: LanguagePair): String {
+    /**
+     * The photo's text, one line per line of text found, or "" when there's
+     * none. Without [languages], as in an Automatic conversation, every
+     * script's model reads it and the one that found most is kept; Vision
+     * detects the language by itself on iOS.
+     */
+    suspend fun text(context: Context, image: Uri, languages: LanguagePair? = null): String {
         // Decoding reads EXIF, so camera photos come out the right way up.
         val input = withContext(Dispatchers.IO) { InputImage.fromFilePath(context, image) }
-        return models(languages).map { read(input, it) }.maxBy { it.length }
+        val models = languages?.let(::models) ?: SCRIPTED.mapNotNull(::model) + TextRecognizerOptions.DEFAULT_OPTIONS
+        return models.map { read(input, it) }.maxBy { it.length }
     }
+
+    /** A language for each script that has its own model. */
+    private val SCRIPTED = listOf("zh", "ja", "ko", "hi").map(::Language)
 
     /**
      * ML Kit has a model per script, where Vision takes a list of

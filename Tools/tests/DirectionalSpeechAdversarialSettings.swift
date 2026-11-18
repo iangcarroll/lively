@@ -4,16 +4,10 @@ enum AudioSessionUsers {
     static func setDirectionalSpeechEnabled(_ value: Bool) {}
 }
 
-final class Utterance {
-    let id = UUID()
-    let target: Language
-    let languages: LanguagePair
-    let createdAt: Date
-    var isFinal = true
-    init(target: Language, languages: LanguagePair, createdAt: Date = .now) {
-        self.target = target
-        self.languages = languages
-        self.createdAt = createdAt
+extension Utterance {
+    convenience init(target: Language, languages: LanguagePair) {
+        self.init(language: languages.other(than: target), languages: languages)
+        isFinal = true
     }
 }
 
@@ -28,9 +22,13 @@ final class ConversationStore {
     var spoken: [UUID: Int] = [:]
     var speechFlushes: [UUID: Task<Void, Never>] = [:]
     var alert: String?
+    var utterances: [Utterance] = []
+    let automaticSessionID = UUID()
+    var isAutomaticLanguageMode: Bool { settings.usesAutomaticLanguageDetection }
     init(settings: AppSettings) { self.settings = settings; self.languages = settings.languages }
     func testSpeaker() -> SonioxSpeaker { activeSpeaker() as! SonioxSpeaker }
     func accept(_ turn: Utterance, text: String, complete: Bool) {
+        if !utterances.contains(where: { $0 === turn }) { utterances.append(turn) }
         speak(turn, stable: text, complete: complete)
     }
     // INSERT_ACTUAL_SPEECH_METHODS
@@ -52,7 +50,7 @@ final class ConversationStore {
     static func drainActor() async { for _ in 0..<100 { await Task.yield() } }
 
     static func main() async throws {
-        TestDefaults.standard.values = [:]
+        TestDefaults.standard.values = ["conversationMode": "pair"]
         let settings = AppSettings()
         settings.setCredential("test-only", for: .soniox)
         settings.speaksTranslations = true

@@ -14,7 +14,31 @@ class AppSettings(
     private val secrets: SecretStore,
     /** Every engine, the default first. */
     val providers: List<SpeechProvider>,
+    /** The `LivelyDemo` launch option. */
+    private val isDemo: () -> Boolean = { false },
 ) {
+    private var _conversationMode by mutableStateOf(
+        ConversationMode.initial(prefs.string("conversationMode"), prefs.bool("onboardingDone")),
+    )
+
+    /**
+     * Online discovery keeps the listener's language fixed and learns
+     * the other language from speech. The saved pair is for manual use.
+     */
+    var conversationMode: ConversationMode
+        get() = _conversationMode
+        set(value) {
+            _conversationMode = value
+            prefs.putString("conversationMode", value.id)
+        }
+
+    val usesAutomaticLanguageDetection: Boolean
+        get() {
+            // The demo is a scripted conversation in the saved pair.
+            if (isDemo()) return false
+            return conversationMode == ConversationMode.AUTOMATIC && providerID == SpeechProviders.SONIOX_ID
+        }
+
     private var _providerID by mutableStateOf(
         prefs.string("speechProvider")?.takeIf { id -> providers.any { it.id == id } } ?: providers.first().id,
     )
@@ -115,6 +139,27 @@ class AppSettings(
             prefs.putBool("speaksTranslations", value)
         }
 
+    private var _speechListenerLanguageCode by mutableStateOf("")
+
+    /**
+     * The reader's own language, independent of the face-to-face layout. In
+     * Automatic it is any Soniox language; with a pair it is one of the two.
+     */
+    var speechListenerLanguage: Language
+        get() {
+            val language = Language(_speechListenerLanguageCode)
+            if (usesAutomaticLanguageDetection) {
+                return if (language in Language.SONIOX) language else Language.ENGLISH
+            }
+            return if (language in languages) language else languages.first
+        }
+        set(value) {
+            val valid = if (usesAutomaticLanguageDetection) value in Language.SONIOX else value in languages
+            if (!valid) return
+            _speechListenerLanguageCode = value.code
+            prefs.putString("speechListenerLanguage", value.code)
+        }
+
     fun credential(credential: ProviderCredential): String = credentials[credential.id] ?: ""
 
     fun setCredential(value: String, credential: ProviderCredential) {
@@ -132,16 +177,33 @@ class AppSettings(
         get() = providers.flatMap { it.credentials }.distinctBy { it.id }
 
     init {
+        // Saved at once, so finishing the welcome tour doesn't change it.
+        prefs.putString("conversationMode", _conversationMode.id)
         val stored = LanguagePair(
             Language(prefs.string("firstLanguage") ?: LanguagePair.DEFAULT.first.code),
             Language(prefs.string("secondLanguage") ?: LanguagePair.DEFAULT.second.code),
         )
         _languages = if (provider.supports(stored) && stored.first != stored.second) stored else LanguagePair.DEFAULT
+        _speechListenerLanguageCode = prefs.string("speechListenerLanguage") ?: stored.first.code
         for (credential in allCredentials) credentials[credential.id] = secrets.read(credential.id) ?: ""
     }
 
     companion object {
         const val DEFAULT_TRANSLATION_MODEL = "mistral-small-latest"
         const val TRANSCRIPTION_MODEL = "voxtral-mini-transcribe-realtime-3"
+    }
+}
+
+enum class ConversationMode(val id: String, val label: String) {
+    AUTOMATIC("automatic", "Automatic"),
+    PAIR("pair", "Choose a pair");
+
+    companion object {
+        /**
+         * The mode at launch. Automatic is for new installs; someone who set
+         * Lively up before it existed keeps their pair.
+         */
+        fun initial(saved: String?, onboardingDone: Boolean) =
+            entries.firstOrNull { it.id == saved } ?: if (onboardingDone) PAIR else AUTOMATIC
     }
 }

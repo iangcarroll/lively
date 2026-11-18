@@ -38,9 +38,11 @@ def main():
     language = (root / "Lively/Model/Language.swift").read_text()
     speaker = (root / "Lively/Networking/SonioxSpeaker.swift").read_text()
     store = (root / "Lively/Model/ConversationStore.swift").read_text()
-    speech_methods = method(store, "speak") + "\n" + method(store, "completeSentences")
+    speech_methods = "\n".join(method(store, name) for name in ["speak", "completeSentences", "canUseAutomaticTurn"])
     fixture = Path(__file__).with_name("DirectionalSpeechRegression.swift").read_text()
     for marker, source in [("// INSERT_ACTUAL_LANGUAGE", language),
+                           ("// INSERT_ACTUAL_FILLER", (root / "Lively/Model/Filler.swift").read_text()),
+                           ("// INSERT_ACTUAL_UTTERANCE", (root / "Lively/Model/Utterance.swift").read_text()),
                            ("// INSERT_ACTUAL_SETTINGS", settings),
                            ("// INSERT_ACTUAL_SPEAKER", speaker),
                            ("// INSERT_ACTUAL_TRANSLATION_SPEAKER", (root / "Lively/Networking/TranslationSpeaker.swift").read_text()),

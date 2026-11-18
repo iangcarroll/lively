@@ -35,7 +35,7 @@ def method(source, name):
 def build_source(source):
     names = ["isListening", "level", "isHearing", "alert", "settings", "mic",
              "demo", "gate", "speaker", "transcriberStatus", "listeningStart",
-             "listeningGeneration", "utterances", "pendingDiscard"]
+             "listeningGeneration", "utterances", "pendingDiscard", "pendingDiscardCutoff"]
     fields = []
     for name in names:
         match = re.search(r"^    (?:private(?:\(set\))? )?(?:let|var) " + name + r"(?:[ : =].*)?$", source, re.M)
@@ -152,6 +152,9 @@ SUPPORT = r'''
     func releaseEngine() { engineReleases += 1 }
     func pauseEngine() { enginePauses += 1 }
     func finalizeCurrent() {}
+    func finalizeStoppedTurn() { finalizeCurrent() }
+    func synchronizeLanguages() {}
+    func expireAutomaticContext(at now: Date) {}
     func refreshStatus() {}
     static func keepScreenAwake(_ awake: Bool) {}
 '''
