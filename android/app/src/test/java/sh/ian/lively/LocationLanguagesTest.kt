@@ -110,11 +110,24 @@ class LocationLanguagesTest {
         assertEquals(LanguagePair(Language.ENGLISH, Language("fr")), settings.languages)
     }
 
+    @Test fun aConversationStartedDuringTheLookupKeepsItsPair() = runTest {
+        val location = LocationLanguages(settings, locator, backgroundScope, english)
+        location.enable(granted = true); runCurrent()
+        locator.region = "FR"
+        // Idle when asked, talking by the time the country is known.
+        var asked = 0
+        assertFalse(location.update(canChange = { asked++ == 0 }))
+        assertEquals(2, asked)
+        assertEquals(Language("ja"), settings.languages.second)
+        assertTrue(location.update())
+        assertEquals(Language("fr"), settings.languages.second)
+    }
+
     @Test fun waitsWhileAConversationIsUnderWay() = runTest {
         val location = LocationLanguages(settings, locator, backgroundScope, english)
         location.enable(granted = true); runCurrent()
         locator.region = "FR"
-        assertFalse(location.update(canChange = false))
+        assertFalse(location.update(canChange = { false }))
         assertEquals(Language("ja"), settings.languages.second)
         assertTrue(location.update())
         assertEquals(Language("fr"), settings.languages.second)

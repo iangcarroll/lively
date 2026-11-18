@@ -86,11 +86,13 @@ class LocationLanguages(
 
     /**
      * Looks up the country and sets the pair if it's a new one (or [force]).
-     * Pass `canChange = false` while a conversation is under way; the lookup
-     * then waits for a later call. Returns true when the pair changed.
+     * `canChange` is false while a conversation is under way; the lookup
+     * then waits for a later call. It's asked again once the country is
+     * known, since finding it takes long enough to start talking.
+     * Returns true when the pair changed.
      */
-    suspend fun update(force: Boolean = false, canChange: Boolean = true): Boolean {
-        if (!settings.usesLocationLanguages || !canChange || isUpdating) return false
+    suspend fun update(force: Boolean = false, canChange: () -> Boolean = { true }): Boolean {
+        if (!settings.usesLocationLanguages || !canChange() || isUpdating) return false
         if (!locator.isAuthorized) {
             // Access was taken away in the system settings.
             settings.usesLocationLanguages = false
@@ -105,7 +107,7 @@ class LocationLanguages(
                 if (force) status = Status.Failed
                 return false
             }
-            if (!settings.usesLocationLanguages || (!force && region == settings.locationLanguageRegion)) return false
+            if (!settings.usesLocationLanguages || !canChange() || (!force && region == settings.locationLanguageRegion)) return false
             settings.locationLanguageRegion = region
             val (own, ownScript) = systemLanguage()
             val suggestion = suggestion(region, own, ownScript, settings.provider.languages)

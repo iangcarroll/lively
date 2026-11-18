@@ -219,7 +219,7 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
     var accountReturnsOnSignIn by remember { mutableStateOf(false) }
 
     ForegroundEffects(graph, store)
-    ReviewPromptEffect(graph, store)
+    ReviewPromptEffect(graph, store) { nav.currentDestination?.route == Routes.CONVERSATION }
     SettingsEffects(graph.settings, store)
 
     NavHost(
@@ -376,8 +376,9 @@ private fun LivelyNavigation(graph: LivelyApp.Graph, store: ConversationStore) {
  * mirrors this with StoreKit's `requestReview`. Never in demo mode.
  */
 @Composable
-private fun ReviewPromptEffect(graph: LivelyApp.Graph, store: ConversationStore) {
+private fun ReviewPromptEffect(graph: LivelyApp.Graph, store: ConversationStore, onConversation: () -> Boolean) {
     val activity = LocalActivity.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val prefs = graph.prefs
     // This conversation has been counted. Hold-to-talk stops after every
     // sentence, so one conversation stops many times.
@@ -390,6 +391,12 @@ private fun ReviewPromptEffect(graph: LivelyApp.Graph, store: ConversationStore)
             val stopped = wasListening && !listening
             wasListening = listening
             if (!stopped || DebugFlags.demo || counted) return@collectLatest
+            // Not the instant the mic stops, and not if they've started again.
+            delay(1500)
+            // Nor when listening stopped for something else: leaving the app,
+            // the address lookup, Settings, or the day's free time running out.
+            if (store.isListening || counted || activity == null) return@collectLatest
+            if (!onConversation() || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@collectLatest
             // Only turns that were translated; a row still waiting for the other
             // language, or one the engine took back, wasn't a conversation.
             val turns = store.visibleUtterances.count { it.isFinal && it.translation.isNotEmpty() }
@@ -398,9 +405,6 @@ private fun ReviewPromptEffect(graph: LivelyApp.Graph, store: ConversationStore)
             val good = prefs.int("goodConversations") + 1
             prefs.putInt("goodConversations", good)
             if (!ReviewPrompt.shouldAsk(turns, good, prefs.bool("reviewAsked"))) return@collectLatest
-            // Not the instant the mic stops, and not if they've started again.
-            delay(1500)
-            if (store.isListening || activity == null) return@collectLatest
             prefs.putBool("reviewAsked", true)
             try {
                 val reviews = ReviewManagerFactory.create(activity)
@@ -460,8 +464,8 @@ private fun ForegroundEffects(graph: LivelyApp.Graph, store: ConversationStore) 
                     // Location chooses a pair, which automatic detection doesn't use.
                     if (graph.settings.usesLocationLanguages && !graph.settings.usesAutomaticLanguageDetection && !DebugFlags.demo) {
                         graph.scope.launch {
-                            val idle = store.utterances.isEmpty() && !store.isListening
-                            if (graph.locationLanguages.update(canChange = idle)) store.settingsDidClose()
+                            val changed = graph.locationLanguages.update { store.utterances.isEmpty() && !store.isListening }
+                            if (changed) store.settingsDidClose()
                         }
                     }
                 }

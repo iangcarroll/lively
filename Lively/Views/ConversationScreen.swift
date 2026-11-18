@@ -307,8 +307,8 @@ struct ConversationScreen: View {
         // Location chooses a pair, which automatic detection doesn't use.
         guard settings.usesLocationLanguages, !settings.usesAutomaticLanguageDetection, !isDemo else { return }
         Task {
-            let idle = store.utterances.isEmpty && !store.isListening
-            if await LocationLanguages.shared.update(canChange: idle) { store.settingsDidClose() }
+            let changed = await LocationLanguages.shared.update { store.utterances.isEmpty && !store.isListening }
+            if changed { store.settingsDidClose() }
         }
     }
 
@@ -530,18 +530,22 @@ struct ConversationScreen: View {
     /// have been useful, asks once for an App Store review; iOS decides
     /// whether to show it. Android asks Google Play the same way.
     private func conversationPaused() {
-        guard !isDemo, !countedConversation else { return }
-        // Only turns that were translated; a row still waiting for the other
-        // language, or one the engine took back, wasn't a conversation.
-        let turns = store.visibleUtterances.count { $0.isFinal && !$0.translation.isEmpty }
-        guard turns >= ReviewPrompt.minTurns else { return }
-        countedConversation = true
-        goodConversations += 1
-        guard ReviewPrompt.shouldAsk(turns: turns, goodConversations: goodConversations, alreadyAsked: reviewAsked) else { return }
+        // Leaving the app stops listening too, and isn't the end of a conversation.
+        guard !isDemo, !countedConversation, scenePhase == .active else { return }
         Task {
             // Not on top of the last line being read.
             try? await Task.sleep(for: .milliseconds(1500))
-            guard !store.isListening else { return }
+            // Nor when listening stopped for something else: the address
+            // lookup, Settings, or the day's free time running out.
+            guard !store.isListening, !countedConversation,
+                  !showAddress, !showSettings, !showLanguages, !showOnboarding, !hitFreeLimit else { return }
+            // Only turns that were translated; a row still waiting for the other
+            // language, or one the engine took back, wasn't a conversation.
+            let turns = store.visibleUtterances.count { $0.isFinal && !$0.translation.isEmpty }
+            guard turns >= ReviewPrompt.minTurns else { return }
+            countedConversation = true
+            goodConversations += 1
+            guard ReviewPrompt.shouldAsk(turns: turns, goodConversations: goodConversations, alreadyAsked: reviewAsked) else { return }
             reviewAsked = true
             requestReview()
         }
