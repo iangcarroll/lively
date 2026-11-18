@@ -14,6 +14,9 @@ struct ConversationScreen: View {
     @AppStorage("reviewAsked") private var reviewAsked = false
     /// This conversation has been counted; cleared with the conversation.
     @State private var countedConversation = false
+    /// The scene phase as state, which a task that waited can read afresh;
+    /// the environment value it captured would be the one from before the wait.
+    @State private var sceneIsActive = true
     @Environment(\.requestReview) private var requestReview
     @State private var showAddress = false
     @AppStorage("onboardingDone") private var onboardingDone = false
@@ -249,6 +252,7 @@ struct ConversationScreen: View {
         }
         .animation(.smooth(duration: 0.3), value: showLocationOffer)
         .onChange(of: scenePhase) { _, phase in
+            sceneIsActive = phase == .active
             if phase == .active {
                 store.didBecomeActive()
                 followLocation()
@@ -537,7 +541,8 @@ struct ConversationScreen: View {
             try? await Task.sleep(for: .milliseconds(1500))
             // Nor when listening stopped for something else: the address
             // lookup, Settings, or the day's free time running out.
-            guard !store.isListening, !countedConversation,
+            // Asking while the app is leaving would spend the one prompt unseen.
+            guard !store.isListening, !countedConversation, sceneIsActive,
                   !showAddress, !showSettings, !showLanguages, !showOnboarding, !hitFreeLimit else { return }
             // Only turns that were translated; a row still waiting for the other
             // language, or one the engine took back, wasn't a conversation.
