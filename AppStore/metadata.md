@@ -79,7 +79,7 @@ The product IDs must match `Pro.productIDs` in the app and `APP_STORE_PRODUCT_ID
 
 ## Content and privacy declarations
 
-- Content rights: Lively does not contain, show, or access third-party content.
+- Content rights: Lively displays Apple Maps place results and offers third-party voice assets. Cautela Limited confirmed the necessary rights for the selected territories.
 - Age rating: None for all mature-content categories; no unrestricted web access, user-generated-content feed, remote messaging, advertising, gambling, or health content.
 - Privacy policy: `https://lively.cautela.hk/privacy`
 - Account deletion URL: `https://lively.cautela.hk/delete-account`
@@ -120,8 +120,8 @@ custom artwork, and device frames. Raw captures are retained separately.
 - Rebuild with `swift Tools/store-assets/render.swift` from the repository root.
   Obtain the official Apple frames as described in `creative/device-frames/README.md`.
 - Main screenshot: “Every word. Both languages.”; four panels total.
-- Subscription review screenshot: `review/lively-pro-paywall.jpg`, captured
-  from the app with the matching local StoreKit catalog.
+- Subscription review screenshots: `review/lively-pro-paywall.jpg` (yearly) and
+  `review/lively-pro-monthly.jpg` (monthly), each captured with its plan selected.
 - Artwork provenance and prompt: `creative/PROMPT.md`.
 
 The private reviewer address and code are stored in
