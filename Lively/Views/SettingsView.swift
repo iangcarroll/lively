@@ -51,6 +51,8 @@ struct SettingsView: View {
                         set: { settings.chooseOnlineProcessing($0) }
                     ))
                     Link("Privacy Policy", destination: Links.privacy)
+                } footer: {
+                    if settings.onlineProcessing != true { OfflineTranslationNotice() }
                 }
 
                 Section {

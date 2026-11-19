@@ -243,12 +243,15 @@ private struct TablePage: View {
             ) {
                 TableDemo()
             }
-            OnlineTranslationToggle(isOn: $onlineSelection)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .background(Color(.card), in: .rect(cornerRadius: 22))
-                .padding(.horizontal, 24)
-                .padding(.bottom, 14)
+            VStack(spacing: 8) {
+                OnlineTranslationToggle(isOn: $onlineSelection)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(Color(.card), in: .rect(cornerRadius: 22))
+                if !onlineSelection { OfflineTranslationNotice() }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 14)
         }
     }
 }
