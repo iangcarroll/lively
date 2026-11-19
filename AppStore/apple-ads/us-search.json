@@ -1,0 +1,20 @@
+{
+  "Lively US - Brand": {
+    "Brand": {"exact": ["lively translator", "lively live translator"]}
+  },
+  "Lively US - Category": {
+    "Conversation": {"exact": ["live translator", "voice translator", "interpreter", "face to face translator", "conversation translator"]},
+    "Offline": {"exact": ["offline voice translator", "offline travel translator"]}
+  },
+  "Lively US - Language pair": {
+    "Japanese": {"exact": ["english to japanese translator", "japanese voice translator", "japanese to english translator"]},
+    "Chinese": {"exact": ["chinese translator", "english to chinese translator", "chinese voice translator"]}
+  },
+  "Lively US - Competitor": {
+    "Other translators": {"exact": ["itranslate translator", "microsoft translator"]}
+  },
+  "Lively US - Discovery": {
+    "Broad": {"broad": ["travel translator", "two way translator", "speech translation"]},
+    "Search Match": {}
+  }
+}

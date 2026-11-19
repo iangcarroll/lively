@@ -7,6 +7,12 @@ existing Play product IDs in the separate `PLAY_PRODUCT_IDS` allowlist.
 
 ## Product page
 
+The [Japanese listing](localizations/ja/metadata.md) and [Traditional Chinese
+listing](localizations/zh-Hant/metadata.md) have separate App Information and
+iOS version fields for App Store Connect. Each locale's `marketing/` directory
+contains the matching screenshot sets. Only upload the device folders. The
+contact sheet is for review. The screenshots show the app's English interface.
+
 - Name: `Lively: Live Translator`
 - Subtitle: `Speak, type & translate live`
 - Promotional text: `Understand each other with live translation, a shared face-to-face view, and bilingual transcripts. Type, translate photos, or prepare languages for offline use.`
@@ -122,6 +128,7 @@ custom artwork, and device frames. Raw captures are retained separately.
 - Preview: `marketing/contact-sheet.png`.
 - Rebuild with `swift Tools/store-assets/render.swift` from the repository root.
   Obtain the official Apple frames as described in `creative/device-frames/README.md`.
+- For localized screenshots, add `--locale ja` or `--locale zh-Hant` to the same command.
 - Main screenshot: “Every word. Both languages.”; four panels total.
 - Subscription review screenshots: `review/lively-pro-paywall.jpg` (yearly) and
   `review/lively-pro-monthly.jpg` (monthly), each captured with its plan selected.
