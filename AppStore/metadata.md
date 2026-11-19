@@ -113,6 +113,7 @@ custom artwork, and device frames. Raw captures are retained separately.
 
 - iPhone medium: `marketing/iphone-medium/`, four PNGs at 1206 × 2622.
 - iPhone large: `marketing/iphone-large/`, four PNGs at 1320 × 2868.
+- iPhone Duo uses the two PNGs in `marketing/iphone-duo/`, outer portrait at 1398 × 2034 and inner landscape at 2853 × 2007. Rebuild them from the native simulator captures with `swift Tools/store-assets/render.swift --duo-only`.
 - iPad 13-inch: `marketing/ipad-13/`, one PNG at 2064 × 2752.
 - Header: `creative/product-page-header.png`, 3840 × 1646.
 - Search results: `creative/search-results.png`, 1920 × 1280.

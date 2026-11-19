@@ -58,6 +58,35 @@ func canvas(_ width:Int,_ height:Int,_ output:String,_ draw:()->Void) {
     try! rep.representation(using:.png,properties:[:])!.write(to:url)
     print(output)
 }
+// Use the captured screen's aspect ratio so the two Duo displays keep their
+// native geometry. These panels show the app directly without a device bezel.
+func duoScreen(_ name: String, centeredIn width: CGFloat, top: CGFloat, height: CGFloat) {
+    let capture = NSImage(contentsOf: root.appendingPathComponent("AppStore/screenshots/iphone-duo/" + name))!
+    let scaledWidth = height * capture.size.width / capture.size.height
+    let bounds = NSRect(x: (width - scaledWidth) / 2, y: top, width: scaledWidth, height: height)
+    NSGraphicsContext.saveGraphicsState()
+    NSBezierPath(roundedRect: bounds, xRadius: 24, yRadius: 24).addClip()
+    capture.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true,
+                 hints: [.interpolation: NSImageInterpolation.high])
+    NSGraphicsContext.restoreGraphicsState()
+}
+
+canvas(1398, 2034, "AppStore/marketing/iphone-duo/01-face-to-face.png") {
+    rect(0, 0, 1398, 2034, color("211D42"))
+    text("Talk face to face.", 75, 50, 1250, 112, .white, "Bold")
+    text("One language faces each speaker.", 82, 201, 1230, 47, color("D9D5F3"), "Medium")
+    duoScreen("outer-portrait.png", centeredIn: 1398, top: 320, height: 1630)
+}
+
+canvas(2853, 2007, "AppStore/marketing/iphone-duo/02-unfold-the-conversation.png") {
+    rect(0, 0, 2853, 2007, cream)
+    text("Unfold the conversation.", 112, 38, 2630, 120, ink, "Bold")
+    text("Read both languages side by side.", 120, 195, 2610, 52, violet, "Medium")
+    duoScreen("inner-landscape.png", centeredIn: 2853, top: 324, height: 1615)
+}
+
+if CommandLine.arguments.contains("--duo-only") { exit(0) }
+
 let raw="AppStore/screenshots/raw-2026-11-16/"
 let titles=["unused","01-every-word","02-offline-voices","03-your-languages","04-type-translate"]
 let orderedTitles=Array(titles.dropFirst())
