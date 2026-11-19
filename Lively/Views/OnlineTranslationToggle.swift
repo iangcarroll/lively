@@ -5,8 +5,8 @@ struct OnlineTranslationToggle: View {
 
     private var detail: LocalizedStringKey {
         isOn
-            ? "Translate your audio and conversation text via the [Lively Cloud](\(Links.privacy.absoluteString))."
-            : "Translate on this device with downloaded languages and voices."
+            ? "Translate your audio and text via the [Lively Cloud](\(Links.privacy.absoluteString)). Offline translation is usually slower and less accurate."
+            : "Use downloaded languages and voices. Offline translation is usually slower and less accurate than online."
     }
 
     var body: some View {
