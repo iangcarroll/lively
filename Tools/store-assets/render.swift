@@ -4,6 +4,26 @@ import AppKit
 // without redrawing or changing the interface. Run from the repository root.
 let fm = FileManager.default
 let root = URL(fileURLWithPath: fm.currentDirectoryPath)
+let locale: String? = {
+    guard let index = CommandLine.arguments.firstIndex(of: "--locale") else { return nil }
+    guard let value = CommandLine.arguments.dropFirst(index + 1).first, ["ja", "zh-Hant"].contains(value)
+    else { fatalError("Expected --locale ja or --locale zh-Hant") }
+    return value
+}()
+let marketing = locale.map { "AppStore/localizations/\($0)/marketing" } ?? "AppStore/marketing"
+let captions: [String: String] = try locale.map {
+    let url = root.appendingPathComponent("AppStore/localizations/\($0)/captions.json")
+    return try JSONDecoder().decode([String: String].self, from: Data(contentsOf: url))
+} ?? [:]
+
+func caption(_ english: String) -> String {
+    guard locale != nil else { return english }
+    if let localized = captions[english] { return localized }
+    // Branding, the example language names, counts and page numbers are shared.
+    if ["LIVELY", "English", "中文", "日本語"].contains(english)
+        || english.allSatisfy({ $0.isNumber || $0 == " " || $0 == "/" }) { return english }
+    fatalError("Missing caption for \(english)")
+}
 let W: CGFloat = 1206, H: CGFloat = 2622
 func color(_ hex: String, _ alpha: CGFloat = 1) -> NSColor {
     let v = UInt32(hex, radix:16)!
@@ -15,11 +35,19 @@ func rect(_ x: CGFloat,_ y: CGFloat,_ w: CGFloat,_ h: CGFloat,_ c:NSColor,_ r:CG
 }
 func text(_ s:String,_ x:CGFloat,_ y:CGFloat,_ w:CGFloat,_ size:CGFloat,_ c:NSColor=ink,_ weight:String="DemiBold",_ align:NSTextAlignment = .left) {
     let para=NSMutableParagraphStyle(); para.alignment=align; para.lineSpacing = size * 0.015
-    let font=NSFont(name:"AvenirNext-"+weight,size:size) ?? NSFont.systemFont(ofSize:size,weight:.semibold)
-    (s as NSString).draw(in:NSRect(x:x,y:y,width:w,height:900),withAttributes:[.font:font,.foregroundColor:c,.paragraphStyle:para,.kern:-size*0.035])
+    let value = caption(s)
+    let fontName: String
+    switch locale {
+    case "ja" where value != s: fontName = weight == "Medium" ? "HiraginoSans-W4" : "HiraginoSans-W7"
+    case "zh-Hant" where value != s: fontName = weight == "Medium" ? "PingFangTC-Medium" : "PingFangTC-Semibold"
+    default: fontName = "AvenirNext-" + weight
+    }
+    let font=NSFont(name:fontName,size:size) ?? NSFont.systemFont(ofSize:size,weight:.semibold)
+    (value as NSString).draw(in:NSRect(x:x,y:y,width:w,height:900),withAttributes:[.font:font,.foregroundColor:c,.paragraphStyle:para,.kern:-size*0.035])
 }
 func serif(_ s:String,_ x:CGFloat,_ y:CGFloat,_ w:CGFloat,_ size:CGFloat,_ c:NSColor) {
-    (s as NSString).draw(in:NSRect(x:x,y:y,width:w,height:500),withAttributes:[.font:NSFont(name:"Baskerville-Italic",size:size)!, .foregroundColor:c,.kern:-size*0.025])
+    let name = locale == "ja" ? "HiraMinProN-W6" : locale == "zh-Hant" ? "Songti-TC-Bold" : "Baskerville-Italic"
+    (caption(s) as NSString).draw(in:NSRect(x:x,y:y,width:w,height:500),withAttributes:[.font:NSFont(name:name,size:size) ?? NSFont.systemFont(ofSize:size), .foregroundColor:c,.kern:-size*0.025])
 }
 func image(_ path:String,_ r:NSRect) {
     let im=NSImage(contentsOf:root.appendingPathComponent(path))!
@@ -71,14 +99,14 @@ func duoScreen(_ name: String, centeredIn width: CGFloat, top: CGFloat, height: 
     NSGraphicsContext.restoreGraphicsState()
 }
 
-canvas(1398, 2034, "AppStore/marketing/iphone-duo/01-face-to-face.png") {
+canvas(1398, 2034, "\(marketing)/iphone-duo/01-face-to-face.png") {
     rect(0, 0, 1398, 2034, color("211D42"))
     text("Talk face to face.", 75, 50, 1250, 112, .white, "Bold")
     text("One language faces each speaker.", 82, 201, 1230, 47, color("D9D5F3"), "Medium")
     duoScreen("outer-portrait.png", centeredIn: 1398, top: 320, height: 1630)
 }
 
-canvas(2853, 2007, "AppStore/marketing/iphone-duo/02-unfold-the-conversation.png") {
+canvas(2853, 2007, "\(marketing)/iphone-duo/02-unfold-the-conversation.png") {
     rect(0, 0, 2853, 2007, cream)
     text("Unfold the conversation.", 112, 38, 2630, 120, ink, "Bold")
     text("Read both languages side by side.", 120, 195, 2610, 52, violet, "Medium")
@@ -91,7 +119,7 @@ let raw="AppStore/screenshots/raw-2026-11-16/"
 let titles=["unused","01-every-word","02-offline-voices","03-your-languages","04-type-translate"]
 let orderedTitles=Array(titles.dropFirst())
 for i in 1..<5 {
- canvas(Int(W),Int(H),"AppStore/marketing/iphone-medium/\(titles[i]).png") {
+ canvas(Int(W),Int(H),"\(marketing)/iphone-medium/\(titles[i]).png") {
     let dark=i==1;let bg=[cream,color("211D42"),color("F1F0FC"),color("FCEDE7"),color("F1F6F3")][i]
     let fg=dark ? NSColor.white : ink
     rect(0,0,W,H,bg)
@@ -101,7 +129,8 @@ for i in 1..<5 {
         text("Every word.\nBoth languages.",80,170,1050,118,.white,"Bold")
         text("Follow the conversation as it happens.",85,510,1010,40,color("CEC9EE"),"Medium")
         wave(100,710,990,color("7468ED"),1.5)
-        phone(raw+"02-transcript.png",208,820,790)
+        let transcript = locale.map { "AppStore/localizations/\($0)/transcript.png" } ?? raw+"02-transcript.png"
+        phone(transcript,208,820,790)
         pill("LIVE TRANSCRIPT",408,2470,390,color("F3EF85"),ink)
     } else if i==2 {
         text("A voice for\nyour words.",80,170,1040,123,ink,"Bold")
@@ -134,12 +163,12 @@ for i in 1..<5 {
 // Large iPhone placement uses the same marketing design with proportional
 // scaling; the app itself remains an unmodified iPhone capture.
 for name in orderedTitles {
- canvas(1320,2868,"AppStore/marketing/iphone-large/\(name).png") {
+ canvas(1320,2868,"\(marketing)/iphone-large/\(name).png") {
     rect(0,0,1320,2868,cream)
-    image("AppStore/marketing/iphone-medium/\(name).png",NSRect(x:0,y:0,width:1320,height:2868))
+    image("\(marketing)/iphone-medium/\(name).png",NSRect(x:0,y:0,width:1320,height:2868))
  }
 }
-canvas(2064,2752,"AppStore/marketing/ipad-13/01-room-for-conversation.png") {
+canvas(2064,2752,"\(marketing)/ipad-13/01-room-for-conversation.png") {
  rect(0,0,2064,2752,cream)
  text("LIVELY  /  FOR IPAD",100,85,1800,37,violet,"Bold")
  text("More room for\na real conversation.",100,200,1850,166,ink,"Bold")
@@ -154,15 +183,17 @@ canvas(2064,2752,"AppStore/marketing/ipad-13/01-room-for-conversation.png") {
  image("AppStore/creative/device-frames/ipad-pro-m5-silver.png",frame)
  pill("SIDE-BY-SIDE TRANSLATION",100,880,680,color("E3DEF9"),violet)
 }
-canvas(3840,1646,"AppStore/creative/product-page-header.png") {
- rect(0,0,3840,1646,cream)
- image("AppStore/creative/source/conversation-art.png",NSRect(x:0,y:-109.8,width:3840,height:1865.6))
+if locale == nil {
+    canvas(3840,1646,"AppStore/creative/product-page-header.png") {
+        rect(0,0,3840,1646,cream)
+        image("AppStore/creative/source/conversation-art.png",NSRect(x:0,y:-109.8,width:3840,height:1865.6))
+    }
+    canvas(1920,1280,"AppStore/creative/search-results.png") {
+        rect(0,0,1920,1280,cream)
+        image("AppStore/creative/source/conversation-art.png",NSRect(x:-357,y:0,width:2634,height:1280))
+    }
 }
-canvas(1920,1280,"AppStore/creative/search-results.png") {
- rect(0,0,1920,1280,cream)
- image("AppStore/creative/source/conversation-art.png",NSRect(x:-357,y:0,width:2634,height:1280))
-}
-canvas(1200,652,"AppStore/marketing/contact-sheet.png") {
+canvas(1200,652,"\(marketing)/contact-sheet.png") {
  rect(0,0,1200,652,cream)
- for (i,name) in orderedTitles.enumerated() { image("AppStore/marketing/iphone-medium/\(name).png",NSRect(x:CGFloat(i)*300,y:0,width:300,height:652)) }
+ for (i,name) in orderedTitles.enumerated() { image("\(marketing)/iphone-medium/\(name).png",NSRect(x:CGFloat(i)*300,y:0,width:300,height:652)) }
 }
