@@ -134,6 +134,23 @@ describe("Sign in with Apple", () => {
     expect(byApple.user.id).toBe(byCode.user.id);
   });
 
+  it("recovers the Apple subject for an authenticated upgraded install after linking", async () => {
+    const email = randomEmail();
+    await worker.fetch(post("/v1/auth/email/start", { email }), local);
+    const code = /\b(\d{6})\b/.exec((send.mock.calls.at(-1)![0] as EmailMessageBuilder).subject)![1];
+    const legacy = await (await worker.fetch(post("/v1/auth/email/verify", { email, code }), local)).json<SignedIn>();
+    const recover = (token: string) => worker.fetch(new Request("https://broker.test/v1/auth/me", { headers: {
+      Authorization: `Bearer ${token}`, "X-Lively-Recover-Apple-Credential": "1",
+    } }), local);
+    expect((await recover(legacy.token)).status).toBe(200);
+    expect(await (await recover(legacy.token)).json()).toMatchObject({ apple_subject: null });
+    const claims = await appleClaims({ email });
+    const appleSession = await (await apple(claims)).json<SignedIn>();
+    expect(await (await recover(appleSession.token)).json()).toMatchObject({ apple_subject: claims.sub });
+    expect(await (await recover(legacy.token)).json()).toMatchObject({ apple_subject: claims.sub });
+    expect((await recover(crypto.randomUUID())).status).toBe(401);
+  });
+
   it("accepts Apple's string form of email_verified, and refuses an unverified or missing email", async () => {
     expect((await apple(await appleClaims({ email_verified: "true" }))).status).toBe(200);
     for (const overrides of [{ email_verified: false }, { email_verified: undefined }, { email: undefined }]) {
@@ -306,5 +323,20 @@ describe("Sign in with Apple account notifications", () => {
     await notify("email-enabled", claims.sub, seconds, { email });
     expect((await start()).status).toBe(200);
     expect(send).toHaveBeenCalledOnce();
+  });
+
+  it("restores email login on unlink and ignores disabled-forwarding events from the old grant after relinking", async () => {
+    const email = crypto.randomUUID() + "@privaterelay.appleid.com";
+    const claims = await appleClaims({ email });
+    await apple(claims);
+    await notify("email-disabled", claims.sub, seconds - 2, { email });
+    await notify("consent-revoked", claims.sub, seconds - 1);
+    const start = () => worker.fetch(post("/v1/auth/email/start", { email }), local);
+    expect((await start()).status).toBe(200);
+    expect(send).toHaveBeenCalledOnce();
+    await apple({ ...claims, iat: seconds });
+    await notify("email-disabled", claims.sub, seconds - 2, { email });
+    expect((await start()).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(2);
   });
 });

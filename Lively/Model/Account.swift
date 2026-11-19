@@ -39,6 +39,7 @@ final class Account {
 
     private static let tokenAccount = "lively-session-token"
     private static let appleUserAccount = "lively-apple-user"
+    private static let emailSignIn = "email-code"
     private static let emailAccount = "lively-account-email"
     private static let freeProKey = "LivelyAccountFreePro"
 
@@ -98,7 +99,7 @@ final class Account {
     }
 
     private func adopt(_ body: SignedIn, appleUser: String? = nil) {
-        Keychain.write(appleUser, account: Self.appleUserAccount)
+        Keychain.write(appleUser ?? Self.emailSignIn, account: Self.appleUserAccount)
         Keychain.write(body.token, account: Self.tokenAccount)
         Keychain.write(body.user.email, account: Self.emailAccount)
         token = body.token
@@ -107,7 +108,7 @@ final class Account {
     }
 
     func refreshAppleCredential() async {
-        guard let initialToken = token, let subject = Keychain.read(account: Self.appleUserAccount),
+        guard let initialToken = token, let subject = Keychain.read(account: Self.appleUserAccount), subject != Self.emailSignIn,
               let state = try? await ASAuthorizationAppleIDProvider().credentialState(forUserID: subject),
               token == initialToken else { return }
         if state == .revoked || state == .notFound { signOut() }
@@ -122,12 +123,22 @@ final class Account {
         #endif
         var request = URLRequest(url: brokerURL.appending(path: "v1/auth/me"))
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let needsAppleSubject = Keychain.read(account: Self.appleUserAccount) == nil
+        if needsAppleSubject { request.setValue("1", forHTTPHeaderField: "X-Lively-Recover-Apple-Credential") }
         guard let (data, response) = try? await session.data(for: request),
               let http = response as? HTTPURLResponse else { return }
         if http.statusCode == 401 {
             tokenWasRejected(token)
         } else if self.token == token, http.statusCode == 200, let body = try? JSONDecoder().decode(Me.self, from: data) {
             setFreePro(body.user.free_pro ?? false)
+            // Older sessions stored no login method. A linked account can also
+            // sign in by email on a device that has never authorized Apple.
+            if needsAppleSubject, let subject = body.apple_subject,
+               let state = try? await ASAuthorizationAppleIDProvider().credentialState(forUserID: subject),
+               self.token == token {
+                if state == .authorized { Keychain.write(subject, account: Self.appleUserAccount) }
+                if state == .revoked { signOut() }
+            }
         }
     }
 
@@ -216,6 +227,7 @@ final class Account {
 
     private struct Me: Decodable {
         let user: User
+        let apple_subject: String?
     }
 
     private struct BrokerError: Decodable {

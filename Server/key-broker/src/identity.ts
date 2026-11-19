@@ -190,7 +190,8 @@ export async function appleAccountNotification(request: Request, env: Env, now: 
     const address = "SELECT email FROM users WHERE apple_sub = ? AND apple_authorized_at <= ?";
     const change = type === "account-deleted"
       ? "DELETE FROM users WHERE apple_sub = ? AND apple_authorized_at <= ?"
-      : "UPDATE users SET apple_sub = NULL, apple_refresh_token = NULL WHERE apple_sub = ? AND apple_authorized_at <= ?";
+      : "UPDATE users SET apple_sub = NULL, apple_refresh_token = NULL, apple_email_disabled = 0, " +
+        "apple_email_event_at = MAX(apple_email_event_at, ?2) WHERE apple_sub = ?1 AND apple_authorized_at <= ?2";
     await env.DB.batch([
       env.DB.prepare(`DELETE FROM sessions WHERE user_id IN (${affected})`).bind(sub, at),
       env.DB.prepare(`DELETE FROM login_codes WHERE email IN (${address})`).bind(sub, at),

@@ -157,6 +157,11 @@ export async function openSession(env: Env, now: number, userID: string): Promis
 export async function me(request: Request, env: Env, now: number): Promise<Response> {
   const auth = await authenticate(request, env, now);
   if (auth.state !== "signed_in") return unauthorized();
+  if (request.headers.get("X-Lively-Recover-Apple-Credential") === "1") {
+    const row = await env.DB.prepare("SELECT apple_sub FROM users WHERE id = ?")
+      .bind(auth.user.id).first<{ apple_sub: string | null }>();
+    return json(200, { user: userJSON(auth.user), apple_subject: row?.apple_sub ?? null });
+  }
   return json(200, { user: userJSON(auth.user) });
 }
 
