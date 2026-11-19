@@ -14,6 +14,7 @@ final class StoreKitFlowTests {
         defer { session.clearTransactions() }
 
         let pro = Pro.shared
+        pro.start()
         await pro.loadOffers()
         guard case .ready(let offers) = pro.store else {
             Issue.record("The paywall could not load the local StoreKit catalog.")
@@ -28,7 +29,11 @@ final class StoreKitFlowTests {
             #expect(pro.subscription?.productID == offer.id)
             #expect(pro.signedTransaction != nil)
             try session.refundTransaction(identifier: UInt(transaction.id))
-            await pro.refresh()
+            // StoreKit delivers the refund to Transaction.updates asynchronously.
+            let deadline = ContinuousClock.now + .seconds(8)
+            while pro.isSubscribed && ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(50))
+            }
             #expect(!pro.isSubscribed)
         }
     }
