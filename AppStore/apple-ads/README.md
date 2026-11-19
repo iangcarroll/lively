@@ -56,8 +56,11 @@ and [negative keyword CSV](https://ads.apple.com/app-store/help/keywords/0060-us
 | --- | --- | --- |
 | Conversation | Face-to-face conversations | Waiting for Review |
 | Offline | Offline travel translation | Waiting for Review |
-| Japanese | Japanese for your trip | Prepare for Submission |
-| Chinese | English and Chinese conversations | Prepare for Submission |
+| Japanese | Japanese for your trip | Waiting for Review |
+| Chinese | English and Chinese conversations | Waiting for Review |
+
+Apple received all four pages and the “Live transcript vs. offline voices”
+product page optimization test in one marketing submission on November 19.
 
 The import leaves the custom ad fields empty. Assign these pages when Apple
 offers them as eligible ad variations. Use the default listing for Brand,
