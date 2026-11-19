@@ -54,7 +54,7 @@ Privacy Policy: https://lively.cautela.hk/privacy
 ## Review information
 
 - Sign-in required: No
-- Notes: `Lively does not require an account. To exercise the online flow, choose Allow Online Processing, skip optional sign-in, and allow microphone access. Tap the microphone and speak in your language and a supported second language. On-device processing is available as a separate choice. The default Soniox engine obtains a temporary key automatically. Free use is an hour a day (two hours when signed in, with Sign in with Apple or a one-time email code). Lively Pro, an auto-renewing subscription in Settings › Lively Pro, raises it to 10 hours a day; Restore Purchases is on the same screen. Accounts can be deleted in Settings › Account › Delete Account. Settings also offers an optional Voxtral + Mistral engine for users who provide their own Mistral API key.`
+- Notes: `Lively does not require an account. To exercise the online flow, tap Get Started and then Use Online Translation on the table demo, skip optional sign-in, and allow microphone access. Tap the microphone and speak in your language and a supported second language. On-device processing is available as a separate choice. The default Soniox engine obtains a temporary key automatically. Free use is an hour a day (two hours when signed in, with Sign in with Apple or a one-time email code). Lively Pro, an auto-renewing subscription in Settings › Lively Pro, raises it to 10 hours a day; Restore Purchases is on the same screen. Accounts can be deleted in Settings › Account › Delete Account. Settings also offers an optional Voxtral + Mistral engine for users who provide their own Mistral API key.`
 - Release: Manual release after approval
 
 ## In-app purchases
@@ -113,6 +113,7 @@ custom artwork, and device frames. Raw captures are retained separately.
 
 - iPhone medium: `marketing/iphone-medium/`, four PNGs at 1206 × 2622.
 - iPhone large: `marketing/iphone-large/`, four PNGs at 1320 × 2868.
+- iPhone Duo uses the two PNGs in `marketing/iphone-duo/`, outer portrait at 1398 × 2034 and inner landscape at 2853 × 2007. Rebuild them from the native simulator captures with `swift Tools/store-assets/render.swift --duo-only`.
 - iPad 13-inch: `marketing/ipad-13/`, one PNG at 2064 × 2752.
 - Header: `creative/product-page-header.png`, 3840 × 1646.
 - Search results: `creative/search-results.png`, 1920 × 1280.

@@ -7,6 +7,13 @@ struct OnboardingView: View {
     var onFinish: () -> Void
 
     @State private var step: Step = .welcome
+    @State private var onlineSelection: Bool
+
+    init(settings: AppSettings, onFinish: @escaping () -> Void) {
+        self.settings = settings
+        self.onFinish = onFinish
+        _onlineSelection = State(initialValue: settings.onlineProcessing ?? true)
+    }
     /// Which way the last step change went, for the slide direction.
     @State private var forward = true
     /// The safe area insets. The narrower side is padded to match the wider,
@@ -82,7 +89,7 @@ struct OnboardingView: View {
     private var page: some View {
         switch step {
         case .welcome: WelcomePage(languageCount: SpeechProvider.all.map(\.languages.count).max() ?? 0).environment(\.colorScheme, .dark)
-        case .table: TablePage()
+        case .table: TablePage(onlineSelection: $onlineSelection)
         case .languages: LanguagesPage(settings: settings)
         case .account: if let account = Account.shared { AccountPage(account: account, onSignedIn: onFinish) }
         }
@@ -120,12 +127,16 @@ struct OnboardingView: View {
     private var primaryTitle: String {
         switch step {
         case .welcome: "Get Started"
+        case .table: onlineSelection ? "Use Online Translation" : "Use On-Device Translation"
         case .languages where !steps.contains(.account): "Start Talking"
         default: "Continue"
         }
     }
 
     private func advance() {
+        if step == .table, settings.onlineProcessing != onlineSelection {
+            settings.chooseOnlineProcessing(onlineSelection)
+        }
         guard let index = steps.firstIndex(of: step), index + 1 < steps.count else {
             onFinish()
             return
@@ -144,7 +155,11 @@ struct OnboardingView: View {
         DragGesture(minimumDistance: 30)
             .onEnded { drag in
                 guard abs(drag.translation.width) > abs(drag.translation.height) * 1.5 else { return }
-                if drag.translation.width < -60, step != .account { advance() }
+                // A swipe can navigate, but only the labeled button enables online sharing.
+                if drag.translation.width < -60, step != .account,
+                   step != .table || !onlineSelection || settings.onlineProcessing == true {
+                    advance()
+                }
                 if drag.translation.width > 60 { goBack() }
             }
     }
@@ -218,12 +233,25 @@ private struct WelcomePage: View {
 }
 
 private struct TablePage: View {
+    @Binding var onlineSelection: Bool
+
     var body: some View {
-        OnboardingPage(
-            title: "Lay it flat between you",
-            message: "Just talk. Lively hears who's speaking, and each of you reads your own half, in your own language."
-        ) {
-            TableDemo()
+        VStack(spacing: 0) {
+            OnboardingPage(
+                title: "Lay it flat between you",
+                message: "Just talk. Lively hears who's speaking, and each of you reads your own half, in your own language."
+            ) {
+                TableDemo()
+            }
+            VStack(spacing: 8) {
+                OnlineTranslationToggle(isOn: $onlineSelection)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(Color(.card), in: .rect(cornerRadius: 22))
+                if !onlineSelection { OfflineTranslationNotice() }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 14)
         }
     }
 }

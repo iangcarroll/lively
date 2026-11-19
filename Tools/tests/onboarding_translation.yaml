@@ -1,0 +1,40 @@
+appId: hk.cautela.lively
+---
+- launchApp:
+    clearState: true
+    permissions: { all: allow }
+- assertVisible: "Get Started"
+- assertNotVisible: "Use Online Translation"
+- tapOn: "Get Started"
+- assertVisible: "Lay it flat between you"
+- assertVisible: "Use Online Translation"
+- assertNotVisible: { id: "offlineTranslationNotice" }
+- tapOn:
+    id: "onlineTranslationToggle"
+    point: "93%,50%"
+- assertVisible: "Use On-Device Translation"
+- assertVisible: { id: "offlineTranslationNotice" }
+- tapOn: "Use On-Device Translation"
+- assertVisible: "Pick your languages"
+- tapOn: "Back"
+- assertVisible: "Use On-Device Translation"
+- tapOn:
+    id: "onlineTranslationToggle"
+    point: "93%,50%"
+- assertNotVisible: { id: "offlineTranslationNotice" }
+- tapOn: "Use Online Translation"
+- assertVisible: "Choose your language"
+- tapOn: "Continue"
+- tapOn: "Not Now"
+- launchApp
+- assertVisible: "More"
+- assertNotVisible: "Get Started"
+- assertNotVisible: "Use Online Translation"
+- tapOn: "More"
+- tapOn: "Settings"
+- assertVisible: { id: "onlineTranslationToggle" }
+- assertNotVisible: { id: "offlineTranslationNotice" }
+- tapOn: { id: "onlineTranslationToggle", point: "93%,50%" }
+- assertVisible: { id: "offlineTranslationNotice" }
+- tapOn: { id: "onlineTranslationToggle", point: "93%,50%" }
+- assertNotVisible: { id: "offlineTranslationNotice" }

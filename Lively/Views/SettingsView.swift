@@ -17,14 +17,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Privacy") {
-                    NavigationLink {
-                        OnlineProcessingChoice(settings: settings)
-                    } label: {
-                        LabeledContent("Conversation processing", value: settings.onlineProcessing == true ? "Online allowed" : "On-device only")
-                    }
-                    Link("Privacy Policy", destination: Links.privacy)
-                }
                 if let account = Account.shared {
                     Section {
                         NavigationLink {
@@ -51,6 +43,16 @@ struct SettingsView: View {
                             Text("Up to 10 hours of translation a day.")
                         }
                     }
+                }
+
+                Section {
+                    OnlineTranslationToggle(isOn: Binding(
+                        get: { settings.onlineProcessing == true },
+                        set: { settings.chooseOnlineProcessing($0) }
+                    ))
+                    Link("Privacy Policy", destination: Links.privacy)
+                } footer: {
+                    if settings.onlineProcessing != true { OfflineTranslationNotice() }
                 }
 
                 Section {
