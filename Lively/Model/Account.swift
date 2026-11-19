@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import Observation
 
@@ -37,6 +38,8 @@ final class Account {
     private let session: URLSession
 
     private static let tokenAccount = "lively-session-token"
+    private static let appleUserAccount = "lively-apple-user"
+    private static let emailSignIn = "email-code"
     private static let emailAccount = "lively-account-email"
     private static let freeProKey = "LivelyAccountFreePro"
 
@@ -82,7 +85,7 @@ final class Account {
     /// Signs in with what Sign in with Apple returned. `nonce` is the value
     /// whose SHA-256 the request carried; `authorizationCode` lets the broker
     /// revoke the app's access if the account is deleted.
-    func signInWithApple(identityToken: String, authorizationCode: String?, nonce: String) async throws {
+    func signInWithApple(identityToken: String, authorizationCode: String?, nonce: String, appleUser: String) async throws {
         #if DEBUG
         if isDemo {
             try await Task.sleep(for: .milliseconds(600))
@@ -92,15 +95,23 @@ final class Account {
         #endif
         var body = ["identity_token": identityToken, "nonce": nonce]
         if let authorizationCode { body["authorization_code"] = authorizationCode }
-        adopt(try await post("v1/auth/apple", body, as: SignedIn.self))
+        adopt(try await post("v1/auth/apple", body, as: SignedIn.self), appleUser: appleUser)
     }
 
-    private func adopt(_ body: SignedIn) {
+    private func adopt(_ body: SignedIn, appleUser: String? = nil) {
+        Keychain.write(appleUser ?? Self.emailSignIn, account: Self.appleUserAccount)
         Keychain.write(body.token, account: Self.tokenAccount)
         Keychain.write(body.user.email, account: Self.emailAccount)
         token = body.token
         self.email = body.user.email
         setFreePro(body.user.free_pro ?? false)
+    }
+
+    func refreshAppleCredential() async {
+        guard let initialToken = token, let subject = Keychain.read(account: Self.appleUserAccount), subject != Self.emailSignIn,
+              let state = try? await ASAuthorizationAppleIDProvider().credentialState(forUserID: subject),
+              token == initialToken else { return }
+        if state == .revoked || state == .notFound { signOut() }
     }
 
     /// Rereads the account from the broker, which may have granted or taken
@@ -112,12 +123,22 @@ final class Account {
         #endif
         var request = URLRequest(url: brokerURL.appending(path: "v1/auth/me"))
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let needsAppleSubject = Keychain.read(account: Self.appleUserAccount) == nil
+        if needsAppleSubject { request.setValue("1", forHTTPHeaderField: "X-Lively-Recover-Apple-Credential") }
         guard let (data, response) = try? await session.data(for: request),
               let http = response as? HTTPURLResponse else { return }
         if http.statusCode == 401 {
             tokenWasRejected(token)
-        } else if http.statusCode == 200, let body = try? JSONDecoder().decode(Me.self, from: data) {
+        } else if self.token == token, http.statusCode == 200, let body = try? JSONDecoder().decode(Me.self, from: data) {
             setFreePro(body.user.free_pro ?? false)
+            // Older sessions stored no login method. A linked account can also
+            // sign in by email on a device that has never authorized Apple.
+            if needsAppleSubject, let subject = body.apple_subject,
+               let state = try? await ASAuthorizationAppleIDProvider().credentialState(forUserID: subject),
+               self.token == token {
+                if state == .authorized { Keychain.write(subject, account: Self.appleUserAccount) }
+                if state == .revoked { signOut() }
+            }
         }
     }
 
@@ -164,6 +185,7 @@ final class Account {
     }
 
     private func forget() {
+        Keychain.write(nil, account: Self.appleUserAccount)
         Keychain.write(nil, account: Self.tokenAccount)
         Keychain.write(nil, account: Self.emailAccount)
         token = nil
@@ -205,6 +227,7 @@ final class Account {
 
     private struct Me: Decodable {
         let user: User
+        let apple_subject: String?
     }
 
     private struct BrokerError: Decodable {

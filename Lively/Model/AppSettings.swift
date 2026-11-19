@@ -5,7 +5,16 @@ import Observation
 final class AppSettings {
     static let shared = AppSettings()
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+
+    private(set) var onlineProcessing: Bool?
+
+    func chooseOnlineProcessing(_ allowed: Bool) {
+        onlineProcessing = allowed
+        defaults.set(allowed, forKey: "allowsOnlineProcessing")
+        if !provider.supports(languages) { languages = .default }
+        publishWidgetLanguages()
+    }
 
     /// Online discovery keeps the headphone wearer's language fixed and learns
     /// the other language from speech. The saved pair is for manual/offline use.
@@ -25,9 +34,12 @@ final class AppSettings {
     }
 
     /// `SpeechProvider.id` of the chosen engine.
+    private var selectedProviderID: String
     var providerID: String {
-        didSet {
-            defaults.set(providerID, forKey: "speechProvider")
+        get { onlineProcessing == true ? selectedProviderID : SpeechProvider.onDevice.id }
+        set {
+            selectedProviderID = newValue
+            defaults.set(newValue, forKey: "speechProvider")
             if !provider.supports(languages) { languages = .default }
             publishWidgetLanguages()
         }
@@ -91,8 +103,13 @@ final class AppSettings {
         didSet { defaults.set(speaksTranslations, forKey: "speaksTranslations") }
     }
 
+    private var selectedSpeechSource: SpeechSource
     var speechSource: SpeechSource {
-        didSet { defaults.set(speechSource.rawValue, forKey: "speechSource") }
+        get { onlineProcessing == true ? selectedSpeechSource : .downloaded }
+        set {
+            selectedSpeechSource = newValue
+            defaults.set(newValue.rawValue, forKey: "speechSource")
+        }
     }
 
     private var speechListenerLanguageCode: String {
@@ -153,19 +170,23 @@ final class AppSettings {
         provider.credentials.allSatisfy { $0.isOptional || !credential($0).trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
-    private init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let allowsOnline = defaults.object(forKey: "allowsOnlineProcessing") as? Bool
+        onlineProcessing = allowsOnline
         let mode = ConversationMode.initial(
             saved: defaults.string(forKey: "conversationMode"), onboardingDone: defaults.bool(forKey: "onboardingDone"))
         // Saved at once, so finishing the welcome tour doesn't change it.
         defaults.set(mode.rawValue, forKey: "conversationMode")
         conversationMode = mode
         let providerID = defaults.string(forKey: "speechProvider") ?? SpeechProvider.fallback.id
-        self.providerID = providerID
+        self.selectedProviderID = providerID
         let stored = LanguagePair(
             first: Language(defaults.string(forKey: "firstLanguage") ?? LanguagePair.default.first.rawValue),
             second: Language(defaults.string(forKey: "secondLanguage") ?? LanguagePair.default.second.rawValue)
         )
-        languages = SpeechProvider.with(id: providerID).supports(stored) && stored.first != stored.second ? stored : .default
+        let effectiveProvider = allowsOnline == false ? .onDevice : SpeechProvider.with(id: providerID)
+        languages = effectiveProvider.supports(stored) && stored.first != stored.second ? stored : .default
         usesLocationLanguages = defaults.bool(forKey: "usesLocationLanguages")
         locationLanguageRegion = defaults.string(forKey: "locationLanguageRegion")
         latency = Latency(rawValue: defaults.integer(forKey: "latency")) ?? .fastest
@@ -173,7 +194,7 @@ final class AppSettings {
         chineseScript = ChineseScript(rawValue: defaults.string(forKey: "chineseScript") ?? "") ?? .simplified
         translationModel = defaults.string(forKey: "translationModel") ?? Self.defaultTranslationModel
         speaksTranslations = defaults.bool(forKey: "speaksTranslations")
-        speechSource = SpeechSource(rawValue: defaults.string(forKey: "speechSource") ?? "") ?? .original
+        selectedSpeechSource = SpeechSource(rawValue: defaults.string(forKey: "speechSource") ?? "") ?? .original
         // The device voice option was removed. Don't retain an old selection.
         defaults.set(nil, forKey: "speechVoice")
         speechListenerLanguageCode = defaults.string(forKey: "speechListenerLanguage") ?? stored.first.rawValue

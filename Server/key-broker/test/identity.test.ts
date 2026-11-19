@@ -134,6 +134,23 @@ describe("Sign in with Apple", () => {
     expect(byApple.user.id).toBe(byCode.user.id);
   });
 
+  it("recovers the Apple subject for an authenticated upgraded install after linking", async () => {
+    const email = randomEmail();
+    await worker.fetch(post("/v1/auth/email/start", { email }), local);
+    const code = /\b(\d{6})\b/.exec((send.mock.calls.at(-1)![0] as EmailMessageBuilder).subject)![1];
+    const legacy = await (await worker.fetch(post("/v1/auth/email/verify", { email, code }), local)).json<SignedIn>();
+    const recover = (token: string) => worker.fetch(new Request("https://broker.test/v1/auth/me", { headers: {
+      Authorization: `Bearer ${token}`, "X-Lively-Recover-Apple-Credential": "1",
+    } }), local);
+    expect((await recover(legacy.token)).status).toBe(200);
+    expect(await (await recover(legacy.token)).json()).toMatchObject({ apple_subject: null });
+    const claims = await appleClaims({ email });
+    const appleSession = await (await apple(claims)).json<SignedIn>();
+    expect(await (await recover(appleSession.token)).json()).toMatchObject({ apple_subject: claims.sub });
+    expect(await (await recover(legacy.token)).json()).toMatchObject({ apple_subject: claims.sub });
+    expect((await recover(crypto.randomUUID())).status).toBe(401);
+  });
+
   it("accepts Apple's string form of email_verified, and refuses an unverified or missing email", async () => {
     expect((await apple(await appleClaims({ email_verified: "true" }))).status).toBe(200);
     for (const overrides of [{ email_verified: false }, { email_verified: undefined }, { email: undefined }]) {
@@ -268,5 +285,58 @@ describe("Sign in with Google", () => {
     expect((await worker.fetch(post("/v1/auth/google", { id_token: appleToken, nonce: "raw-nonce" }), local)).status).toBe(400);
     const googleToken = await sign(googleClaims({ nonce: await sha256Hex("raw-nonce") }));
     expect((await worker.fetch(post("/v1/auth/apple", { identity_token: googleToken, nonce: "raw-nonce" }), local)).status).toBe(400);
+  });
+});
+
+
+describe("Sign in with Apple account notifications", () => {
+  async function notify(type: string, sub: string, timestamp = seconds, extra: Record<string, unknown> = {}, aud = env.APP_BUNDLE_ID) {
+    const payload = await sign({ iss: "https://appleid.apple.com", aud, iat: seconds, jti: crypto.randomUUID(),
+      events: { type, sub, event_time: timestamp, ...extra } });
+    return worker.fetch(post("/v1/auth/apple/notifications", { payload }), local);
+  }
+
+  it.each(["consent-revoked", "account-deleted"])("handles %s only for the matching current grant", async (type) => {
+    const claims = await appleClaims();
+    const { user, token } = await (await apple(claims)).json<SignedIn>();
+    const session = () => env.DB.prepare("SELECT user_id FROM sessions WHERE user_id = ?").bind(user.id).first();
+    expect(token).toBeTruthy();
+    expect((await notify(type, claims.sub, seconds, {}, "unrelated.app")).status).toBe(400);
+    expect((await notify(type, claims.sub, seconds - 60)).status).toBe(200);
+    expect(await session()).toBeTruthy();
+    expect((await notify(type, claims.sub)).status).toBe(200);
+    expect(await session()).toBeNull();
+    const row = await env.DB.prepare("SELECT apple_sub FROM users WHERE id = ?").bind(user.id).first();
+    expect(row).toEqual(type === "account-deleted" ? null : { apple_sub: null });
+    expect((await notify(type, claims.sub)).status).toBe(200);
+  });
+
+  it("honors relay forwarding changes in event order before sending a code", async () => {
+    const email = crypto.randomUUID() + "@privaterelay.appleid.com";
+    const claims = await appleClaims({ email });
+    await apple(claims);
+    const start = () => worker.fetch(post("/v1/auth/email/start", { email }), local);
+    await notify("email-disabled", claims.sub, seconds - 1, { email });
+    await notify("email-enabled", claims.sub, seconds - 2, { email });
+    expect((await start()).status).toBe(200);
+    expect(send).not.toHaveBeenCalled();
+    await notify("email-enabled", claims.sub, seconds, { email });
+    expect((await start()).status).toBe(200);
+    expect(send).toHaveBeenCalledOnce();
+  });
+
+  it("restores email login on unlink and ignores disabled-forwarding events from the old grant after relinking", async () => {
+    const email = crypto.randomUUID() + "@privaterelay.appleid.com";
+    const claims = await appleClaims({ email });
+    await apple(claims);
+    await notify("email-disabled", claims.sub, seconds - 2, { email });
+    await notify("consent-revoked", claims.sub, seconds - 1);
+    const start = () => worker.fetch(post("/v1/auth/email/start", { email }), local);
+    expect((await start()).status).toBe(200);
+    expect(send).toHaveBeenCalledOnce();
+    await apple({ ...claims, iat: seconds });
+    await notify("email-disabled", claims.sub, seconds - 2, { email });
+    expect((await start()).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(2);
   });
 });

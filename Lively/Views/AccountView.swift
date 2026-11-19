@@ -212,6 +212,8 @@ private struct SignedInCard: View {
             .buttonStyle(.plain)
             .foregroundStyle(.red)
             .disabled(deleting)
+            Link("Manage Sign in with Apple access", destination: URL(string: "https://support.apple.com/en-us/102571")!)
+                .font(.footnote)
             if let deleteError {
                 Label(deleteError, systemImage: "exclamationmark.circle.fill")
                     .font(.footnote.weight(.medium))
@@ -304,7 +306,7 @@ private struct SignInForm: View {
                 }
                 let code = credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
                 let nonce = appleNonce
-                run { try await account.signInWithApple(identityToken: token, authorizationCode: code, nonce: nonce) }
+                run { try await account.signInWithApple(identityToken: token, authorizationCode: code, nonce: nonce, appleUser: credential.user) }
             case .failure(let error):
                 // Closing the sheet isn't an error.
                 if (error as? ASAuthorizationError)?.code != .canceled {
@@ -323,7 +325,7 @@ private struct SignInForm: View {
         .overlay {
             if account.isDemo {
                 Color.clear.contentShape(.capsule)
-                    .onTapGesture { run { try await account.signInWithApple(identityToken: "", authorizationCode: nil, nonce: "") } }
+                    .onTapGesture { run { try await account.signInWithApple(identityToken: "", authorizationCode: nil, nonce: "", appleUser: "") } }
                     .accessibilityHidden(true)
             }
         }

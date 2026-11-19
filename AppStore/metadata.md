@@ -24,13 +24,13 @@ Every word. Both languages.
 A quick question at the station. A conversation over dinner. A new place that suddenly feels a little more familiar. Lively helps you understand each other with live voice translation, a shared conversation view, and clear bilingual transcripts.
 
 TALK NATURALLY
-Choose your two languages, tap the microphone, and start talking. With the default online engine, Lively recognizes either language and translates as the conversation unfolds. No need to select a speaker or tap for every sentence.
+Choose your language, tap the microphone, and start talking. With automatic detection, the online engine recognizes the other speaker’s language and translates as the conversation unfolds. You can also choose a specific language pair.
 
 ONE PHONE. BOTH SIDES.
 Place your iPhone between two people. Face-to-face mode turns each language toward its reader. Switch to the transcript to follow both languages together, or enjoy a spacious side-by-side view on iPad.
 
 MORE WAYS TO SAY IT
-Type when speaking is inconvenient. Translate text from a photo of a menu or sign. Correct a misheard word and translate it again. Choose Simplified or Traditional Chinese output.
+Type when speaking is inconvenient. Translate text from a photo of a menu or sign. Correct a misheard word and translate it again. Choose Simplified or Traditional Chinese output. Look up a place with Apple Maps to show its address in a supported language.
 
 HEAR THE TRANSLATION
 Turn on spoken translations to hear the words aloud. Choose online speech or download the offline voice library: 54 voices across eight languages. On supported iPhones, compatible headphones can keep incoming translations in your ears while the other person hears the device speaker.
@@ -54,7 +54,7 @@ Privacy Policy: https://lively.cautela.hk/privacy
 ## Review information
 
 - Sign-in required: No
-- Notes: `Lively does not require an account. To exercise the primary flow, skip the optional sign-in, allow microphone access, tap the microphone, and speak English or Chinese. The default Soniox engine obtains a temporary key automatically. Free use is an hour a day (two hours when signed in, with Sign in with Apple or a one-time email code). Lively Pro, an auto-renewing subscription in Settings › Lively Pro, raises it to 10 hours a day; Restore Purchases is on the same screen. Accounts can be deleted in Settings › Account › Delete Account. Settings also offers an optional Voxtral + Mistral engine for users who provide their own Mistral API key.`
+- Notes: `Lively does not require an account. To exercise the online flow, choose Allow Online Processing, skip optional sign-in, and allow microphone access. Tap the microphone and speak in your language and a supported second language. On-device processing is available as a separate choice. The default Soniox engine obtains a temporary key automatically. Free use is an hour a day (two hours when signed in, with Sign in with Apple or a one-time email code). Lively Pro, an auto-renewing subscription in Settings › Lively Pro, raises it to 10 hours a day; Restore Purchases is on the same screen. Accounts can be deleted in Settings › Account › Delete Account. Settings also offers an optional Voxtral + Mistral engine for users who provide their own Mistral API key.`
 - Release: Manual release after approval
 
 ## In-app purchases
@@ -74,11 +74,12 @@ The product IDs must match `Pro.productIDs` in the app and `APP_STORE_PRODUCT_ID
 - Each product needs a review screenshot of the paywall (Settings › Lively Pro).
 - Submit both with the first version that includes Pro.
 - License agreement: Apple's standard EULA, linked from the description and from `https://lively.cautela.hk/terms`.
+- Sign in with Apple account changes: `https://lively.cautela.hk/v1/auth/apple/notifications`.
 - App Store Server Notifications V2: `https://lively.cautela.hk/v1/appstore/notifications`, for Production and Sandbox.
 
 ## Content and privacy declarations
 
-- Content rights: Lively does not contain, show, or access third-party content.
+- Content rights: Lively displays Apple Maps place results and offers third-party voice assets. Cautela Limited confirmed the necessary rights for the selected territories.
 - Age rating: None for all mature-content categories; no unrestricted web access, user-generated-content feed, remote messaging, advertising, gambling, or health content.
 - Privacy policy: `https://lively.cautela.hk/privacy`
 - Account deletion URL: `https://lively.cautela.hk/delete-account`
@@ -119,8 +120,8 @@ custom artwork, and device frames. Raw captures are retained separately.
 - Rebuild with `swift Tools/store-assets/render.swift` from the repository root.
   Obtain the official Apple frames as described in `creative/device-frames/README.md`.
 - Main screenshot: “Every word. Both languages.”; four panels total.
-- Subscription review screenshot: `review/lively-pro-paywall.jpg`, captured
-  from the app with the matching local StoreKit catalog.
+- Subscription review screenshots: `review/lively-pro-paywall.jpg` (yearly) and
+  `review/lively-pro-monthly.jpg` (monthly), each captured with its plan selected.
 - Artwork provenance and prompt: `creative/PROMPT.md`.
 
 The private reviewer address and code are stored in

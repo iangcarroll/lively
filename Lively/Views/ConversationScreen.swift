@@ -171,6 +171,12 @@ struct ConversationScreen: View {
         .onChange(of: settings.offlineSpokenLanguage) { _, _ in
             if store.isUsingOnDevice || settings.provider.id == SpeechProvider.onDevice.id { store.offlineSpeakerDidChange() }
         }
+        .onChange(of: settings.onlineProcessing) { _, allowed in
+            if allowed != true {
+                store.stopListening()
+                store.offlineSpeakerDidChange()
+            }
+        }
         .onChange(of: settings.providerID) { _, _ in
             store.offlineSpeakerDidChange()
         }

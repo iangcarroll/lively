@@ -1,7 +1,7 @@
 import { appStoreNotification } from "./appstore";
 import { deleteAccount, deleteExpiredAuth, logout, me, startEmailSignIn, verifyEmailSignIn } from "./auth";
 import { error, issueSonioxKey, issueSonioxSpeechKey, json, nowSeconds, type Env } from "./broker";
-import { appleSignIn, googleSignIn } from "./identity";
+import { appleAccountNotification, appleSignIn, googleSignIn } from "./identity";
 import { translate } from "./translate";
 import { isVoiceRoute, voices } from "./voices";
 
@@ -11,12 +11,14 @@ const PUBLIC_PAGES = new Set(["/", "/privacy", "/support", "/terms", "/delete-ac
 
 const privacy = page(
   "Privacy Policy",
-  `<p><strong>Effective November 17, 2026</strong></p>
+  `<p><strong>Effective November 18, 2026</strong></p>
   <p>Lively is provided by Cautela Limited, a Hong Kong company, and translates live conversations across its supported languages. It is designed to work without an account, advertising, analytics, or tracking.</p>
   <h2>Speech and translations</h2>
-  <p>When you start listening, Lively sends microphone audio to the speech provider selected in Settings so it can transcribe and translate the conversation in real time. The default provider is Soniox. Soniox says its real-time API processes audio, transcripts, and translations transiently, does not store that content, and does not use it to train models.</p>
+  <p>When you use an online speech engine, Lively sends microphone audio to the provider selected in Settings for live transcription and translation. With on-device translation, supported speech and text are processed on your device. The default provider is Soniox. Soniox says its real-time API processes audio, transcripts, and translations transiently, does not store that content, and does not use it to train models.</p>
   <p>If you choose the optional Voxtral + Mistral engine, Lively sends audio and transcript text directly to Mistral using the API key you provide. Mistral's terms and privacy practices apply to that processing.</p>
-  <p>When you type a line to translate, Lively sends that text and the last few turns of the conversation to Lively's key service, which has DeepSeek translate it through Cloudflare AI Gateway and returns the translation. Neither Lively's key service nor its gateway logs keep that text; DeepSeek's terms and privacy practices apply to its processing. If the key service can't be reached, the app translates on your device with Apple's Translation framework instead.</p>
+  <p>When the default online engine needs a text translation, Lively can send speech transcripts, typed, scanned or corrected text, and recent conversation turns to Lively's key service, which has DeepSeek translate it through Cloudflare AI Gateway and returns the translation. Neither Lively's key service nor its gateway logs keep that text; DeepSeek's terms and privacy practices apply to its processing. If the key service can't be reached, the app translates on your device with Apple's Translation framework instead.</p>
+  <p>Photos are read on the device. If you translate the recognized text online, the selected text provider receives that text. Soniox receives translated text when you use its online spoken voice. Downloaded voices synthesize speech on your device.</p>
+  <p>On iPhone and iPad, address lookup sends your search and the selected place to Apple Maps for search and localized address information. The optional location-based language setting uses an approximate location with Apple’s geocoding service and saves the country on your device.</p>
   <p>If you download the offline voice library, the app fetches the voice files from Lively's key service, which keeps a copy of them in Cloudflare storage, and later asks it whether newer voice files are available. Those requests carry no installation identifier, account, or conversation content.</p>
   <p>The conversation shown in Lively remains on your device for the current app session. Lively does not store it on its own servers.</p>
   <h2>Temporary keys and abuse prevention</h2>
@@ -87,6 +89,7 @@ const ROUTES: Record<string, { method: string; handle: (request: Request, env: E
   "/v1/translate": { method: "POST", handle: translate },
   "/v1/auth/email/start": { method: "POST", handle: startEmailSignIn },
   "/v1/auth/email/verify": { method: "POST", handle: verifyEmailSignIn },
+  "/v1/auth/apple/notifications": { method: "POST", handle: appleAccountNotification },
   "/v1/auth/apple": { method: "POST", handle: appleSignIn },
   "/v1/auth/google": { method: "POST", handle: googleSignIn },
   "/v1/auth/me": { method: "GET", handle: me },
