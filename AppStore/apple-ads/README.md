@@ -16,8 +16,8 @@ Apple Ads account and are proposed starting bids and budgets.
 The daily budgets total $55 across campaigns, or a nominal $1,540 over
 28 days. Each daily budget is an average. Set the flight dates and check
 cumulative spend against the four-week budget before enabling the campaigns.
-The settings workbook uses the account's currency. Convert all budgets and
-bids, including the keyword bids below, if the account uses another currency.
+The settings workbook uses the account's currency. Convert its budgets and
+bids before import if the account uses another currency.
 
 ## Stage campaigns and keywords
 
@@ -27,8 +27,9 @@ bids, including the keyword bids below, if the account uses another currency.
 2. Download Campaign, Ad Group, and Ad Settings from that campaign group.
    Export the `Settings` worksheet to UTF-8 CSV. From the repository root run
    `python3 Tools/apple-ads/keywords.py settings.csv uploads`. The command
-   matches Lively's campaign and ad group names to Apple's assigned IDs and
-   reads terms and bids from [us-search.json](us-search.json).
+   matches Lively's campaign and ad group names to Apple's assigned IDs, uses
+   the exported group's Default Max Bid in account currency, and reads the
+   terms from [us-search.json](us-search.json).
 3. Upload each `<group> - <id>.csv` in that group's Keywords tab. Upload
    `discovery-negatives.csv` under Discovery's campaign-level Negative
    Keywords. Every exact-match target is excluded from both Discovery groups.

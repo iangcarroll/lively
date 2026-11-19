@@ -1,35 +1,20 @@
 {
   "Lively US - Brand": {
-    "dailyBudget": 4,
-    "groups": {
-      "Brand": { "maxCPT": 0.50, "exact": ["lively translator", "lively live translator"] }
-    }
+    "Brand": {"exact": ["lively translator", "lively live translator"]}
   },
   "Lively US - Category": {
-    "dailyBudget": 12,
-    "groups": {
-      "Conversation": { "maxCPT": 1.00, "exact": ["live translator", "voice translator", "interpreter", "face to face translator", "conversation translator"] },
-      "Offline": { "maxCPT": 0.85, "exact": ["offline voice translator", "offline travel translator"] }
-    }
+    "Conversation": {"exact": ["live translator", "voice translator", "interpreter", "face to face translator", "conversation translator"]},
+    "Offline": {"exact": ["offline voice translator", "offline travel translator"]}
   },
   "Lively US - Language pair": {
-    "dailyBudget": 24,
-    "groups": {
-      "Japanese": { "maxCPT": 1.10, "exact": ["english to japanese translator", "japanese voice translator", "japanese to english translator"] },
-      "Chinese": { "maxCPT": 1.10, "exact": ["chinese translator", "english to chinese translator", "chinese voice translator"] }
-    }
+    "Japanese": {"exact": ["english to japanese translator", "japanese voice translator", "japanese to english translator"]},
+    "Chinese": {"exact": ["chinese translator", "english to chinese translator", "chinese voice translator"]}
   },
   "Lively US - Competitor": {
-    "dailyBudget": 4,
-    "groups": {
-      "Other translators": { "maxCPT": 0.65, "exact": ["itranslate translator", "microsoft translator"] }
-    }
+    "Other translators": {"exact": ["itranslate translator", "microsoft translator"]}
   },
   "Lively US - Discovery": {
-    "dailyBudget": 11,
-    "groups": {
-      "Broad": { "maxCPT": 0.70, "broad": ["travel translator", "two way translator", "speech translation"] },
-      "Search Match": { "maxCPT": 0.70, "searchMatch": true }
-    }
+    "Broad": {"broad": ["travel translator", "two way translator", "speech translation"]},
+    "Search Match": {}
   }
 }

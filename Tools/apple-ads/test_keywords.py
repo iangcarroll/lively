@@ -14,12 +14,13 @@ class KeywordUploadTests(unittest.TestCase):
     def setUp(self):
         self.campaigns = json.loads(keywords.LAUNCH.read_text())
         self.rows = []
-        for campaign_id, (name, spec) in enumerate(self.campaigns.items(), start=900):
-            for group in spec["groups"]:
+        for campaign_id, (name, groups) in enumerate(self.campaigns.items(), start=900):
+            for group in groups:
                 self.rows.append({
                     "App ID": keywords.APP_ID, "Countries Or Regions": "US",
                     "Campaign Name": name, "Ad Group Name": group,
                     "Campaign ID": str(campaign_id), "Ad Group ID": str(1000 + len(self.rows)),
+                    "Default Max Bid": f"{1 + len(self.rows)}.45",
                 })
 
     def export(self, rows):
@@ -51,11 +52,11 @@ class KeywordUploadTests(unittest.TestCase):
             self.assertNotEqual(subprocess.run(command, capture_output=True).returncode, 0)
         expected = []
         for row in self.rows:
-            group = self.campaigns[row["Campaign Name"]]["groups"][row["Ad Group Name"]]
+            group = self.campaigns[row["Campaign Name"]][row["Ad Group Name"]]
             for match in ("exact", "broad"):
                 for term in group.get(match, []):
-                    expected.append((term, match.upper(), group["maxCPT"], row["Campaign ID"], row["Ad Group ID"]))
-        self.assertCountEqual([(r["Keyword"], r["Match Type"], float(r["Bid"]), r["Campaign ID"], r["Ad Group ID"])
+                    expected.append((term, match.upper(), row["Default Max Bid"], row["Campaign ID"], row["Ad Group ID"]))
+        self.assertCountEqual([(r["Keyword"], r["Match Type"], r["Bid"], r["Campaign ID"], r["Ad Group ID"])
                                for r in targets], expected)
         exact = {r["Keyword"] for r in targets if r["Match Type"] == "EXACT"}
         discovery = next(r["Campaign ID"] for r in self.rows if r["Campaign Name"] == keywords.DISCOVERY)
@@ -69,6 +70,8 @@ class KeywordUploadTests(unittest.TestCase):
             [{**original, "App ID": "123"}, *self.rows[1:]],
             [{**original, "Countries Or Regions": "JP"}, *self.rows[1:]],
             [{**original, "Ad Group ID": ""}, *self.rows[1:]],
+            [{**original, "Default Max Bid": "NaN"}, *self.rows[1:]],
+            [{**original, "Default Max Bid": ""}, *self.rows[1:]],
             [*self.rows, {**original, "Campaign ID": "321"}],
             [{**original, "Ad Group ID": self.rows[-1]["Ad Group ID"]}, *self.rows[1:]],
         ):
