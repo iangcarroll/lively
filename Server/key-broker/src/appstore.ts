@@ -104,7 +104,9 @@ export async function appStoreNotification(request: Request, env: Env): Promise<
   if (!transaction) return json(200, { ok: true });
 
   const type = notification.notificationType;
-  if (type === "SUBSCRIBED" || type === "DID_RENEW" || type === "OFFER_REDEEMED") {
+  // A plan change can charge immediately. The signed transaction price and
+  // purchase date distinguish an actual payment from a future change.
+  if (type === "SUBSCRIBED" || type === "DID_RENEW" || type === "OFFER_REDEEMED" || type === "DID_CHANGE_RENEWAL_PREF") {
     await recordAppleAdsPurchase(transaction, env);
   } else if (type === "REFUND" || type === "REVOKE") {
     await env.DB.prepare(

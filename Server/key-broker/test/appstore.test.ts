@@ -427,16 +427,16 @@ describe("Apple Ads keyword to paid Pro subscription", () => {
     expect((await report()).results[0].paid_subscriptions).toBe(2);
   });
 
-  it("binds trial conversions to the original install even across out-of-order renewal delivery", async () => {
+  it.each(["DID_RENEW", "DID_CHANGE_RENEWAL_PREF"])("binds trial conversions to the original install when %s arrives first", async (event) => {
     const id = install();
     soniox.mockImplementation(async () => Response.json({ ...record, keywordId: undefined }));
     await lookup(id);
     const trial = purchase(id, { price: 0 });
     const paid = { ...trial, transactionId: "later", price: 4990, purchaseDate: trial.purchaseDate + DAY };
-    await notify("DID_RENEW", paid);
+    await notify(event, paid);
     expect((await report()).results).toMatchObject([{ keyword_id: null, installs: 1, paid_subscriptions: 0 }]);
     await notify("SUBSCRIBED", trial);
-    await notify("DID_RENEW", paid);
+    await notify(event, paid);
     expect((await report()).results[0].paid_subscriptions).toBe(1);
     expect(await env.DB.prepare("SELECT first_paid_at FROM apple_ads_subscriptions").first("first_paid_at")).toBe(Math.floor(paid.purchaseDate / 1000));
   });
