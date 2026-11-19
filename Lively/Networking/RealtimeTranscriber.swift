@@ -131,7 +131,7 @@ extension SpeechProvider {
     static let voxtralMistral = SpeechProvider(
         id: "voxtral-mistral",
         name: "Voxtral + Mistral",
-        summary: "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn.",
+        summary: "Mistral receives your audio for transcription and conversation text for translation using your API key.",
         credentials: [.mistral],
         options: [.speed, .translationModel],
         languages: Language.voxtral,
