@@ -21,9 +21,24 @@ final class StoreKitFlowTests {
             return
         }
         #expect(Set(offers.map(\.id)) == Set(Pro.productIDs))
+        #if os(iOS)
+        let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let attribution = AppleAdsAttribution(directory: folder)
+        #endif
         for offer in offers {
             session.clearTransactions()
+            #if os(iOS)
+            let product = try #require(offer.product)
+            guard case .success(.verified(let transaction)) = try await product.purchase(options: attribution.purchaseOptions) else {
+                Issue.record("StoreKit did not verify the test purchase.")
+                return
+            }
+            let token = try #require(transaction.appAccountToken)
+            #expect(attribution.purchaseOptions == [.appAccountToken(token)])
+            #else
             let transaction = try await session.buyProduct(identifier: offer.id)
+            #endif
             await pro.didBuy(offer, transaction: transaction)
             await pro.restore()
             #expect(pro.subscription?.productID == offer.id)

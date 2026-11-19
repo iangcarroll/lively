@@ -528,3 +528,44 @@ the review account because it would hide the subscription purchase UI.
 To disable review access, remove the hash secret while retaining the reserved
 email, and revoke that account's sessions in D1. Never reuse a personal account
 as the reviewer address.
+
+## Apple Ads keyword conversions
+
+After the D1 migration and the attribution-enabled iOS release, run this from
+`Server/key-broker` to see which bid keywords acquired paying Pro subscriptions.
+The report is private to D1 operators. It resolves all 20 bid keywords in the five
+US launch campaigns by name. A row appears after the first attributed install. Adjust the UTC cohort dates to the flight you want to read.
+
+```sh
+npx wrangler d1 execute lively-key-broker --remote --command "
+  SELECT campaign_id, ad_group_id, keyword_id,
+         CASE WHEN keyword_id IS NULL THEN '(keyword not provided)'
+              ELSE coalesce(keyword, '(unmapped keyword ID)') END AS bid_keyword,
+         match_type, sum(installs) AS attributed_installs,
+         sum(paid_subscriptions) AS paid_subscriptions
+  FROM apple_ads_keyword_conversions
+  WHERE install_cohort_utc BETWEEN '2026-11-19' AND '2026-12-16'
+  GROUP BY campaign_id, ad_group_id, keyword_id
+  ORDER BY paid_subscriptions DESC, attributed_installs DESC"
+```
+
+A cohort starts when the broker first receives a successful Apple attribution.
+Only installs that opened the updated app and returned a matching campaign appear.
+Use `claim_type = 'Click'` and `conversion_type = 'Download'` to limit the
+report to tap-through new downloads. Search Match can omit the keyword.
+For broad match, the keyword is the bid term. Apple does not provide the
+customer's search phrase. For a new bid term, add its IDs, name and match
+type from Apple Ads → All Keywords → Actions → Download Keywords to
+`apple_ads_keywords` in a migration. Add new Lively campaign IDs to
+`APPLE_ADS_CAMPAIGN_IDS` before enabling delivery.
+
+Each original Apple subscription counts once, after the first verified
+positive-price production charge. Renewals can convert a free trial. Refunds
+and later cancellations do not subtract a historical first payment. The
+original purchase must carry the install's StoreKit app account token. Old
+purchases, Family Sharing, tests and free account grants do not enter the
+report. Production App Store Server Notifications V2 must point to
+`/v1/appstore/notifications`. Install and purchase records can arrive in
+either order. The report updates as later purchases or notifications arrive.
+
+[Apple's attribution token and keyword fields](https://developer.apple.com/documentation/adservices/aaattribution/attributiontoken())

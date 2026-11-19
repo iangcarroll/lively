@@ -11,6 +11,12 @@ struct LivelyApp: App {
                 .task {
                     Pro.shared.start()
                 }
+                #if os(iOS)
+                .task(id: scenePhase) {
+                    guard scenePhase == .active else { return }
+                    await AppleAdsAttribution.shared.collect()
+                }
+                #endif
                 .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
                     Task { await Account.shared?.refreshAppleCredential() }
                 }

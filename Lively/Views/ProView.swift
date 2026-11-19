@@ -167,7 +167,12 @@ struct ProView: View {
             defer { buying = false }
             guard let product = offer.product else { return await pro.didBuy(offer, transaction: nil) }
             do {
-                switch try await purchase(product) {
+                #if os(iOS)
+                let options = AppleAdsAttribution.shared.purchaseOptions
+                #else
+                let options: Set<Product.PurchaseOption> = []
+                #endif
+                switch try await purchase(product, options: options) {
                 case .success(.verified(let transaction)): await pro.didBuy(offer, transaction: transaction)
                 case .success(.unverified): errorMessage = "The App Store couldn't verify that purchase."
                 // Waiting on Ask to Buy, or closed without buying.

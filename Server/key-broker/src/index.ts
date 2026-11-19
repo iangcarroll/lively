@@ -1,3 +1,4 @@
+import { attributeAppleAds } from "./apple-ads";
 import { appStoreNotification } from "./appstore";
 import { deleteAccount, deleteExpiredAuth, logout, me, startEmailSignIn, verifyEmailSignIn } from "./auth";
 import { error, issueSonioxKey, issueSonioxSpeechKey, json, nowSeconds, type Env } from "./broker";
@@ -11,32 +12,24 @@ const PUBLIC_PAGES = new Set(["/", "/privacy", "/support", "/terms", "/delete-ac
 
 const privacy = page(
   "Privacy Policy",
-  `<p><strong>Effective November 18, 2026</strong></p>
-  <p>Lively is provided by Cautela Limited, a Hong Kong company, and translates live conversations across its supported languages. It is designed to work without an account, advertising, analytics, or tracking.</p>
-  <h2>Speech and translations</h2>
-  <p>When you use an online speech engine, Lively sends microphone audio to the provider selected in Settings for live transcription and translation. With on-device translation, supported speech and text are processed on your device. The default provider is Soniox. Soniox says its real-time API processes audio, transcripts, and translations transiently, does not store that content, and does not use it to train models.</p>
-  <p>If you choose the optional Voxtral + Mistral engine, Lively sends audio and transcript text directly to Mistral using the API key you provide. Mistral's terms and privacy practices apply to that processing.</p>
-  <p>When the default online engine needs a text translation, Lively can send speech transcripts, typed, scanned or corrected text, and recent conversation turns to Lively's key service, which has DeepSeek translate it through Cloudflare AI Gateway and returns the translation. Neither Lively's key service nor its gateway logs keep that text; DeepSeek's terms and privacy practices apply to its processing. If the key service can't be reached, the app translates on your device with Apple's Translation framework instead.</p>
-  <p>Photos are read on the device. If you translate the recognized text online, the selected text provider receives that text. Soniox receives translated text when you use its online spoken voice. Downloaded voices synthesize speech on your device.</p>
-  <p>On iPhone and iPad, address lookup sends your search and the selected place to Apple Maps for search and localized address information. The optional location-based language setting uses an approximate location with Apple’s geocoding service and saves the country on your device.</p>
-  <p>If you download the offline voice library, the app fetches the voice files from Lively's key service, which keeps a copy of them in Cloudflare storage, and later asks it whether newer voice files are available. Those requests carry no installation identifier, account, or conversation content.</p>
-  <p>The conversation shown in Lively remains on your device for the current app session. Lively does not store it on its own servers.</p>
-  <h2>Temporary keys and abuse prevention</h2>
-  <p>To use the default provider without creating an account, the app creates a random installation identifier and stores it in your device Keychain (on Android, in app storage encrypted with a key held by the Android Keystore). Lively's key service receives that identifier and your network address to enforce usage limits and prevent abuse. It stores one-way hashes and short-lived counters, not your raw identifier, raw network address, audio, or transcript.</p>
-  <h2>Optional account</h2>
-  <p>You can optionally sign in for a larger listening allowance. You can sign in with Apple, with Google on Android, or with a code sent to your email address. If you do, Lively collects your email address, stores it with a randomly generated account identifier, and stores only hashes of sign-in codes and session tokens. With Sign in with Apple or Google, Lively also receives and stores that provider's identifier for your account, so it can recognise you next time, and with Apple a token used only to end Lively's access when you delete your account. Apple lets you hide your email address, in which case Lively receives a relay address instead. Lively does not receive your name, contacts, or password. Your email is used only to send a requested sign-in code and operate your account. It is not used for marketing or linked to your conversation content.</p>
-  <p>You can delete your account at any time in Settings → Account → Delete Account or at <a href="/delete-account">lively.cautela.hk/delete-account</a>. This immediately deletes your email address, account identifier, sign-in provider identifiers and sessions from Lively's servers.</p>
-  <h2>Lively Pro purchases</h2>
-  <p>Lively Pro is sold through Apple's App Store, and Apple processes your payment. Lively never receives your payment details or Apple ID. To check that a subscription is active, the app sends Lively's key service the signed transaction record the App Store issued, which includes the product, its purchase and expiry dates, and a transaction identifier. Lively uses it only to apply your Pro allowance, and keeps a one-way hash of the transaction identifier in short-lived usage counters. If a purchase is refunded, Lively stores that transaction identifier to stop the refunded subscription from being used.</p>
-  <p>On Android, Lively Pro is sold through Google Play, and Google processes your payment. Lively never receives your payment details or Google account. To check that a subscription is active, the app sends Lively's key service the purchase token Google Play issued, and the key service asks Google for the subscription's product, status and expiry date. Lively uses it only to apply your Pro allowance, and keeps a one-way hash of the token in short-lived usage counters.</p>
-  <h2>Data we do not use</h2>
-  <p>Lively does not sell personal information, show ads, track you across apps or websites, or use conversation content for marketing or analytics.</p>
-  <h2>Your choices</h2>
-  <p>You can stop transmission at any time by tapping the microphone button. You can clear the visible conversation in the app. Uninstalling Lively removes its local app data. On iPhone and iPad, the random installation identifier may remain in your device Keychain after deletion, but it is not linked to your identity. On Android, uninstalling removes it.</p>
-  <h2>Third-party services</h2>
-  <ul><li><a href="https://soniox.com/policies/privacy-policy">Soniox Privacy Policy</a></li><li><a href="https://mistral.ai/terms#privacy-policy">Mistral Privacy Policy</a></li><li><a href="https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html">DeepSeek Privacy Policy</a></li><li><a href="https://www.cloudflare.com/privacypolicy/">Cloudflare Privacy Policy</a></li></ul>
-  <h2>Contact</h2>
-  <p>For privacy questions, email <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>`,
+  `<p><strong>Last updated November 19, 2026</strong></p>
+  <p>Cautela Limited, a Hong Kong company, operates Lively. This policy explains how we handle your information when you use Lively and the choices you have. You can translate without creating an account.</p>
+  <h2>Your conversations</h2>
+  <p>With on-device translation, supported speech and text stay on your device. When you choose online translation, our speech and translation providers receive the audio or text needed to translate your conversation. This includes text you select from a photo. The photo itself stays on your device.</p>
+  <p>We do not keep a copy of your conversations on our servers or use them for advertising. Your current conversation stays in the app until you clear it or the session ends. You can stop listening at any time using the microphone button.</p>
+  <h2>Accounts and purchases</h2>
+  <p>If you create an account, we use your email address and sign-in information to recognize you and provide your listening allowance. If you use Apple’s Hide My Email, we receive the address Apple provides. We use your email to operate your account and respond to you.</p>
+  <p>Apple or Google processes your payment for Lively Pro. We receive subscription details, including the plan, purchase dates and a purchase identifier, to provide Pro access and handle renewals and refunds. We do not receive your payment card details.</p>
+  <h2>Usage and advertising</h2>
+  <p>We use information about your installation, network address and usage to apply daily limits and prevent abuse. We keep usage counts for a limited time.</p>
+  <p>If you find Lively through an App Store ad, Apple may tell us which campaign and keyword led to your download. We use that information to measure how often those downloads lead to a paid Pro subscription. Lively does not show ads, sell personal information or track you across other companies’ apps and websites.</p>
+  <h2>Service providers</h2>
+  <p>Our service providers include Soniox and DeepSeek for speech and translation, and Cloudflare for hosting. If you choose Mistral, its privacy policy and your account settings apply to the audio and text you send.</p>
+  <p>On iPhone and iPad, Apple Maps receives the places you look up. If you choose to set your language by location, Apple uses your approximate location to identify the country.</p>
+  <p>Read the privacy policies of <a href="https://soniox.com/policies/privacy-policy">Soniox</a>, <a href="https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html">DeepSeek</a>, <a href="https://mistral.ai/terms#privacy-policy">Mistral</a>, <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a> and <a href="https://www.apple.com/legal/privacy/">Apple</a> for more about their practices.</p>
+  <h2>Your choices and contact information</h2>
+  <p>You can delete your account in Settings → Account → Delete Account or on our <a href="/delete-account">account deletion page</a>. This deletes your email, sign-in information and active sessions. Apple or Google manages your subscription separately.</p>
+  <p>For privacy questions or requests about your information, email <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>`,
 );
 
 const support = page(
@@ -95,6 +88,7 @@ const ROUTES: Record<string, { method: string; handle: (request: Request, env: E
   "/v1/auth/me": { method: "GET", handle: me },
   "/v1/auth/logout": { method: "POST", handle: logout },
   "/v1/auth/delete": { method: "POST", handle: deleteAccount },
+  "/v1/apple-ads/attribution": { method: "POST", handle: attributeAppleAds },
   "/v1/appstore/notifications": { method: "POST", handle: appStoreNotification },
 };
 
