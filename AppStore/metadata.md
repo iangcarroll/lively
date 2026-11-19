@@ -24,13 +24,13 @@ Every word. Both languages.
 A quick question at the station. A conversation over dinner. A new place that suddenly feels a little more familiar. Lively helps you understand each other with live voice translation, a shared conversation view, and clear bilingual transcripts.
 
 TALK NATURALLY
-Choose your two languages, tap the microphone, and start talking. With the default online engine, Lively recognizes either language and translates as the conversation unfolds. No need to select a speaker or tap for every sentence.
+Choose your language, tap the microphone, and start talking. With automatic detection, the online engine recognizes the other speaker’s language and translates as the conversation unfolds. You can also choose a specific language pair.
 
 ONE PHONE. BOTH SIDES.
 Place your iPhone between two people. Face-to-face mode turns each language toward its reader. Switch to the transcript to follow both languages together, or enjoy a spacious side-by-side view on iPad.
 
 MORE WAYS TO SAY IT
-Type when speaking is inconvenient. Translate text from a photo of a menu or sign. Correct a misheard word and translate it again. Choose Simplified or Traditional Chinese output.
+Type when speaking is inconvenient. Translate text from a photo of a menu or sign. Correct a misheard word and translate it again. Choose Simplified or Traditional Chinese output. Look up a place with Apple Maps to show its address in a supported language.
 
 HEAR THE TRANSLATION
 Turn on spoken translations to hear the words aloud. Choose online speech or download the offline voice library: 54 voices across eight languages. On supported iPhones, compatible headphones can keep incoming translations in your ears while the other person hears the device speaker.
