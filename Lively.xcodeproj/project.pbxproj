@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C30000000000000000000020 /* Lively.storekit in Resources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000021 /* Lively.storekit */; };
 		B20000000000000000000001 /* NeuralVoices in Frameworks */ = {isa = PBXBuildFile; productRef = B20000000000000000000002 /* NeuralVoices */; };
 		A10000000000000000000025 /* LivelyWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* LivelyWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -43,6 +44,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C30000000000000000000021 /* Lively.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Config/Lively.storekit; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000001 /* Lively.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lively.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000010 /* LivelyWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LivelyWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C30000000000000000000001 /* LivelyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LivelyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -118,6 +120,7 @@
 				A10000000000000000000011 /* LivelyWidgets */,
 				A10000000000000000000012 /* Shared */,
 				C30000000000000000000002 /* LivelyTests */,
+				C30000000000000000000021 /* Lively.storekit */,
 				A10000000000000000000005 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -273,6 +276,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C30000000000000000000020 /* Lively.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

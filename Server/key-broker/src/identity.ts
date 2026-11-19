@@ -25,7 +25,7 @@
  */
 
 import { openSession } from "./auth";
-import { error, type Env } from "./broker";
+import { error, json, type Env } from "./broker";
 
 interface Provider {
   name: "apple" | "google";
@@ -63,6 +63,8 @@ interface Claims {
   sub?: unknown;
   exp?: unknown;
   iat?: unknown;
+  events?: unknown;
+  jti?: unknown;
   nonce?: unknown;
   email?: unknown;
   email_verified?: unknown;
@@ -75,7 +77,11 @@ export async function appleSignIn(request: Request, env: Env, now: number): Prom
   // Apple puts the SHA-256 of the app's nonce in the token.
   if (!claims || !nonce || claims.nonce !== (await sha256Hex(nonce))) return rejected();
   const response = await signIn(env, now, APPLE, claims);
-  if (response.status === 200) await keepAppleRefreshToken(env, now, claims.sub as string, text(body?.authorization_code));
+  if (response.status === 200) {
+    await env.DB.prepare("UPDATE users SET apple_authorized_at = MAX(apple_authorized_at, ?) WHERE apple_sub = ?")
+      .bind(Number(claims.iat) * 1000, claims.sub).run();
+    await keepAppleRefreshToken(env, now, claims.sub as string, text(body?.authorization_code));
+  }
   return response;
 }
 
@@ -117,6 +123,16 @@ async function signIn(env: Env, now: number, provider: Provider, claims: Claims)
 
 /** The token's claims, if one of the provider's keys signed it for one of `audiences` recently. */
 export async function verifyIDToken(token: string | undefined, provider: Provider, audiences: string[], now: number): Promise<Claims | undefined> {
+  const claims = await verifyProviderPayload(token, provider, audiences, now);
+  const seconds = Math.floor(now / 1000);
+  if (!claims || typeof claims.sub !== "string" || !claims.sub || claims.sub.length > 255) return undefined;
+  if (typeof claims.exp !== "number" || claims.exp + CLOCK_SKEW_SECONDS < seconds) return undefined;
+  if (typeof claims.iat !== "number" || claims.iat + TOKEN_MAX_AGE_SECONDS < seconds) return undefined;
+  return claims;
+}
+
+/** Both identity tokens and account-change events use Apple's published signing keys. */
+async function verifyProviderPayload(token: string | undefined, provider: Provider, audiences: string[], now: number): Promise<Claims | undefined> {
   const parts = token?.split(".") ?? [];
   if (parts.length !== 3) return undefined;
   let header: { alg?: unknown; kid?: unknown };
@@ -127,7 +143,7 @@ export async function verifyIDToken(token: string | undefined, provider: Provide
   } catch {
     return undefined;
   }
-  if (header.alg !== "RS256" || typeof header.kid !== "string") return undefined;
+  if (!header || !claims || header.alg !== "RS256" || typeof header.kid !== "string") return undefined;
   const key = await signingKey(provider, header.kid, now);
   if (!key) return undefined;
   let signed = false;
@@ -141,10 +157,47 @@ export async function verifyIDToken(token: string | undefined, provider: Provide
   const seconds = Math.floor(now / 1000);
   if (typeof claims.iss !== "string" || !provider.issuers.includes(claims.iss)) return undefined;
   if (typeof claims.aud !== "string" || !audiences.includes(claims.aud)) return undefined;
-  if (typeof claims.sub !== "string" || claims.sub === "" || claims.sub.length > 255) return undefined;
-  if (typeof claims.exp !== "number" || claims.exp + CLOCK_SKEW_SECONDS < seconds) return undefined;
-  if (typeof claims.iat !== "number" || claims.iat - CLOCK_SKEW_SECONDS > seconds || claims.iat + TOKEN_MAX_AGE_SECONDS < seconds) return undefined;
+  if (typeof claims.iat !== "number" || claims.iat - CLOCK_SKEW_SECONDS > seconds) return undefined;
   return claims;
+}
+
+/** Account changes sent to the primary App ID, separate from StoreKit notifications. */
+export async function appleAccountNotification(request: Request, env: Env, now: number): Promise<Response> {
+  const body = await readJSON(request);
+  const claims = await verifyProviderPayload(text(body?.payload), APPLE, list(env.APP_BUNDLE_ID), now);
+  if (!claims || !text(claims.jti)) return error(400, "bad_notification", "Expected an Apple account notification.");
+  let event = claims.events;
+  if (typeof event === "string") {
+    try { event = JSON.parse(event); } catch { event = null; }
+  }
+  if (!event || typeof event !== "object") return error(400, "bad_notification", "Missing event.");
+  const { sub, type, event_time: timestamp, email } = event as Record<string, unknown>;
+  if (typeof sub !== "string" || !sub || sub.length > 255 || typeof type !== "string"
+    || typeof timestamp !== "number" || !Number.isSafeInteger(timestamp) || timestamp <= 0) {
+    return error(400, "bad_notification", "Invalid event.");
+  }
+  const at = timestamp < 1e12 ? timestamp * 1000 : timestamp;
+  if (at > now + CLOCK_SKEW_SECONDS * 1000) return error(400, "bad_notification", "Invalid event date.");
+  if (type === "email-enabled" || type === "email-disabled") {
+    if (typeof email === "string" && email.toLowerCase().endsWith("@privaterelay.appleid.com")) {
+      await env.DB.prepare("UPDATE users SET apple_email_disabled = ?, apple_email_event_at = ? WHERE apple_sub = ? AND email = ? AND apple_email_event_at < ?")
+        .bind(type === "email-disabled" ? 1 : 0, at, sub, email.toLowerCase(), at).run();
+    }
+  } else if (type === "consent-revoked" || type === "account-deleted") {
+    // Apply once to the grant that existed when Apple issued the event. A delayed
+    // delivery must not end a newer grant. Sessions cascade when the user is deleted.
+    const affected = "SELECT id FROM users WHERE apple_sub = ? AND apple_authorized_at <= ?";
+    const address = "SELECT email FROM users WHERE apple_sub = ? AND apple_authorized_at <= ?";
+    const change = type === "account-deleted"
+      ? "DELETE FROM users WHERE apple_sub = ? AND apple_authorized_at <= ?"
+      : "UPDATE users SET apple_sub = NULL, apple_refresh_token = NULL WHERE apple_sub = ? AND apple_authorized_at <= ?";
+    await env.DB.batch([
+      env.DB.prepare(`DELETE FROM sessions WHERE user_id IN (${affected})`).bind(sub, at),
+      env.DB.prepare(`DELETE FROM login_codes WHERE email IN (${address})`).bind(sub, at),
+      env.DB.prepare(change).bind(sub, at),
+    ]);
+  }
+  return json(200, { ok: true });
 }
 
 interface JWK extends JsonWebKey {

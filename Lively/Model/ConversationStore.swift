@@ -161,6 +161,7 @@ final class ConversationStore {
                 let heard = self.gate.process(decibels, range: self.settings.pickupRange)
                     && !(self.speaker?.player.mutesMic ?? false)
                 self.isHearing = heard
+                guard self.engineProviderID == SpeechProvider.onDevice.id || self.settings.onlineProcessing == true else { continue }
                 self.engine?.send(heard ? chunk : Data(count: chunk.count))
                 self.level = self.level * 0.6 + MicCapture.meterLevel(decibels) * 0.4
             }
@@ -667,6 +668,7 @@ final class ConversationStore {
     /// A recovered connection can translate retained text before the speech
     /// engine has finished replacing its local fallback.
     private var onlineTextTranslator: TranslationService {
+        guard settings.onlineProcessing == true else { return AppleTranslator() }
         if let primaryTranslator { return primaryTranslator }
         if let broker = BrokerTranslator.shared { return FallbackTranslator(primary: broker, fallback: AppleTranslator()) }
         let key = settings.credential(.mistral)
@@ -678,7 +680,7 @@ final class ConversationStore {
     var translatesTypedTextOnDevice: Bool { textTranslator is AppleTranslator }
 
     private var usesOnDeviceServices: Bool {
-        !isAutomaticLanguageMode && (settings.provider.id == SpeechProvider.onDevice.id || isUsingOnDevice || !isOnline)
+        settings.onlineProcessing != true || !isAutomaticLanguageMode && (settings.provider.id == SpeechProvider.onDevice.id || isUsingOnDevice || !isOnline)
     }
 
     /// The selected offline recognizer must change with the visible selector.
@@ -1294,7 +1296,10 @@ final class ConversationStore {
                 }
                 // Re-evaluate after a failed cloud attempt so a connection
                 // loss never leaves local translation waiting for the network.
-                let service: TranslationService = !resumedOnline && self?.isDemo != true && self?.usesOnDeviceServices == true ? AppleTranslator() : translator
+                guard let settings = self?.settings else { return }
+                let useLocal = settings.onlineProcessing != true ||
+                    (!resumedOnline && self?.isDemo != true && self?.usesOnDeviceServices == true)
+                let service: TranslationService = useLocal ? AppleTranslator() : translator
                 do {
                     var output = ""
                     // Show tokens as they stream for a first translation. When

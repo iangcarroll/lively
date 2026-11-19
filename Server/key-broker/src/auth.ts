@@ -68,6 +68,8 @@ export async function startEmailSignIn(request: Request, env: Env, now: number):
     return error(429, "rate_limited", "Too many codes. Try again later.", Math.max(1, Math.ceil((exceeded.resetsAt - now) / 1000)));
   }
 
+  const forwardingDisabled = await env.DB.prepare("SELECT 1 FROM users WHERE email = ? AND apple_email_disabled = 1").bind(email).first();
+  if (forwardingDisabled) return json(200, { ok: true, expires_in_seconds: limits.codeTTLSeconds });
   const isReview = email === normalizeEmail(env.APP_REVIEW_EMAIL);
   const reviewHash = configuredReviewHash(env);
   if (isReview && !reviewHash) return error(503, "review_unavailable", "Review sign-in is temporarily unavailable.");

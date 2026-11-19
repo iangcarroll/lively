@@ -270,3 +270,41 @@ describe("Sign in with Google", () => {
     expect((await worker.fetch(post("/v1/auth/apple", { identity_token: googleToken, nonce: "raw-nonce" }), local)).status).toBe(400);
   });
 });
+
+
+describe("Sign in with Apple account notifications", () => {
+  async function notify(type: string, sub: string, timestamp = seconds, extra: Record<string, unknown> = {}, aud = env.APP_BUNDLE_ID) {
+    const payload = await sign({ iss: "https://appleid.apple.com", aud, iat: seconds, jti: crypto.randomUUID(),
+      events: { type, sub, event_time: timestamp, ...extra } });
+    return worker.fetch(post("/v1/auth/apple/notifications", { payload }), local);
+  }
+
+  it.each(["consent-revoked", "account-deleted"])("handles %s only for the matching current grant", async (type) => {
+    const claims = await appleClaims();
+    const { user, token } = await (await apple(claims)).json<SignedIn>();
+    const session = () => env.DB.prepare("SELECT user_id FROM sessions WHERE user_id = ?").bind(user.id).first();
+    expect(token).toBeTruthy();
+    expect((await notify(type, claims.sub, seconds, {}, "unrelated.app")).status).toBe(400);
+    expect((await notify(type, claims.sub, seconds - 60)).status).toBe(200);
+    expect(await session()).toBeTruthy();
+    expect((await notify(type, claims.sub)).status).toBe(200);
+    expect(await session()).toBeNull();
+    const row = await env.DB.prepare("SELECT apple_sub FROM users WHERE id = ?").bind(user.id).first();
+    expect(row).toEqual(type === "account-deleted" ? null : { apple_sub: null });
+    expect((await notify(type, claims.sub)).status).toBe(200);
+  });
+
+  it("honors relay forwarding changes in event order before sending a code", async () => {
+    const email = crypto.randomUUID() + "@privaterelay.appleid.com";
+    const claims = await appleClaims({ email });
+    await apple(claims);
+    const start = () => worker.fetch(post("/v1/auth/email/start", { email }), local);
+    await notify("email-disabled", claims.sub, seconds - 1, { email });
+    await notify("email-enabled", claims.sub, seconds - 2, { email });
+    expect((await start()).status).toBe(200);
+    expect(send).not.toHaveBeenCalled();
+    await notify("email-enabled", claims.sub, seconds, { email });
+    expect((await start()).status).toBe(200);
+    expect(send).toHaveBeenCalledOnce();
+  });
+});

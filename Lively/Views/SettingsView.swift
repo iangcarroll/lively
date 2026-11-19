@@ -17,6 +17,14 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Privacy") {
+                    NavigationLink {
+                        OnlineProcessingChoice(settings: settings)
+                    } label: {
+                        LabeledContent("Conversation processing", value: settings.onlineProcessing == true ? "Online allowed" : "On-device only")
+                    }
+                    Link("Privacy Policy", destination: Links.privacy)
+                }
                 if let account = Account.shared {
                     Section {
                         NavigationLink {
@@ -123,7 +131,7 @@ struct SettingsView: View {
                     }
                     .disabled(settings.speechSource == .original && SonioxSpeaker.credential(settings) == nil)
                     Picker("Spoken voice", selection: $settings.speechSource) {
-                        ForEach(SpeechSource.allCases) { Text($0.label).tag($0) }
+                        ForEach(settings.onlineProcessing == true ? SpeechSource.allCases : [.downloaded]) { Text($0.label).tag($0) }
                     }
                     NavigationLink {
                         OfflineVoiceLibraryView(
@@ -175,7 +183,7 @@ struct SettingsView: View {
 
                 Section {
                     Picker(selection: $settings.providerID) {
-                        ForEach(SpeechProvider.all) { Text($0.name).tag($0.id) }
+                        ForEach(settings.onlineProcessing == true ? SpeechProvider.all : [.onDevice]) { Text($0.name).tag($0.id) }
                     } label: {
                         Label { Text("Engine") } icon: { SettingsIcon(systemImage: "waveform", color: .purple) }
                     }
