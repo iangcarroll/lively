@@ -377,3 +377,96 @@ describe("pages", () => {
     expect(await script.text()).toContain("/v1/auth/delete");
   });
 });
+
+describe("Apple Ads keyword to paid Pro subscription", () => {
+  beforeEach(async () => {
+    await env.DB.batch([env.DB.prepare("DELETE FROM apple_ads_installs"), env.DB.prepare("DELETE FROM apple_ads_subscriptions")]);
+  });
+
+  const install = () => crypto.randomUUID();
+  const campaign = Number(env.APPLE_ADS_CAMPAIGN_IDS.split(",")[0]);
+  const record = { attribution: true, campaignId: campaign, adGroupId: 37, keywordId: 55, claimType: "Click", conversionType: "Download" };
+  const token = () => btoa(crypto.randomUUID());
+
+  function lookup(id: string, body = token()) {
+    return worker.fetch(new Request("https://broker.test/v1/apple-ads/attribution", {
+      method: "POST", headers: { "Lively-Attribution-ID": id, "CF-Connecting-IP": randomIP() }, body,
+    }), local);
+  }
+
+  function purchase(id: string, overrides: Partial<SignedTransaction> = {}) {
+    const t = transaction();
+    return { ...t, purchaseDate: Date.now(), transactionId: t.originalTransactionId, appAccountToken: id,
+      inAppOwnershipType: "PURCHASED", price: 4990, ...overrides };
+  }
+
+  const report = () => env.DB.prepare("SELECT * FROM apple_ads_keyword_conversions ORDER BY keyword_id").all();
+
+  it("joins verified purchases before or after token delivery and counts each original subscription once", async () => {
+    const [a, b] = [install(), install()];
+    const keyword = await env.DB.prepare("SELECT * FROM apple_ads_keywords LIMIT 1")
+      .first<{ campaign_id: number; ad_group_id: number; keyword_id: number; keyword: string; match_type: string }>();
+    if (!keyword) throw Error("Keyword catalogue missing");
+    const mapped = { ...record, campaignId: keyword.campaign_id, adGroupId: keyword.ad_group_id, keywordId: keyword.keyword_id };
+    const first = purchase(a);
+    await notify("SUBSCRIBED", first);
+    await notify("SUBSCRIBED", first);
+    soniox.mockImplementation(async () => Response.json(mapped));
+    const appleToken = token();
+    expect(await (await lookup(a, appleToken)).json()).toEqual({ attributed: true });
+    expect(soniox).toHaveBeenCalledWith("https://api-adservices.apple.com/api/v1/", expect.objectContaining({
+      method: "POST", headers: { "Content-Type": "text/plain" }, body: appleToken,
+    }));
+    expect(await (await lookup(a, appleToken)).json()).toEqual({ attributed: true });
+    expect(soniox).toHaveBeenCalledTimes(1);
+    expect(await (await lookup(b, appleToken)).json()).toEqual({ attributed: false });
+    await lookup(b);
+    await notify("DID_RENEW", { ...first, transactionId: "renewal", appAccountToken: b, purchaseDate: first.purchaseDate + DAY });
+    expect((await report()).results).toMatchObject([{ keyword: keyword.keyword, match_type: keyword.match_type, installs: 2, paid_subscriptions: 1 }]);
+    await notify("SUBSCRIBED", purchase(b));
+    expect((await report()).results[0].paid_subscriptions).toBe(2);
+  });
+
+  it("binds trial conversions to the original install even across out-of-order renewal delivery", async () => {
+    const id = install();
+    soniox.mockImplementation(async () => Response.json({ ...record, keywordId: undefined }));
+    await lookup(id);
+    const trial = purchase(id, { price: 0 });
+    const paid = { ...trial, transactionId: "later", price: 4990, purchaseDate: trial.purchaseDate + DAY };
+    await notify("DID_RENEW", paid);
+    expect((await report()).results).toMatchObject([{ keyword_id: null, installs: 1, paid_subscriptions: 0 }]);
+    await notify("SUBSCRIBED", trial);
+    await notify("DID_RENEW", paid);
+    expect((await report()).results[0].paid_subscriptions).toBe(1);
+    expect(await env.DB.prepare("SELECT first_paid_at FROM apple_ads_subscriptions").first("first_paid_at")).toBe(Math.floor(paid.purchaseDate / 1000));
+  });
+
+  it("excludes sandbox, free, family, legacy, revoked and unverified purchases", async () => {
+    const id = install();
+    soniox.mockImplementation(async () => Response.json(record));
+    await lookup(id);
+    for (const overrides of [{ environment: "Sandbox" }, { price: 0 }, { price: undefined }, { inAppOwnershipType: "FAMILY_SHARED" },
+      { appAccountToken: undefined }, { revocationDate: Date.now() }, { productId: "another.app.pro" }]) {
+      await notify("SUBSCRIBED", purchase(id, overrides));
+    }
+    expect((await worker.fetch(notification("not.signed.proof"), local)).status).toBe(400);
+    expect((await report()).results).toMatchObject([{ installs: 1, paid_subscriptions: 0 }]);
+  });
+
+  it("retries Apple's delayed token and excludes organic, developer and malformed responses", async () => {
+    const id = install();
+    soniox.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    const retry = await lookup(id);
+    expect(retry.status).toBe(503);
+    expect(retry.headers.get("Retry-After")).toBe("5");
+    for (const payload of [{ attribution: false }, { ...record, campaignId: 1234567890 }]) {
+      soniox.mockResolvedValueOnce(Response.json(payload));
+      expect(await (await lookup(id)).json()).toEqual({ attributed: false });
+    }
+    soniox.mockResolvedValueOnce(Response.json({}));
+    expect((await lookup(id)).status).toBe(503);
+    expect((await lookup("invalid")).status).toBe(400);
+    expect((await lookup(id, "x".repeat(16385))).status).toBe(400);
+    expect((await report()).results).toHaveLength(0);
+  });
+});

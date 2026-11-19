@@ -250,7 +250,7 @@ interface Counter {
 }
 
 /** Bumps each counter; if one goes over, takes them all back and returns it. */
-async function overLimit(env: Env, counters: Counter[]): Promise<Counter | undefined> {
+export async function overLimit(env: Env, counters: Counter[]): Promise<Counter | undefined> {
   const results = await env.DB.batch<{ value: number }>(
     counters.map((c) =>
       env.DB.prepare(

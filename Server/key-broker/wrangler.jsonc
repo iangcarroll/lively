@@ -77,6 +77,8 @@
     // Lively Pro. Sandbox is TestFlight's environment, where purchases are free.
     "APP_BUNDLE_ID": "hk.cautela.lively",
     "APP_STORE_PRODUCT_IDS": "hk.cautela.lively.pro.monthly,hk.cautela.lively.pro.yearly",
+    // The five Lively US search campaigns, from the Apple Ads settings export.
+    "APPLE_ADS_CAMPAIGN_IDS": "2145166595,2145166596,2145166597,2145166598,2145166599",
     "APP_STORE_ENVIRONMENTS": "Production,Sandbox",
     // Google Play. The service account's JSON key is the secret
     // GOOGLE_PLAY_SERVICE_ACCOUNT; without it, Play purchases are ignored.

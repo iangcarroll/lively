@@ -88,6 +88,7 @@ export interface Env {
   APP_STORE_PRODUCT_IDS: string;
   /** App Store environments whose transactions count: Production, and Sandbox for TestFlight. */
   APP_STORE_ENVIRONMENTS: string;
+  APPLE_ADS_CAMPAIGN_IDS: string;
   /** Tests only: trust this root (base64 DER) instead of Apple's. */
   APP_STORE_TEST_ROOT?: string;
   /** Google Play: the Android app's package name, and the JSON key of a service account that can read its purchases. */

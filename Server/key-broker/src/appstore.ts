@@ -29,6 +29,7 @@
  * transaction for it.
  */
 
+import { recordAppleAdsPurchase } from "./apple-ads";
 import { X509Certificate } from "node:crypto";
 import { error, json, type Env } from "./broker";
 
@@ -47,6 +48,11 @@ export interface SignedTransaction {
   bundleId: string;
   environment: string;
   type?: string;
+  transactionId?: string;
+  appAccountToken?: string;
+  inAppOwnershipType?: string;
+  price?: number;
+  purchaseDate?: number;
   /** All dates are ms since the epoch. */
   signedDate: number;
   expiresDate?: number;
@@ -98,7 +104,9 @@ export async function appStoreNotification(request: Request, env: Env): Promise<
   if (!transaction) return json(200, { ok: true });
 
   const type = notification.notificationType;
-  if (type === "REFUND" || type === "REVOKE") {
+  if (type === "SUBSCRIBED" || type === "DID_RENEW" || type === "OFFER_REDEEMED") {
+    await recordAppleAdsPurchase(transaction, env);
+  } else if (type === "REFUND" || type === "REVOKE") {
     await env.DB.prepare(
       "INSERT INTO revoked_subscriptions (original_transaction_id, reason) VALUES (?1, ?2) ON CONFLICT DO NOTHING",
     )
