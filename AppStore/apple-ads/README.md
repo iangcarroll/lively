@@ -5,6 +5,12 @@ Use [us-campaigns.xlsx](us-campaigns.xlsx) to stage the five campaigns in
 All campaigns and ad groups start paused. The amounts below assume a USD
 Apple Ads account and are proposed starting bids and budgets.
 
+The initial setup was completed on November 19, 2026. Apple's downloaded
+settings confirmed all five campaigns and eight ad groups were paused.
+Apple Ads shows 17 exact targets, three broad targets and 17 campaign-level
+Discovery exclusions. Use the existing campaigns for this flight. The
+creation workbook and steps below are retained for reference.
+
 | Campaign | Average USD/day | Ad groups | Max USD/tap |
 | --- | ---: | --- | ---: |
 | Brand | 4 | Brand | 0.50 |

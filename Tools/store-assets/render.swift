@@ -46,7 +46,7 @@ func text(_ s:String,_ x:CGFloat,_ y:CGFloat,_ w:CGFloat,_ size:CGFloat,_ c:NSCo
     (value as NSString).draw(in:NSRect(x:x,y:y,width:w,height:900),withAttributes:[.font:font,.foregroundColor:c,.paragraphStyle:para,.kern:-size*0.035])
 }
 func serif(_ s:String,_ x:CGFloat,_ y:CGFloat,_ w:CGFloat,_ size:CGFloat,_ c:NSColor) {
-    let name = locale == "ja" ? "HiraMinProN-W6" : locale == "zh-Hant" ? "Songti-TC-Bold" : "Baskerville-Italic"
+    let name = locale == "ja" ? "HiraMinProN-W6" : locale == "zh-Hant" ? "STSongti-TC-Bold" : "Baskerville-Italic"
     (caption(s) as NSString).draw(in:NSRect(x:x,y:y,width:w,height:500),withAttributes:[.font:NSFont(name:name,size:size) ?? NSFont.systemFont(ofSize:size), .foregroundColor:c,.kern:-size*0.025])
 }
 func image(_ path:String,_ r:NSRect) {
