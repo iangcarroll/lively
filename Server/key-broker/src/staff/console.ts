@@ -1,14 +1,12 @@
+import { authorizeStaff, type StaffPolicy } from "./access";
 import type { StaffReports } from "./reports";
-import { accountPage, overviewPage, subscriptionsPage, type Access, type Section } from "./views";
+import { accountPage, overviewPage, subscriptionsPage, type Section } from "./views";
 import { styles } from "./styles";
 
 const ORIGIN = "https://admin-lively.cautela.hk";
-export interface ConsoleEnv {
+export interface ConsoleEnv extends StaffPolicy {
   STAFF_READ_LIMIT: RateLimit;
   REPORTS: Pick<StaffReports, "overview" | "account" | "recentSubscriptions" | "subscription">;
-  STAFF_ACCESS_AUD?: string;
-  STAFF_SUPPORT_IDS?: string;
-  STAFF_ANALYST_IDS?: string;
 }
 
 const securityHeaders = {
@@ -22,10 +20,6 @@ const securityHeaders = {
 
 function response(body: string, status: number, type = "text/plain") {
   return new Response(body, { status, headers: { ...securityHeaders, "Content-Type": type + "; charset=utf-8" } });
-}
-
-function includes(ids: string | undefined, id: string) {
-  return ids?.split(",").some(item => item.trim() === id) ?? false;
 }
 
 // Keep customer searches out of URLs, referrers and audit logs. Accept only a
@@ -62,12 +56,10 @@ export default {
       return response("Staff access required.", 403);
     }
     try {
-      if (!env.STAFF_ACCESS_AUD || ctx.access?.aud !== env.STAFF_ACCESS_AUD) return denied();
-      const identity = await ctx.access.getIdentity();
-      operator = identity?.user_uuid;
-      if (!operator || !identity?.email) return denied();
-      const access: Access = { support: includes(env.STAFF_SUPPORT_IDS, operator), analyst: includes(env.STAFF_ANALYST_IDS, operator) };
-      if (!access.support && !access.analyst) return denied();
+      const staff = await authorizeStaff(request, env, ctx);
+      if (!staff) return denied();
+      operator = staff.operator;
+      const access = staff.access;
       if (url.search) return response("Use the search form.", 400);
       if (url.pathname === "/console.css" && request.method === "GET") return response(styles, 200, "text/css");
       const paths: Record<string, Section> = { "/": access.analyst ? "overview" : "users",

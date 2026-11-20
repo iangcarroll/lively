@@ -11,27 +11,36 @@ const origin = "https://admin-lively.cautela.hk";
 const audience = crypto.randomUUID();
 const support = crypto.randomUUID();
 const analyst = crypto.randomUUID();
+const idp = crypto.randomUUID();
+const fingerprint = () => crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
+const supportCert = fingerprint(), analystCert = fingerprint();
+const certOwners = { [supportCert]: support, [analystCert]: analyst };
 const reports = new StaffReports(createExecutionContext(), env);
-const bindings: ConsoleEnv = { STAFF_READ_LIMIT: { limit: async () => ({ success: true }) }, REPORTS: reports, STAFF_ACCESS_AUD: audience, STAFF_SUPPORT_IDS: support, STAFF_ANALYST_IDS: analyst };
+const bindings: ConsoleEnv = { STAFF_READ_LIMIT: { limit: async () => ({ success: true }) }, REPORTS: reports, STAFF_ACCESS_AUD: audience, STAFF_IDP_ID: idp, STAFF_CERT_OWNERS: JSON.stringify(certOwners), STAFF_SUPPORT_IDS: support, STAFF_ANALYST_IDS: analyst };
 const staffEmail = "staff@example.com";
 
-function context(id: string, aud = audience, email = staffEmail) {
+function context(id: string, aud = audience, email = staffEmail, overrides: Record<string, unknown> = {}) {
   const ctx = createExecutionContext();
-  Object.defineProperty(ctx, "access", { value: { aud, getIdentity: async () => ({ user_uuid: id, email }) } });
+  Object.defineProperty(ctx, "access", { value: { aud, getIdentity: async () => ({ user_uuid: id, email, idp: { id: idp }, iat: Math.floor(Date.now() / 1000), amr: ["hwk"], ...overrides }) } });
   return ctx;
 }
+function staffRequest(path: string, id: string, init: RequestInit = {}, tls: Record<string, unknown> = {}) {
+  const certificate = { certPresented: "1", certVerified: "SUCCESS", certRevoked: "0",
+    certFingerprintSHA256: id === analyst ? analystCert : supportCert, ...tls };
+  return new Request(origin + path, { ...init, cf: { tlsClientAuth: certificate } });
+}
 function get(path: string, id: string) {
-  return staff.fetch(new Request(origin + path), bindings, context(id));
+  return staff.fetch(staffRequest(path, id), bindings, context(id));
 }
 function lookup(path: string, query: string, id = support, initiator = origin) {
-  return staff.fetch(new Request(origin + path, { method: "POST", headers: { Origin: initiator },
+  return staff.fetch(staffRequest(path, id, { method: "POST", headers: { Origin: initiator },
     body: new URLSearchParams({ q: query }) }), bindings, context(id));
 }
 
 describe("staff access", () => {
   it("requires a platform-authenticated human in the configured application and role, on every route", async () => {
     for (const path of ["/", "/users", "/subscriptions", "/overview", "/console.css"]) {
-      const req = new Request(origin + path, { headers: { "Cf-Access-Authenticated-User-Email": staffEmail, Authorization: "Bearer customer" } });
+      const req = staffRequest(path, support, { headers: { "Cf-Access-Authenticated-User-Email": staffEmail, Authorization: "Bearer customer" } });
       for (const ctx of [createExecutionContext(), context(support, "another-app"), context(crypto.randomUUID()), context(support, audience, "")]) {
         expect((await staff.fetch(req, bindings, ctx)).status).toBe(403);
       }
@@ -39,6 +48,41 @@ describe("staff access", () => {
       expect((await staff.fetch(new Request("https://alternate.workers.dev" + path), bindings, context(support))).status).toBe(404);
       if (path !== "/") expect((await broker.fetch(new Request("https://lively.cautela.hk" + path), env)).status).toBe(404);
     }
+  });
+
+  it("denies staff without both independent identity proofs before invoking any report", async () => {
+    const reportsCalled = vi.fn(() => { throw Error("Unexpected report access"); });
+    const guarded = { ...bindings, REPORTS: { account: reportsCalled, recentSubscriptions: reportsCalled,
+      subscription: reportsCalled, overview: reportsCalled } };
+    const now = Math.floor(Date.now() / 1000);
+    for (const path of ["/", "/users", "/subscriptions", "/console.css"]) {
+      const req = staffRequest(path, support);
+      const missingCert = new Request(origin + path, { headers: { "Client-Cert": supportCert,
+        "Cf-Access-Authenticated-User-Email": staffEmail } });
+      const scenarios = [
+        [missingCert, guarded, context(support)],
+        [req, guarded, createExecutionContext()],
+        [req, guarded, context(support, "another-audience")],
+        [req, guarded, context(support, audience, staffEmail, { idp: { id: "email-otp" } })],
+        [req, guarded, context(support, audience, staffEmail, { amr: ["pwd", "otp"] })],
+        [req, guarded, context(support, audience, staffEmail, { amr: undefined })],
+        [req, guarded, context(support, audience, staffEmail, { iat: now - 4 * 3600 })],
+        [req, guarded, context(support, audience, staffEmail, { iat: now + 600 })],
+        [req, guarded, context(support, audience, staffEmail, { iat: undefined })],
+        [req, guarded, context(analyst)],
+        [req, { ...guarded, STAFF_SUPPORT_IDS: "" }, context(support)],
+        [req, { ...guarded, STAFF_IDP_ID: undefined }, context(support)],
+        ...[undefined, "{}", "broken", "null", "[]", JSON.stringify({ [supportCert]: "*" })].map(
+          pinConfig => [req, { ...guarded, STAFF_CERT_OWNERS: pinConfig }, context(support)] as const),
+        ...[{ certPresented: "0" }, { certVerified: "FAILED" }, { certRevoked: "1" }, { certRevoked: undefined },
+          { certFingerprintSHA256: fingerprint() }, { certFingerprintSHA256: "" }].map(
+          tls => [staffRequest(path, support, {}, tls), guarded, context(support)] as const),
+      ] as const;
+      for (const [request, policy, ctx] of scenarios) {
+        expect((await staff.fetch(request, policy, ctx)).status).toBe(403);
+      }
+    }
+    expect(reportsCalled).not.toHaveBeenCalled();
   });
 
   it("enforces both roles before querying and gives each a usable home", async () => {
@@ -56,7 +100,7 @@ describe("staff access", () => {
 
   it("throttles authorized staff reads before reaching the service binding", async () => {
     const limit = vi.fn(async () => ({ success: false }));
-    const res = await staff.fetch(new Request(origin + "/users", { method: "POST",
+    const res = await staff.fetch(staffRequest("/users", support, { method: "POST",
       headers: { Origin: origin }, body: new URLSearchParams({ q: "user@example.com" }) }),
       { ...bindings, STAFF_READ_LIMIT: { limit } }, context(support));
     expect(res.status).toBe(429);
@@ -65,7 +109,7 @@ describe("staff access", () => {
   });
 
   it("serves an overview over the named workerd RPC binding", async () => {
-    const res = await staff.fetch(new Request(origin), { ...bindings, REPORTS: workers.StaffReports }, context(analyst));
+    const res = await staff.fetch(staffRequest("/", analyst), { ...bindings, REPORTS: workers.StaffReports }, context(analyst));
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("<h1>Overview</h1>");
   });
@@ -75,7 +119,7 @@ describe("staff access", () => {
       await lookup("/users", "a@b.co", support, "https://sibling.example"),
       await lookup("/users", "x".repeat(3000)),
       await get("/users?q=private", support),
-      await staff.fetch(new Request(origin + "/users", { method: "POST", body: "q=foo" }), bindings, context(support)),
+      await staff.fetch(staffRequest("/users", support, { method: "POST", body: "q=foo" }), bindings, context(support)),
     ];
     for (const res of responses) expect(res.status).toBe(400);
     for (const res of [...responses, await get("/users", support), await get("/users", analyst)]) {

@@ -606,29 +606,44 @@ are more than 90 days old.
 
 1. In Cloudflare Zero Trust create a self-hosted Access application for the
    entire `admin-lively.cautela.hk` hostname. Allow the staff group through
-   the company identity provider. Require a phishing-resistant passkey or security
-   key at the IdP, or enable Access independent MFA for this application with
-   Security key as the only allowed method. Restrict sign-in to the selected IdP,
-   omit Bypass and Service Auth policies, and start with a four-hour session.
-   Record the application's audience tag and staff Access user UUIDs.
-2. Apply the broker migrations and deploy the broker through its existing
+   the company identity provider. Require WebAuthn sign-in, restrict Access to
+   that IdP, omit Bypass and Service Auth policies, and set a four-hour session.
+   Record the application audience, Access identity-provider ID and each staff
+   Access user UUID. Verify in a test sign-in that the trusted Access identity
+   reports the IdP ID, issue time and a key authentication method (`hwk` or
+   `swk`). If these claims are unavailable the Worker denies access.
+2. Enable inbound mutual TLS for the entire staff hostname and associate the
+   client CA with it. Issue a distinct client certificate per staff device.
+   Keep the private key on that device, hardware-backed where available.
+   Enroll the leaf SHA-256 fingerprint, 64 lowercase hex digits without
+   separators, against its owner's Access user UUID.
+3. Apply the broker migrations and deploy the broker through its existing
    workflow. This publishes the named RPC service. The public mobile endpoints
    do not expose staff reports.
-3. From this directory deploy the separate UI with
+4. From this directory deploy the separate UI with
    `npx wrangler deploy --config wrangler.staff.jsonc`. An unconfigured UI
    denies all requests. Its workers.dev route and version preview URLs are
    disabled.
-4. Use `npx wrangler secret put NAME --config wrangler.staff.jsonc` for
-   `STAFF_ACCESS_AUD`, `STAFF_SUPPORT_IDS` and `STAFF_ANALYST_IDS`. Each role
+5. Use `npx wrangler secret put NAME --config wrangler.staff.jsonc` for
+   `STAFF_ACCESS_AUD`, `STAFF_IDP_ID`, `STAFF_CERT_OWNERS`, `STAFF_SUPPORT_IDS`
+   and `STAFF_ANALYST_IDS`. The certificate registry is a JSON object whose keys
+   are leaf fingerprints and whose values are the owning Access user UUIDs.
+   Multiple certificates can map to the same person during rotation. Each role
    accepts a comma-separated list of exact Access user UUIDs. Leave an unused
    role unset. Staff who need both roles must appear in both lists.
-5. Check each role with its own staff identity and check that an unassigned
-   identity is denied. Removing an ID from a role takes effect on the next
+6. Check each role with its own staff identity and enrolled device. Verify a
+   missing certificate, another staff member's certificate, and an unassigned
+   identity all receive 403. To decommission a device, remove its fingerprint
+   and revoke the certificate at the CA. Removing an ID from a role takes effect on the next
    request after the configuration update. Access session revocation is also
    available in Zero Trust.
 
-Every screen and stylesheet requires the platform's Access context, matching
-application audience and an assigned human identity. Lookups use same-origin
+Every request requires both the platform's trusted Access context and
+`request.cf.tlsClientAuth` from the TLS handshake. Before dispatch, the Worker
+checks the audience, pinned IdP, key-based authentication method, a positive
+identity lifetime under four hours, an explicit staff role and a verified,
+unrevoked certificate pinned to the same person. Client-supplied headers do
+not participate in these checks. A missing or malformed enrollment denies access. Lookups use same-origin
 POST bodies. Worker responses disable caching and scripts. Successful reads,
 misses, access denials, rate limits and backend failures emit structured
 `lively_staff_access` events with the staff UUID, operation and outcome.
@@ -636,5 +651,5 @@ Customer search terms, record contents and request bodies are omitted.
 Staff data requests share a per-operator rate limit of about 60 per minute
 per Cloudflare location. Use the staff Worker's logs for access review.
 
-Cloudflare documents the [trusted Access context](https://developers.cloudflare.com/workers/configuration/cloudflare-access/), [independent MFA](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/independent-mfa/)
+Cloudflare documents the [trusted Access context](https://developers.cloudflare.com/workers/configuration/cloudflare-access/), [key authentication methods](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/mfa-requirements/), [verified TLS metadata](https://developers.cloudflare.com/ssl/client-certificates/client-certificate-variables/)
 and [per-location rate limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
