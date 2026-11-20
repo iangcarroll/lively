@@ -605,13 +605,12 @@ are more than 90 days old.
 ### Deployment and access
 
 1. In Cloudflare Zero Trust create a self-hosted Access application for the
-   entire `admin-lively.cautela.hk` hostname. Allow the staff group through
-   the company identity provider. Require WebAuthn sign-in, restrict Access to
-   that IdP, omit Bypass and Service Auth policies, and set a four-hour session.
-   Record the application audience, Access identity-provider ID and each staff
-   Access user UUID. Verify in a test sign-in that the trusted Access identity
-   reports the IdP ID, issue time and a key authentication method (`hwk`,
-   `swk` or `fido`). If these claims are unavailable the Worker denies access.
+   entire `admin-lively.cautela.hk` hostname. Select the Cloudflare account
+   identity provider with **Restrict to account members** enabled. Configure
+   the Allow policy to include that login method and require the approved staff
+   email address. Set a four-hour session and omit Bypass and Service Auth
+   policies. Record the application audience, identity-provider ID and each
+   approved staff member's Access user UUID.
 2. Apply the broker migrations and deploy the broker through its existing
    workflow to publish the named RPC service.
 3. Once the broker deployment succeeds, run the **Deploy key broker** workflow
@@ -626,7 +625,7 @@ are more than 90 days old.
    comma-separated list of exact Access user UUIDs. Leave an unused role unset.
    Staff who need both roles must appear in both lists.
 5. Check each role with its own staff identity. Confirm an unassigned identity,
-   a missing assertion and a password-only login are denied. Remove a staff
+   a missing assertion and a different identity provider are denied. Remove a staff
    UUID to revoke its role. Access sessions can also be revoked in Zero Trust.
 
 Before serving a screen or stylesheet, the Worker validates the
@@ -634,7 +633,7 @@ Before serving a screen or stylesheet, the Worker validates the
 rotating keys. It checks the issuer, application audience, token type, issue
 time, validity window, and local role for the signed subject. The runtime
 Access identity must independently match the subject and email and confirm
-the pinned IdP, a key-based sign-in and an identity age under four hours.
+the pinned IdP and an identity age under four hours.
 Missing claims, an unavailable signing key, or a request that bypasses Access
 deny the read before the report service is called. Lookups use same-origin
 POST bodies. Worker responses disable caching and scripts. Successful reads,
@@ -644,5 +643,5 @@ Customer search terms, record contents and request bodies are omitted.
 Staff data requests share a per-operator rate limit of about 60 per minute
 per Cloudflare location. Use the staff Worker's logs for access review.
 
-Cloudflare documents the [trusted Access context](https://developers.cloudflare.com/workers/configuration/cloudflare-access/), [key authentication methods](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/mfa-requirements/), [application token validation](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)
+Cloudflare documents the [trusted Access context](https://developers.cloudflare.com/workers/configuration/cloudflare-access/), [Cloudflare account identity provider](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/cloudflare/), [application token validation](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)
 and [per-location rate limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
