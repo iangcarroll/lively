@@ -10,6 +10,12 @@ on:
     paths:
       - "Server/key-broker/**"
   workflow_dispatch:
+    inputs:
+      target:
+        description: Worker to deploy
+        type: choice
+        options: [broker, staff]
+        default: broker
 
 concurrency:
   group: deploy-key-broker
@@ -32,10 +38,12 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Validate staff Worker bindings and bundle
+        run: npx wrangler deploy --dry-run --config wrangler.staff.jsonc
 
   deploy:
     needs: test
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && inputs.target != 'staff'
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -63,3 +71,19 @@ jobs:
       - name: Remove temporary reviewer credentials
         if: always()
         run: rm -f "$RUNNER_TEMP/lively-review-secrets.json"
+
+  deploy-staff:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.target == 'staff'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Server/key-broker/package-lock.json
+      - run: npm ci
+      - run: npx wrangler deploy --config wrangler.staff.jsonc

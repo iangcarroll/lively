@@ -29,6 +29,7 @@
  * transaction for it.
  */
 
+import { observeApple } from "./staff/observations";
 import { recordAppleAdsPurchase } from "./apple-ads";
 import { X509Certificate } from "node:crypto";
 import { error, json, type Env } from "./broker";
@@ -118,6 +119,10 @@ export async function appStoreNotification(request: Request, env: Env): Promise<
     await env.DB.prepare("DELETE FROM revoked_subscriptions WHERE original_transaction_id = ?")
       .bind(transaction.originalTransactionId)
       .run();
+  }
+  if (type && notification.signedDate) {
+    await observeApple(env, transaction, type, notification.signedDate)
+      .catch(() => console.error("App Store reporting write failed"));
   }
   return json(200, { ok: true });
 }

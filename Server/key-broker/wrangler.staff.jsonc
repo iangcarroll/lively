@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lively-staff",
+  "main": "src/staff/console.ts",
+  "account_id": "1020dc9a8bd7a82cd0801975a100d3ee",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "admin-lively.cautela.hk", "custom_domain": true }],
+  "ratelimits": [{ "name": "STAFF_READ_LIMIT", "namespace_id": "170721", "simple": { "limit": 60, "period": 60 } }],
+  "services": [{ "binding": "REPORTS", "service": "lively-key-broker", "entrypoint": "StaffReports" }],
+  "observability": { "enabled": true, "head_sampling_rate": 1, "logs": { "invocation_logs": false } }
+  // Staff issuer, audience, IdP and role bindings are documented in
+  // README.md. Missing staff configuration denies access, including on the CSS route.
+}

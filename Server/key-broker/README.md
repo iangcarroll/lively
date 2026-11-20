@@ -569,3 +569,80 @@ report. Production App Store Server Notifications V2 must point to
 either order. The report updates as later purchases or notifications arrive.
 
 [Apple's attribution token and keyword fields](https://developer.apple.com/documentation/adservices/aaattribution/attributiontoken())
+
+## Staff console
+
+The staff web UI runs as a separate Worker on `admin-lively.cautela.hk`. Its
+only data binding is the named `StaffReports` service on the broker. The
+service exposes four fixed read operations. Staff can neither run SQL nor
+change customer accounts or entitlements through it.
+
+**Support** can look up one user by exact email or user ID, view the 20 most
+recent production subscription records, and look up one purchase by an App
+Store original transaction ID or the latest recorded Google Play order ID.
+Store purchases can be anonymous. A complimentary Pro grant belongs to an
+account. A store record does not establish ownership by a particular account.
+
+**Analysts** see aggregate account creation, complimentary grants, production
+store records, and Apple Ads install cohorts with subsequent first payments.
+The registration chart covers the current UTC day and the preceding 13 UTC
+days and includes accounts that still exist. Subscription counts include
+ended records. Use the store consoles for active subscriber and revenue totals.
+
+### Data coverage
+
+Migration 0007 imports existing verified first App Store payment dates.
+New signed production App Store notifications update the latest event by
+Apple's notification signing time. A fresh Google Play API check records the
+last known state of a recognized production product. A subscription may never
+reach the broker, and a Play record can become stale between checks. Failed
+reporting writes emit a generic operational error and do not change entitlement
+decisions. Store lookups use hashes. The records contain no customer email,
+user ID, purchase token, signed receipt, or payment details. The hourly cleanup
+removes an observation once both the last update and any recorded period end
+are more than 90 days old.
+
+### Deployment and access
+
+1. In Cloudflare Zero Trust create a self-hosted Access application for the
+   entire `admin-lively.cautela.hk` hostname. Allow the staff group through
+   the company identity provider. Require WebAuthn sign-in, restrict Access to
+   that IdP, omit Bypass and Service Auth policies, and set a four-hour session.
+   Record the application audience, Access identity-provider ID and each staff
+   Access user UUID. Verify in a test sign-in that the trusted Access identity
+   reports the IdP ID, issue time and a key authentication method (`hwk`,
+   `swk` or `fido`). If these claims are unavailable the Worker denies access.
+2. Apply the broker migrations and deploy the broker through its existing
+   workflow to publish the named RPC service.
+3. Once the broker deployment succeeds, run the **Deploy key broker** workflow
+   on `main` with target `staff` to deploy the separate UI using the existing
+   deployment credential. An unconfigured UI
+   denies all requests. Its workers.dev route and version preview URLs are
+   disabled.
+4. Use `npx wrangler secret put NAME --config wrangler.staff.jsonc` for
+   `STAFF_ACCESS_ISSUER` (the exact HTTPS team origin, e.g.
+   `https://your-team.cloudflareaccess.com`), `STAFF_ACCESS_AUD`, `STAFF_IDP_ID`,
+   `STAFF_SUPPORT_IDS` and `STAFF_ANALYST_IDS`. Each role accepts a
+   comma-separated list of exact Access user UUIDs. Leave an unused role unset.
+   Staff who need both roles must appear in both lists.
+5. Check each role with its own staff identity. Confirm an unassigned identity,
+   a missing assertion and a password-only login are denied. Remove a staff
+   UUID to revoke its role. Access sessions can also be revoked in Zero Trust.
+
+Before serving a screen or stylesheet, the Worker validates the
+`Cf-Access-Jwt-Assertion` RS256 signature against the configured team's
+rotating keys. It checks the issuer, application audience, token type, issue
+time, validity window, and local role for the signed subject. The runtime
+Access identity must independently match the subject and email and confirm
+the pinned IdP, a key-based sign-in and an identity age under four hours.
+Missing claims, an unavailable signing key, or a request that bypasses Access
+deny the read before the report service is called. Lookups use same-origin
+POST bodies. Worker responses disable caching and scripts. Successful reads,
+misses, access denials, rate limits and backend failures emit structured
+`lively_staff_access` events with the staff UUID, operation and outcome.
+Customer search terms, record contents and request bodies are omitted.
+Staff data requests share a per-operator rate limit of about 60 per minute
+per Cloudflare location. Use the staff Worker's logs for access review.
+
+Cloudflare documents the [trusted Access context](https://developers.cloudflare.com/workers/configuration/cloudflare-access/), [key authentication methods](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/mfa-requirements/), [application token validation](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)
+and [per-location rate limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).

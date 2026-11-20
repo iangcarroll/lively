@@ -1,5 +1,6 @@
 import { X509Certificate } from "node:crypto";
-import { env } from "cloudflare:test";
+import { createExecutionContext, env } from "cloudflare:test";
+import { StaffReports } from "../src/staff/reports";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { isAppleIntermediate, type SignedTransaction } from "../src/appstore";
 import { hash, type Env } from "../src/broker";
@@ -97,10 +98,10 @@ function notification(signedPayload: string): Request {
   });
 }
 
-async function notify(type: string, t: SignedTransaction): Promise<Response> {
+async function notify(type: string, t: SignedTransaction, signedDate = Date.now()): Promise<Response> {
   const signedTransactionInfo = await sign(t);
   return worker.fetch(
-    notification(await sign({ notificationType: type, signedDate: Date.now(), data: { bundleId: t.bundleId, environment: t.environment, signedTransactionInfo } })),
+    notification(await sign({ notificationType: type, signedDate, data: { bundleId: t.bundleId, environment: t.environment, signedTransactionInfo } })),
     local,
   );
 }
@@ -116,6 +117,19 @@ describe("Apple's chain", () => {
 });
 
 describe("Pro subscriptions", () => {
+  it("reports the newest signed production update and ignores duplicate, late and sandbox notifications", async () => {
+    const reports = new StaffReports(createExecutionContext(), env);
+    const t = transaction(), at = Date.now();
+    await notify("DID_RENEW", t, at);
+    await notify("SUBSCRIBED", t, at - 1000);
+    await notify("DID_RENEW", t, at);
+    await notify("EXPIRED", { ...t, environment: "Sandbox" }, at + 1000);
+    expect(await reports.subscription(t.originalTransactionId)).toMatchObject({ event: "Renewed", observed_ms: at, period_end_ms: t.expiresDate });
+    const sandbox = transaction({ environment: "Sandbox" });
+    await notify("SUBSCRIBED", sandbox);
+    expect(await reports.subscription(sandbox.originalTransactionId)).toBeNull();
+  });
+
   it("is free without a subscription", async () => {
     expect(await planOf(await worker.fetch(keyRequest(), local))).toBe("free");
   });
