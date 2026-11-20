@@ -10,6 +10,6 @@
   "ratelimits": [{ "name": "STAFF_READ_LIMIT", "namespace_id": "170721", "simple": { "limit": 60, "period": 60 } }],
   "services": [{ "binding": "REPORTS", "service": "lively-key-broker", "entrypoint": "StaffReports" }],
   "observability": { "enabled": true, "head_sampling_rate": 1, "logs": { "invocation_logs": false } }
-  // Staff identity, certificate enrollment and role bindings are documented in
-  // README.md. Missing enrollment denies access, including on the CSS route.
+  // Staff issuer, audience, IdP and role bindings are documented in
+  // README.md. Missing staff configuration denies access, including on the CSS route.
 }
