@@ -47,7 +47,9 @@ afterEach(() => vi.restoreAllMocks());
 
 function context(id: string, aud = audience, email = staffEmail, overrides: Record<string, unknown> = {}) {
   const ctx = createExecutionContext();
-  Object.defineProperty(ctx, "access", { value: { aud, getIdentity: async () => ({ user_uuid: id, email, idp: { id: idp }, iat: Math.floor(Date.now() / 1000), amr: ["hwk"], ...overrides }) } });
+  Object.defineProperty(ctx, "access", { value: { aud, getIdentity: async () => ({
+    user_uuid: id, email, idp: { id: idp, type: "cloudflare" }, iat: Math.floor(Date.now() / 1000), ...overrides,
+  }) } });
   return ctx;
 }
 function staffRequest(path: string, id: string, init: RequestInit = {}) {
@@ -76,7 +78,7 @@ describe("staff access", () => {
     }
   });
 
-  it("denies missing, mismatched and weak staff identities before invoking any report", async () => {
+  it("denies missing, mismatched and stale staff identities before invoking any report", async () => {
     const reportsCalled = vi.fn(() => { throw Error("Unexpected report access"); });
     const guarded = { ...bindings, REPORTS: { account: reportsCalled, recentSubscriptions: reportsCalled,
       subscription: reportsCalled, overview: reportsCalled } };
@@ -88,9 +90,8 @@ describe("staff access", () => {
         [missingAssertion, guarded, context(support)],
         [req, guarded, createExecutionContext()],
         [req, guarded, context(support, "another-audience")],
-        [req, guarded, context(support, audience, staffEmail, { idp: { id: "email-otp" } })],
-        [req, guarded, context(support, audience, staffEmail, { amr: ["pwd", "otp"] })],
-        [req, guarded, context(support, audience, staffEmail, { amr: undefined })],
+        [req, guarded, context(support, audience, staffEmail, { idp: { id: crypto.randomUUID(), type: "cloudflare" }, amr: ["hwk"] })],
+        [req, guarded, context(support, audience, staffEmail, { idp: undefined })],
         [req, guarded, context(support, audience, staffEmail, { iat: now - 4 * 3600 })],
         [req, guarded, context(support, audience, staffEmail, { iat: now + 600 })],
         [req, guarded, context(support, audience, staffEmail, { iat: undefined })],
@@ -106,12 +107,6 @@ describe("staff access", () => {
       }
     }
     expect(reportsCalled).not.toHaveBeenCalled();
-  });
-
-  it.each(["hwk", "swk", "fido"])("accepts the provider's %s key authentication method", async method => {
-    const res = await staff.fetch(staffRequest("/users", support), bindings,
-      context(support, audience, staffEmail, { amr: [method] }));
-    expect(res.status).toBe(200);
   });
 
   it("rejects invalid signatures, wrong claims, expired assertions and service credentials", async () => {
@@ -159,7 +154,7 @@ describe("staff access", () => {
     expect(res.headers.get("Retry-After")).toBe("60");
   });
 
-  it("serves an overview over the named workerd RPC binding", async () => {
+  it("serves the overview over RPC when Cloudflare authenticates the analyst without reporting a sign-in method", async () => {
     const res = await staff.fetch(staffRequest("/", analyst), { ...bindings, REPORTS: workers.StaffReports }, context(analyst));
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("<h1>Overview</h1>");
