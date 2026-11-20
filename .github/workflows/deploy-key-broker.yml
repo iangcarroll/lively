@@ -32,6 +32,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Validate staff Worker bindings and bundle
+        run: npx wrangler deploy --dry-run --config wrangler.staff.jsonc
 
   deploy:
     needs: test

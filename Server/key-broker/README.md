@@ -569,3 +569,72 @@ report. Production App Store Server Notifications V2 must point to
 either order. The report updates as later purchases or notifications arrive.
 
 [Apple's attribution token and keyword fields](https://developer.apple.com/documentation/adservices/aaattribution/attributiontoken())
+
+## Staff console
+
+The staff web UI runs as a separate Worker on `admin-lively.cautela.hk`. Its
+only data binding is the named `StaffReports` service on the broker. The
+service exposes four fixed read operations. Staff can neither run SQL nor
+change customer accounts or entitlements through it.
+
+**Support** can look up one user by exact email or user ID, view the 20 most
+recent production subscription records, and look up one purchase by an App
+Store original transaction ID or the latest recorded Google Play order ID.
+Store purchases can be anonymous. A complimentary Pro grant belongs to an
+account. A store record does not establish ownership by a particular account.
+
+**Analysts** see aggregate account creation, complimentary grants, production
+store records, and Apple Ads install cohorts with subsequent first payments.
+The registration chart covers the current UTC day and the preceding 13 UTC
+days and includes accounts that still exist. Subscription counts include
+ended records. Use the store consoles for active subscriber and revenue totals.
+
+### Data coverage
+
+Migration 0007 imports existing verified first App Store payment dates.
+New signed production App Store notifications update the latest event by
+Apple's notification signing time. A fresh Google Play API check records the
+last known state of a recognized production product. A subscription may never
+reach the broker, and a Play record can become stale between checks. Failed
+reporting writes emit a generic operational error and do not change entitlement
+decisions. Store lookups use hashes. The records contain no customer email,
+user ID, purchase token, signed receipt, or payment details. The hourly cleanup
+removes an observation once both the last update and any recorded period end
+are more than 90 days old.
+
+### Deployment and access
+
+1. In Cloudflare Zero Trust create a self-hosted Access application for the
+   entire `admin-lively.cautela.hk` hostname. Allow the staff group through
+   the company identity provider. Require a phishing-resistant passkey or security
+   key at the IdP, or enable Access independent MFA for this application with
+   Security key as the only allowed method. Restrict sign-in to the selected IdP,
+   omit Bypass and Service Auth policies, and start with a four-hour session.
+   Record the application's audience tag and staff Access user UUIDs.
+2. Apply the broker migrations and deploy the broker through its existing
+   workflow. This publishes the named RPC service. The public mobile endpoints
+   do not expose staff reports.
+3. From this directory deploy the separate UI with
+   `npx wrangler deploy --config wrangler.staff.jsonc`. An unconfigured UI
+   denies all requests. Its workers.dev route and version preview URLs are
+   disabled.
+4. Use `npx wrangler secret put NAME --config wrangler.staff.jsonc` for
+   `STAFF_ACCESS_AUD`, `STAFF_SUPPORT_IDS` and `STAFF_ANALYST_IDS`. Each role
+   accepts a comma-separated list of exact Access user UUIDs. Leave an unused
+   role unset. Staff who need both roles must appear in both lists.
+5. Check each role with its own staff identity and check that an unassigned
+   identity is denied. Removing an ID from a role takes effect on the next
+   request after the configuration update. Access session revocation is also
+   available in Zero Trust.
+
+Every screen and stylesheet requires the platform's Access context, matching
+application audience and an assigned human identity. Lookups use same-origin
+POST bodies. Worker responses disable caching and scripts. Successful reads,
+misses, access denials, rate limits and backend failures emit structured
+`lively_staff_access` events with the staff UUID, operation and outcome.
+Customer search terms, record contents and request bodies are omitted.
+Staff data requests share a per-operator rate limit of about 60 per minute
+per Cloudflare location. Use the staff Worker's logs for access review.
+
+Cloudflare documents the [trusted Access context](https://developers.cloudflare.com/workers/configuration/cloudflare-access/), [independent MFA](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/independent-mfa/)
+and [per-location rate limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).

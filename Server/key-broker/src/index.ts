@@ -1,3 +1,4 @@
+export { StaffReports } from "./staff/reports";
 import { attributeAppleAds } from "./apple-ads";
 import { appStoreNotification } from "./appstore";
 import { deleteAccount, deleteExpiredAuth, logout, me, startEmailSignIn, verifyEmailSignIn } from "./auth";
@@ -128,6 +129,9 @@ export default {
     const now = Date.now();
     await env.DB.prepare("DELETE FROM counters WHERE expires_at < ?").bind(nowSeconds(now)).run();
     await deleteExpiredAuth(env, now);
+    await env.DB.prepare(`DELETE FROM subscription_observations
+      WHERE observed_ms < ?1 AND (period_end_ms IS NULL OR period_end_ms < ?1)`)
+      .bind(now - 90 * 86_400_000).run();
   },
 } satisfies ExportedHandler<Env>;
 

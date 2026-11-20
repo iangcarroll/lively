@@ -30,6 +30,7 @@
  * Without GOOGLE_PLAY_SERVICE_ACCOUNT, the header is ignored.
  */
 
+import { observePlay } from "./staff/observations";
 import { hash, type Env } from "./broker";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -57,7 +58,8 @@ export interface PlaySubscription {
 export interface SubscriptionPurchaseV2 {
   subscriptionState?: string;
   testPurchase?: object;
-  lineItems?: { productId?: string; expiryTime?: string }[];
+  latestOrderId?: string;
+  lineItems?: { productId?: string; expiryTime?: string; latestSuccessfulOrderId?: string }[];
 }
 
 interface ServiceAccount {
@@ -90,6 +92,11 @@ export async function proPlayPurchase(request: Request, env: Env, now: number): 
   if (purchase === "unavailable") {
     verified.set(cacheKey, { subscription: undefined, until: now + UNAVAILABLE_TTL_MS });
     return undefined;
+  }
+  if (purchase) {
+    // Only fresh provider checks update reporting. A reporting outage must
+    // never change the customer's entitlement or expose a purchase token.
+    await observePlay(env, purchase, tokenHash, now).catch(() => console.error("Play reporting write failed"));
   }
   const subscription = purchase ? proSubscriptionOf(purchase, `play:${tokenHash}`, env, now) : undefined;
   verified.set(cacheKey, { subscription, until: now + VERIFIED_TTL_MS });

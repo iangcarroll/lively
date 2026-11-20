@@ -1,4 +1,5 @@
-import { env } from "cloudflare:test";
+import { createExecutionContext, env } from "cloudflare:test";
+import { StaffReports } from "../src/staff/reports";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { hash, type Env } from "../src/broker";
 import worker from "../src/index";
@@ -122,6 +123,25 @@ function callsTo(prefix: string): number {
 }
 
 describe("Google Play subscriptions", () => {
+  it("reports fresh production checks by order ID including expired purchases, without retaining tokens", async () => {
+    const reports = new StaffReports(createExecutionContext(), env);
+    const order = "GPA.3333-2222-1111-44444..2";
+    const lineItems = [{ ...purchase().lineItems![0], latestSuccessfulOrderId: order }];
+    const t = token(purchase({ lineItems }));
+    expect(await planOf(await worker.fetch(keyRequest(t), local))).toBe("pro");
+    expect(await reports.subscription(order.toLowerCase())).toMatchObject({ store: "play", event: "Active" });
+    purchases.set(t, purchase({ lineItems, subscriptionState: "SUBSCRIPTION_STATE_EXPIRED" }));
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 6 * 60_000);
+    expect(await planOf(await worker.fetch(keyRequest(t), local))).toBe("free");
+    expect(await reports.subscription(order)).toMatchObject({ event: "Expired" });
+    const rows = await env.DB.prepare("SELECT * FROM subscription_observations").all();
+    expect(JSON.stringify(rows.results)).not.toContain(t);
+    expect(JSON.stringify(rows.results)).not.toContain(order);
+    const testOrder = "GPA.3333-2222-1111-77777";
+    await worker.fetch(keyRequest(token(purchase({ testPurchase: {}, latestOrderId: testOrder }))), local);
+    expect(await reports.subscription(testOrder)).toBeNull();
+  });
+
   it("continues granting Pro for each configured Play product", async () => {
     for (const productId of env.PLAY_PRODUCT_IDS.split(",")) {
       const t = token(purchase({ lineItems: [{ productId, expiryTime: new Date(Date.now() + DAY).toISOString() }] }));
