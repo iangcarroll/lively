@@ -9,6 +9,7 @@ export interface StaffPolicy {
 }
 
 const maxAge = 4 * 3600;
+const keyMethods = new Set(["hwk", "swk", "fido"]);
 const teamOrigin = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.cloudflareaccess\.com$/;
 let keys: { issuer: string; resolve: ReturnType<typeof createRemoteJWKSet> } | undefined;
 
@@ -47,7 +48,7 @@ export async function authorizeStaff(request: Request, policy: StaffPolicy, ctx:
   // the trusted runtime's IdP and sign-in method to the same verified subject.
   const identity = await ctx.access.getIdentity();
   if (identity?.user_uuid !== operator || identity.email !== claims.email || identity.idp?.id !== policy.STAFF_IDP_ID) return null;
-  if (!Array.isArray(identity.amr) || !identity.amr.some(method => method === "hwk" || method === "swk")) return null;
+  if (!Array.isArray(identity.amr) || !identity.amr.some(method => keyMethods.has(method))) return null;
   const now = Math.floor(Date.now() / 1000);
   if (typeof identity.iat !== "number" || !Number.isSafeInteger(identity.iat) ||
       identity.iat > now || now - identity.iat >= maxAge) return null;

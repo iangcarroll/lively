@@ -108,6 +108,12 @@ describe("staff access", () => {
     expect(reportsCalled).not.toHaveBeenCalled();
   });
 
+  it.each(["hwk", "swk", "fido"])("accepts the provider's %s key authentication method", async method => {
+    const res = await staff.fetch(staffRequest("/users", support), bindings,
+      context(support, audience, staffEmail, { amr: [method] }));
+    expect(res.status).toBe(200);
+  });
+
   it("rejects invalid signatures, wrong claims, expired assertions and service credentials", async () => {
     const now = Math.floor(Date.now() / 1000);
     const other = await generateKeyPair("RS256");

@@ -610,12 +610,13 @@ are more than 90 days old.
    that IdP, omit Bypass and Service Auth policies, and set a four-hour session.
    Record the application audience, Access identity-provider ID and each staff
    Access user UUID. Verify in a test sign-in that the trusted Access identity
-   reports the IdP ID, issue time and a key authentication method (`hwk` or
-   `swk`). If these claims are unavailable the Worker denies access.
+   reports the IdP ID, issue time and a key authentication method (`hwk`,
+   `swk` or `fido`). If these claims are unavailable the Worker denies access.
 2. Apply the broker migrations and deploy the broker through its existing
    workflow to publish the named RPC service.
-3. From this directory deploy the separate UI with
-   `npx wrangler deploy --config wrangler.staff.jsonc`. An unconfigured UI
+3. Once the broker deployment succeeds, run the **Deploy key broker** workflow
+   on `main` with target `staff` to deploy the separate UI using the existing
+   deployment credential. An unconfigured UI
    denies all requests. Its workers.dev route and version preview URLs are
    disabled.
 4. Use `npx wrangler secret put NAME --config wrangler.staff.jsonc` for
