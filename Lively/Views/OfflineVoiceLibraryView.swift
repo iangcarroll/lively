@@ -76,7 +76,7 @@ struct OfflineVoiceLibraryView: View {
 
             ForEach(filteredLanguages) { language in
                 Section {
-                    ForEach(filteredVoices(language)) { voice in voiceRow(voice) }
+                    ForEach(language.voices(matching: query)) { voice in voiceRow(voice) }
                 } header: {
                     Text(language.pickerName)
                 }
@@ -155,17 +155,7 @@ struct OfflineVoiceLibraryView: View {
     }
 
     private var filteredLanguages: [NeuralVoiceLanguage] {
-        NeuralVoiceCatalog.languages.filter { (selectedLanguage == "all" || $0.id == selectedLanguage) && !filteredVoices($0).isEmpty }
-    }
-    private func filteredVoices(_ language: NeuralVoiceLanguage) -> [NeuralVoice] {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty || language.displayName.localizedStandardContains(query) || language.nativeName.localizedStandardContains(query) {
-            return language.voices
-        }
-        return language.voices.filter {
-            $0.name.localizedStandardContains(query) || $0.id.localizedStandardContains(query)
-                || ($0.accent?.localizedStandardContains(query) ?? false)
-        }
+        NeuralVoiceCatalog.languages.filter { (selectedLanguage == "all" || $0.id == selectedLanguage) && !$0.voices(matching: query).isEmpty }
     }
 
     private func preview(_ voice: NeuralVoice) {
