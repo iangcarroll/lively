@@ -125,6 +125,7 @@ struct OnboardingView: View {
             }
         }
         .padding(.horizontal, 24)
+        .padding(.top, step == .account ? 12 : 0)
         .padding(.bottom, 12)
     }
 
