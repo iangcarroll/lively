@@ -3,6 +3,9 @@ import SwiftUI
 
 @main
 struct LivelyApp: App {
+    #if os(macOS)
+    @NSApplicationDelegateAdaptor private var appDelegate: LivelyMacDelegate
+    #endif
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -50,3 +53,12 @@ struct LivelyApp: App {
         #endif
     }
 }
+
+#if os(macOS)
+private final class LivelyMacDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillTerminate(_ notification: Notification) {
+        // A normal Quit can arrive while a window still has focus.
+        AppUsage.shared?.foreground(false)
+    }
+}
+#endif

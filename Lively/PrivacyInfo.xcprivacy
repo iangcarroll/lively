@@ -9,7 +9,7 @@
 	<array/>
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
-		<!-- Local elapsed time for the temporary listening guidance. -->
+		<!-- Elapsed time for listening guidance and foreground session duration. -->
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
