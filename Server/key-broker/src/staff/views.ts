@@ -1,4 +1,4 @@
-import type { Account, Observation, Overview } from "./reports";
+import type { Account, Observation, Overview, Usage } from "./reports";
 
 export type Section = "overview" | "users" | "subscriptions";
 export interface Access { analyst: boolean; support: boolean }
@@ -28,19 +28,47 @@ function metric(label: string, value: number, caption: string) {
   return `<div><span class="metric-label">${label}</span><strong>${number(value)}</strong><small>${caption}</small></div>`;
 }
 
-function chart(days: Overview["days"]) {
+function chart(days: Overview["days"], series: string) {
   const max = Math.max(1, ...days.map(d => d.count));
   const bars = days.map((d, i) => {
     const height = 98 * d.count / max;
     const x = 14 + i * 51;
     const label = date(Date.parse(d.day), false);
-    return `<g><title>${label} · ${number(d.count)} registrations</title>
+    return `<g><title>${label} · ${number(d.count)} ${series.toLowerCase()}</title>
       <rect x="${x}" y="${123 - height}" width="30" height="${height}" rx="4"></rect>
       <text class="value" x="${x + 15}" y="${115 - height}">${number(d.count)}</text>
       <text class="day" x="${x + 15}" y="146">${Number(d.day.slice(-2))}</text></g>`;
   }).join("");
-  return `<svg role="img" aria-label="Registrations by UTC day. ${days.map(d => `${d.day}, ${d.count}`).join(". ")}" viewBox="0 0 720 154">
+  return `<svg role="img" aria-label="${series} by UTC day. ${days.map(d => `${d.day}, ${d.count}`).join(". ")}" viewBox="0 0 720 154">
     <path d="M4 25H716 M4 74H716 M4 123H716" class="grid"/>${bars}</svg>`;
+}
+
+function sessionLength(seconds: number, closes: number) {
+  if (!closes) return "—";
+  const mean = Math.round(seconds / closes);
+  if (mean < 60) return mean + "s";
+  return Math.floor(mean / 60) + "m " + mean % 60 + "s";
+}
+
+function appUsage(data: Usage) {
+  const names = { ios: "iOS", android: "Android", macos: "macOS" };
+  const summary = (label: string, installs: number, opens: number, closes: number, seconds: number) =>
+    `<tr><th scope="row">${label}</th><td class="num">${number(installs)}</td><td class="num">${number(opens)}</td>
+    <td class="num">${number(closes)}</td><td class="num">${sessionLength(seconds, closes)}</td></tr>`;
+  const total = (key: "opens" | "closes" | "seconds") => data.today.reduce((n, row) => n + row[key], 0);
+  const table = `<div class="scroll"><table><thead><tr><th>Platform</th><th class="num">Active installs</th>
+    <th class="num">Opens</th><th class="num">Closes</th><th class="num">Avg. session</th></tr></thead><tbody>
+    ${data.today.map(r => summary(names[r.platform], r.installs, r.opens, r.closes, r.seconds)).join("")}
+    </tbody><tfoot>${summary("Total", data.dau, total("opens"), total("closes"), total("seconds"))}</tfoot></table></div>`;
+  return `<section class="panel"><div class="heading"><h2>App usage</h2><span>UTC</span></div>
+    <p class="sub">Each installation counts once per period, including signed-out use.</p>
+    <div class="metrics usage-metrics">${metric("Daily active", data.dau, "Today")}
+    ${metric("Weekly active", data.wau, "Last 7 days")}${metric("Monthly active", data.mau, "Last 30 days")}</div>
+    ${data.mau ? `<h3>Daily active installations</h3>${chart(data.days, "Active installations")}
+    <small>${date(Date.parse(data.days[0].day), false)} – ${date(Date.parse(data.days.at(-1)!.day), false)} UTC</small>
+    <h3>Sessions today</h3>${data.today.length ? table : '<p class="empty">No app activity received for today.</p>'}
+    <small>Closes count observed exits from the foreground. Average session length uses those closes.</small>`
+    : '<p class="empty">No app activity received in the last 30 days.</p>'}</section>`;
 }
 
 export function overviewPage(access: Access, data: Overview) {
@@ -52,13 +80,14 @@ export function overviewPage(access: Access, data: Overview) {
     <th class="num">Paid subscriptions</th></tr></thead><tbody>${data.ads.map(a => `<tr><td>${escape(a.keyword)}</td>
     <td class="num">${number(a.installs)}</td><td class="num">${number(a.paid)}</td></tr>`).join("")}</tbody></table>`
     : '<p class="empty">No attributed installs in this period.</p>';
-  return page("overview", access, `<p class="intro">Account growth and store activity <span>·</span> ${date(data.now)} UTC</p>
+  return page("overview", access, `<p class="intro">App usage, account growth and store activity <span>·</span> ${date(data.now)} UTC</p>
+    ${appUsage(data.usage)}
     <section class="metrics" aria-label="Summary">
     ${metric("Registered users", data.accounts, "Current Lively accounts")}
     ${metric("Recorded subscriptions", total, "Production store records on file")}
     ${metric("Complimentary Pro", data.grants, "Accounts with a Pro grant")}</section>
     <div class="split"><section class="panel"><div class="heading"><h2>Account registrations</h2><span>14 days</span></div>
-    <div class="chart-total"><strong>${number(recent)}</strong> registrations</div>${chart(data.days)}
+    <div class="chart-total"><strong>${number(recent)}</strong> registrations</div>${chart(data.days, "Registrations")}
     <small>${date(Date.parse(data.days[0].day), false)} – ${date(data.now, false)} UTC · Current accounts by creation date</small></section>
     <section class="panel"><h2>Subscriptions by store</h2><p class="sub">Latest production record per subscription.</p>
     <div class="stores">${stores}</div><small>Includes ended subscriptions on file.</small></section></div>

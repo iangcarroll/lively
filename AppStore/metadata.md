@@ -92,13 +92,14 @@ The product IDs must match `Pro.productIDs` in the app and `APP_STORE_PRODUCT_ID
 - Data types (all declared linked; none used for tracking):
   - Email Address — app functionality; optional account authentication.
   - User ID — app functionality; optional account and provider credentials.
-  - Product Interaction — app functionality; translation usage counters.
-  - Device ID — app functionality, analytics and developer advertising or marketing. Used for abuse prevention and to measure Apple Ads conversions.
+  - Product Interaction — app functionality and analytics. Translation usage counters and daily foreground session statistics.
+  - Device ID — app functionality, analytics and developer advertising or marketing. Used for abuse prevention, active installation counts and Apple Ads conversions.
   - Audio Data — app functionality and other purposes; provider processing and possible model training.
   - Other User Content — app functionality and other purposes; translation text and possible model training.
   - Purchase History — app functionality, analytics and developer advertising or marketing. Used for Pro access and Apple Ads conversion counts.
   - Advertising Data — analytics and developer advertising or marketing. Apple Ads campaign, ad group and keyword attribution.
 - Publish the updated iOS App Privacy answers in App Store Connect before releasing the first attribution-enabled build.
+- Before releasing app usage reporting, update App Store Connect Product Interaction and the Google Play Data safety answers for app interactions and installation identifiers used for analytics.
 - Location is not declared: the optional "Set from location" setting passes an
   approximate location to Apple's reverse geocoder on the device's behalf and
   keeps only the country code on the device. Nothing is sent to Lively or its

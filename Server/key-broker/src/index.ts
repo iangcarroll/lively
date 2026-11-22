@@ -1,4 +1,5 @@
 export { StaffReports } from "./staff/reports";
+import { DAY_MS, recordAppUsage } from "./app-usage";
 import { attributeAppleAds } from "./apple-ads";
 import { appStoreNotification } from "./appstore";
 import { deleteAccount, deleteExpiredAuth, logout, me, startEmailSignIn, verifyEmailSignIn } from "./auth";
@@ -13,7 +14,7 @@ const PUBLIC_PAGES = new Set(["/", "/privacy", "/support", "/terms", "/delete-ac
 
 const privacy = page(
   "Privacy Policy",
-  `<p><strong>Last updated November 19, 2026</strong></p>
+  `<p><strong>Last updated November 21, 2026</strong></p>
   <p>Cautela Limited, a Hong Kong company, operates Lively. This policy explains how we handle your information when you use Lively and the choices you have. You can translate without creating an account.</p>
   <h2>Your conversations</h2>
   <p>With on-device translation, supported speech and text stay on your device. When you choose online translation, our speech and translation providers receive the audio or text needed to translate your conversation. This includes text you select from a photo. The photo itself stays on your device.</p>
@@ -23,6 +24,7 @@ const privacy = page(
   <p>Apple or Google processes your payment for Lively Pro. We receive subscription details, including the plan, purchase dates and a purchase identifier, to provide Pro access and handle renewals and refunds. We do not receive your payment card details.</p>
   <h2>Usage and advertising</h2>
   <p>We use information about your installation, network address and usage to apply daily limits and prevent abuse. We keep usage counts for a limited time.</p>
+  <p>To understand how often people use Lively, we count app opens, moves to the background and time spent in the foreground. We send daily totals, the app platform and a random installation identifier to our own backend. We retain daily totals by installation for 30 days and show staff aggregate counts. These reports contain no account or conversation data.</p>
   <p>If you find Lively through an App Store ad, Apple may tell us which campaign and keyword led to your download. We use that information to measure how often those downloads lead to a paid Pro subscription. Lively does not show ads, sell personal information or track you across other companies’ apps and websites.</p>
   <h2>Service providers</h2>
   <p>Our service providers include Soniox and DeepSeek for speech and translation, and Cloudflare for hosting. If you choose Mistral, its privacy policy and your account settings apply to the audio and text you send.</p>
@@ -80,6 +82,7 @@ const terms = page(
 const ROUTES: Record<string, { method: string; handle: (request: Request, env: Env, now: number) => Promise<Response> }> = {
   "/v1/soniox/key": { method: "POST", handle: issueSonioxKey },
   "/v1/soniox/tts-key": { method: "POST", handle: issueSonioxSpeechKey },
+  "/v1/app-usage": { method: "POST", handle: recordAppUsage },
   "/v1/translate": { method: "POST", handle: translate },
   "/v1/auth/email/start": { method: "POST", handle: startEmailSignIn },
   "/v1/auth/email/verify": { method: "POST", handle: verifyEmailSignIn },
@@ -129,6 +132,7 @@ export default {
     const now = Date.now();
     await env.DB.prepare("DELETE FROM counters WHERE expires_at < ?").bind(nowSeconds(now)).run();
     await deleteExpiredAuth(env, now);
+    await env.DB.prepare("DELETE FROM app_usage_days WHERE day < ?").bind(Math.floor(now / DAY_MS) - 29).run();
     await env.DB.prepare(`DELETE FROM subscription_observations
       WHERE observed_ms < ?1 AND (period_end_ms IS NULL OR period_end_ms < ?1)`)
       .bind(now - 90 * 86_400_000).run();

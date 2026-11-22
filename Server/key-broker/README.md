@@ -645,3 +645,23 @@ per Cloudflare location. Use the staff Worker's logs for access review.
 
 Cloudflare documents the [trusted Access context](https://developers.cloudflare.com/workers/configuration/cloudflare-access/), [Cloudflare account identity provider](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/cloudflare/), [application token validation](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)
 and [per-location rate limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+
+### First-party app usage
+
+Release builds on iOS, macOS and Android send `POST /v1/app-usage` on foreground
+transitions. Each install generates a separate random usage UUID and sends it in
+`Lively-Usage-ID` with its platform and cumulative daily opens, observed closes
+and total seconds of completed sessions. The client saves totals locally before
+upload and retries while foregrounded and on the next open. Both sides retain the
+current UTC day and the preceding 29 days. Updates use a per-install, per-day
+maximum for each counter so retries and out-of-order requests cannot inflate them.
+A foreground session crossing midnight marks the new UTC day active.
+
+The analyst Overview counts distinct reporting installations for the current UTC
+day and trailing 7 and 30 UTC days. Multiple devices count separately. Mobile
+sessions start when the app comes forward and close on backgrounding. Mac sessions
+follow app focus. Session length is assigned to the day of the observed close.
+A crash or abrupt termination can leave an open without a close. The current day
+is partial, offline uploads can revise earlier days, and older app builds have no
+lifecycle telemetry. The broker stores a purpose-specific hash of the usage UUID
+and exposes only aggregates through the existing analyst report.
