@@ -35,7 +35,7 @@
     <string name="change_email">이메일 변경</string>
     <string name="change_languages">언어 변경</string>
     <string name="changing_language_notice">언어를 변경하면 새로운 대화가 시작됩니다.</string>
-    <string name="chinese_script">중국어 자막</string>
+    <string name="chinese_script">중국어 표기 방식</string>
     <string name="choose_a_language">언어 선택</string>
     <string name="choose_a_pair">쌍 선택</string>
     <string name="choose_a_place">장소 선택</string>

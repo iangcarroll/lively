@@ -56,7 +56,7 @@
 "Checking downloaded voices…" = "正在檢查已下載的語音…";
 "Checking this device…" = "正在檢查此裝置…";
 "Checking…" = "正在檢查…";
-"Chinese script" = "中文（繁體）";
+"Chinese script" = "中文書寫形式";
 "Choose Photo" = "選擇相片";
 "Choose a language" = "選擇語言";
 "Choose a language pair in Settings for on-device translation." = "在「設定」中選擇一對語言，即可進行離線翻譯。";
@@ -110,7 +110,7 @@
 "Downloading…" = "正在下載…";
 "Edit" = "編輯";
 "Email" = "電子郵件";
-"Email Me a Code" = "寄驗證碼至我的信箱";
+"Email Me a Code" = "以電子郵件傳送驗證碼";
 "Email hidden" = "隱藏電子郵件";
 "Engine" = "引擎";
 "Enter the code we emailed to" = "輸入我們已寄送至的驗證碼";
@@ -141,7 +141,7 @@
 "Incoming audio stays silent without a compatible headset with a microphone. " = "若無相容的耳機（附麥克風），輸入音訊將保持靜音。 ";
 "Input language" = "輸入語言";
 "It's included free with your account." = "免費包含於您的帳戶中。";
-"Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "只需說話即可。Lively 會偵測另一種語言並雙向翻譯。您的語音保持為 %@。";
+"Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "直接開口就好。Lively 會辨識對方的語言並雙向翻譯。您這邊的螢幕會持續以%@顯示。";
 "Just talk. Lively hears who's speaking, and each of you reads your own half, in your own language." = "直接開口就好。Lively 會分辨誰在說話，兩人都能在各自的半邊螢幕上用自己的語言閱讀對話。";
 "Keys are stored in the Keychain on this device." = "金鑰儲存於此裝置的 Keychain 中。";
 "Language" = "語言";
@@ -193,10 +193,13 @@
 "Offline Languages" = "離線語言";
 "Offline Voice Library" = "離線語音庫";
 "Offline Voices" = "離線語音";
+"Offline speech could not be generated: %@" = "無法產生離線語音：%@";
+"Offline speech is not supported for %@." = "%@ 不支援離線語音。";
 "Offline speech isn't supported for %@ on this device." = "此裝置不支援 %@ 的離線語音。";
 "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet." = "尚未準備好翻譯成 %@ 的離線功能。請在連線至網路時，前往「設定」→「離線語言」下載兩種語言。";
 "Offline translation is usually slower and less accurate than online." = "離線翻譯通常比線上翻譯更慢且準確度較低。";
 "Offline voice downloads aren't configured in this build." = "此版本未配置離線語音下載。";
+"Offline voice files are missing: %@." = "缺少離線語音檔案：%@。";
 "Offline · holding audio" = "離線 · 保留音訊";
 "On all your devices" = "在所有裝置上";
 "On-device" = "裝置端";
@@ -208,7 +211,7 @@
 "Only the people right by the phone. For loud places like restaurants and stations." = "僅限靠近手機的人。適用於餐廳和車站等嘈雜場所。";
 "Open Settings" = "開啟設定";
 "Open in Maps" = "在地圖中開啟";
-"Optional, and it takes a few seconds. Signing in doubles your free translation time to two hours a day." = "選填，需幾秒鐘。登入可將免費翻譯時間加倍至每天兩小時。";
+"Optional, and it takes a few seconds. Signing in doubles your free translation time to two hours a day." = "登入只需幾秒鐘，也可以略過。登入後，每天的免費翻譯時間會從一小時增加到兩小時。";
 "Original transcript unavailable" = "無法取得原始逐字稿";
 "Original voice needs internet; translations stay visible." = "原始語音需要網路；翻譯內容仍會顯示。";
 "Original voice · online" = "原始語音 · 線上";
@@ -284,6 +287,7 @@
 "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline." = "語音辨識與文字翻譯在本機裝置上執行。離線使用前，請先在「離線語言」中準備好兩種語言。";
 "Speech-to-Speech" = "語音對語音";
 "Speed" = "速度";
+"Split this text into pieces of at most %lld characters." = "將此文字分割成最多 %lld 個字元的段落。";
 "Spoken in %@" = "以 %@ 口說";
 "Spoken voice" = "發聲人聲音";
 "Start" = "開始";
@@ -310,12 +314,16 @@
 "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download." = "語言尚未完全安裝。請保持網路連線，然後再次檢查或重新下載。";
 "The microphone audio couldn't be converted for on-device speech recognition." = "無法將麥克風音訊轉換為裝置上的語音辨識格式。";
 "The microphone stopped. Tap the mic to start again." = "麥克風已停止。輕觸麥克風圖示以重新開始。";
+"The offline voice %@ is not installed." = "離線語音 %@ 未安裝。";
+"The offline voice files could not be loaded: %@" = "無法載入離線語音檔案：%@";
+"The offline voice model is not loaded." = "離線語音模型尚未載入。";
 "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "原始語音會將翻譯文字傳送至 Soniox，需要網路連線。當語音輸出暫停時，離線文字仍會顯示。 ";
 "The other language will appear when they speak." = "對方說話時，另一種語言的翻譯就會出現。";
 "The voice download details aren't valid. Update Lively and try again." = "語音下載資訊無效。請更新 Lively 後再試一次。";
 "The voice download failed (HTTP %lld). Try again." = "語音下載失敗 (HTTP %lld)。請再試一次。";
 "The voice files couldn't be verified. Retry the download." = "無法驗證語音檔案。請重新下載。";
 "The voice preview could not play on the selected output." = "選定的輸出裝置無法播放語音預覽。";
+"There is no text to speak." = "沒有可朗讀的文字。";
 "They Speak" = "對方的語言";
 "They speak" = "對方的語言";
 "This Conversation" = "本次對話";
@@ -339,8 +347,8 @@
 "Translations into %@ play through your current audio output. " = "%@ 的翻譯將透過您目前的音訊輸出播放。 ";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "翻譯內容會透過您目前的音訊輸出裝置播放。喇叭播放期間聆聽會暫停。";
 "Try again" = "再試一次";
-"Two free hours a day instead of one" = "每天兩小時免費，而非一小時";
-"Two hours a day, free" = "每天兩小時免費";
+"Two free hours a day instead of one" = "每日免費時數從一小時增至兩小時";
+"Two hours a day, free" = "每天免費翻譯兩小時";
 "Type to translate" = "輸入以進行翻譯";
 "Unavailable on this device" = "此裝置不支援";
 "Up to 10 hours of translation a day." = "每天最多可翻譯 10 小時。";
@@ -359,6 +367,8 @@
 "Use the volume buttons to adjust playback." = "使用音量鍵調整播放音量。";
 "Using your location" = "正在使用您的位置";
 "Verified" = "已驗證";
+"Voice %@ does not support %@." = "語音 %1$@ 不支援 %2$@。";
+"Voice %@ unavailable: %@" = "語音 %1$@ 不可用：%2$@";
 "Voice Licenses" = "語音授權";
 "Voice licenses" = "語音授權";
 "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn." = "Voxtral 負責即時轉錄與話輪偵測；Mistral 聊天模型則負責翻譯每個話輪。";

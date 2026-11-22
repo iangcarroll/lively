@@ -56,7 +56,7 @@
 "Checking downloaded voices…" = "ダウンロードした音声を確認中…";
 "Checking this device…" = "このデバイスをチェック中…";
 "Checking…" = "確認中…";
-"Chinese script" = "中国語（簡体字）";
+"Chinese script" = "中国語の表記";
 "Choose Photo" = "写真を選択";
 "Choose a language" = "言語を選択";
 "Choose a language pair in Settings for on-device translation." = "オンデバイス翻訳用の言語ペアを[設定]で選択してください。";
@@ -110,7 +110,7 @@
 "Downloading…" = "ダウンロード中…";
 "Edit" = "編集";
 "Email" = "メールアドレス";
-"Email Me a Code" = "コードをメールで送信";
+"Email Me a Code" = "メールでコードを受け取る";
 "Email hidden" = "メールアドレスは非表示";
 "Engine" = "エンジン";
 "Enter the code we emailed to" = "メールでお送りしたコードを入力してください";
@@ -141,7 +141,7 @@
 "Incoming audio stays silent without a compatible headset with a microphone. " = "マイク付きの対応ヘッドセットがない場合、受信音声はミュートされます。 ";
 "Input language" = "入力言語";
 "It's included free with your account." = "アカウントに無料で含まれています。";
-"Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "話すだけです。Livelyが相手の言語を検出し、双方向で翻訳します。あなたの発言は%@のままです。";
+"Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "そのまま話してください。Lively が相手の言語を判別して双方向に翻訳します。手元の画面は%@で表示されます。";
 "Just talk. Lively hears who's speaking, and each of you reads your own half, in your own language." = "そのまま話してください。Lively が話し手を聞き分け、それぞれの言語で画面の半分ずつに会話を表示します。";
 "Keys are stored in the Keychain on this device." = "キーはこのデバイスのキーチェーンに保存されています。";
 "Language" = "言語";
@@ -193,10 +193,13 @@
 "Offline Languages" = "オフライン言語";
 "Offline Voice Library" = "オフライン音声ライブラリ";
 "Offline Voices" = "オフライン音声";
+"Offline speech could not be generated: %@" = "オフラインスピーチの生成に失敗しました：%@";
+"Offline speech is not supported for %@." = "%@ はオフラインスピーチに対応していません。";
 "Offline speech isn't supported for %@ on this device." = "このデバイスでは %@ のオフライン音声はサポートされていません。";
 "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet." = "%@ へのオフライン翻訳はまだ準備ができていません。インターネット接続時に [設定] → [オフライン言語] で両方の言語をダウンロードしてください。";
 "Offline translation is usually slower and less accurate than online." = "オフライン翻訳は通常、オンラインより遅く、精度も低くなります。";
 "Offline voice downloads aren't configured in this build." = "このビルドではオフライン音声のダウンロードが構成されていません。";
+"Offline voice files are missing: %@." = "オフライン音声ファイルが見つかりません：%@。";
 "Offline · holding audio" = "オフライン・オーディオ保持中";
 "On all your devices" = "すべてのデバイスで";
 "On-device" = "オンデバイス";
@@ -208,7 +211,7 @@
 "Only the people right by the phone. For loud places like restaurants and stations." = "電話のすぐそばの人向け。レストランや駅などの騒がしい場所に最適です。";
 "Open Settings" = "設定を開く";
 "Open in Maps" = "マップで開く";
-"Optional, and it takes a few seconds. Signing in doubles your free translation time to two hours a day." = "任意（数秒かかります）。サインインすると、無料翻訳時間が1日2時間に倍増します。";
+"Optional, and it takes a few seconds. Signing in doubles your free translation time to two hours a day." = "サインインは任意で、数秒で完了します。サインインすると、無料で翻訳できる時間が1日1時間から2時間に増えます。";
 "Original transcript unavailable" = "原文の文字起こしが利用できません";
 "Original voice needs internet; translations stay visible." = "原文の音声にはインターネットが必要です。翻訳は表示されたままになります。";
 "Original voice · online" = "原文音声・オンライン";
@@ -284,6 +287,7 @@
 "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline." = "音声認識とテキスト翻訳はこのデバイス上で実行されます。オフラインにする前に、[オフライン言語]で両方の言語を準備してください。";
 "Speech-to-Speech" = "音声対音声";
 "Speed" = "速度";
+"Split this text into pieces of at most %lld characters." = "このテキストを最大 %lld 文字ごとに分割します。";
 "Spoken in %@" = "%@ で話されました";
 "Spoken voice" = "発話音声";
 "Start" = "開始";
@@ -310,12 +314,16 @@
 "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download." = "言語のインストールが完了していません。インターネット接続を維持し、再確認するかダウンロードをやり直してください。";
 "The microphone audio couldn't be converted for on-device speech recognition." = "マイク入力がオンデバイス音声認識に変換できませんでした。";
 "The microphone stopped. Tap the mic to start again." = "マイクが停止しました。マイクをタップして再開してください。";
+"The offline voice %@ is not installed." = "オフライン音声 %@ がインストールされていません。";
+"The offline voice files could not be loaded: %@" = "オフライン音声ファイルを読み込めませんでした：%@";
+"The offline voice model is not loaded." = "オフライン音声モデルが読み込まれていません。";
 "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "元の音声は翻訳テキストをSonioxに送信し、インターネット接続が必要です。オフライン時のテキストは表示されたままですが、音声出力は一時停止します。 ";
 "The other language will appear when they speak." = "相手が話すと、その言語が表示されます。";
 "The voice download details aren't valid. Update Lively and try again." = "音声ダウンロードの詳細が無効です。Livelyを更新して再試行してください。";
 "The voice download failed (HTTP %lld). Try again." = "音声のダウンロードに失敗しました（HTTP %lld）。再試行してください。";
 "The voice files couldn't be verified. Retry the download." = "音声ファイルを検証できませんでした。ダウンロードをやり直してください。";
 "The voice preview could not play on the selected output." = "選択した出力先で音声プレビューが再生できませんでした。";
+"There is no text to speak." = "読み上げるテキストがありません。";
 "They Speak" = "相手の言語";
 "They speak" = "相手の言語";
 "This Conversation" = "この会話";
@@ -339,8 +347,8 @@
 "Translations into %@ play through your current audio output. " = "%@ への翻訳は現在のオーディオ出力先から再生されます。 ";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "翻訳は現在のオーディオ出力先から再生されます。スピーカー再生中は録音が一時停止します。";
 "Try again" = "再試行";
-"Two free hours a day instead of one" = "1時間ではなく、毎日無料の2時間";
-"Two hours a day, free" = "毎日無料の2時間";
+"Two free hours a day instead of one" = "無料の翻訳時間が1日1時間から2時間に";
+"Two hours a day, free" = "毎日2時間まで無料";
 "Type to translate" = "翻訳するには入力してください";
 "Unavailable on this device" = "このデバイスでは利用できません";
 "Up to 10 hours of translation a day." = "1日最大10時間翻訳可能。";
@@ -359,6 +367,8 @@
 "Use the volume buttons to adjust playback." = "音量ボタンで再生音量を調整してください。";
 "Using your location" = "現在地を取得中";
 "Verified" = "認証済み";
+"Voice %@ does not support %@." = "音声 %1$@ は %2$@ に対応していません。";
+"Voice %@ unavailable: %@" = "音声 %1$@ が利用できません：%2$@";
 "Voice Licenses" = "音声ライセンス";
 "Voice licenses" = "音声ライセンス";
 "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn." = "Voxtralはリアルタイムで文字起こしと話者切替を検出し、Mistralチャットモデルが各発言を翻訳します。";

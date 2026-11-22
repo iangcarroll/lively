@@ -193,10 +193,13 @@
 "Offline Languages" = "ऑफ़लाइन भाषाएं";
 "Offline Voice Library" = "ऑफ़लाइन आवाज़ लाइब्रेरी";
 "Offline Voices" = "ऑफ़लाइन आवाज़ें";
+"Offline speech could not be generated: %@" = "ऑफ़लाइन स्पीच उत्पन्न नहीं की जा सकी: %@";
+"Offline speech is not supported for %@." = "%@ के लिए ऑफ़लाइन स्पीच समर्थित नहीं है।";
 "Offline speech isn't supported for %@ on this device." = "इस डिवाइस पर %@ के लिए ऑफ़लाइन स्पीच समर्थित नहीं है।";
 "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet." = "%@ में ऑफ़लाइन अनुवाद तैयार नहीं है। इंटरनेट से जुड़े रहकर सेटिंग्स → ऑफ़लाइन भाषाओं में दोनों भाषाएँ डाउनलोड करें।";
 "Offline translation is usually slower and less accurate than online." = "ऑफ़लाइन अनुवाद आमतौर पर ऑनलाइन की तुलना में धीमा और कम सटीक होता है।";
 "Offline voice downloads aren't configured in this build." = "इस बिल्ड में ऑफ़लाइन आवाज़ डाउनलोड कॉन्फ़िगर नहीं किए गए हैं।";
+"Offline voice files are missing: %@." = "ऑफ़लाइन वॉइस फ़ाइलें अनुपलब्ध हैं: %@.";
 "Offline · holding audio" = "ऑफ़लाइन · ऑडियो रोकें";
 "On all your devices" = "आपके सभी डिवाइसों पर";
 "On-device" = "डिवाइस पर";
@@ -284,6 +287,7 @@
 "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline." = "स्पीच रिकग्निशन और टेक्स्ट अनुवाद इस डिवाइस पर चलते हैं। ऑफ़लाइन जाने से पहले दोनों भाषाओं को ऑफ़लाइन भाषाओं में तैयार करें।";
 "Speech-to-Speech" = "स्पीच-टू-स्पीच";
 "Speed" = "गति";
+"Split this text into pieces of at most %lld characters." = "इस पाठ को अधिकतम %lld अक्षरों के टुकड़ों में विभाजित करें।";
 "Spoken in %@" = "%@ में बोला गया";
 "Spoken voice" = "बोली गई आवाज़";
 "Start" = "शुरू करें";
@@ -310,12 +314,16 @@
 "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download." = "भाषा पूरी तरह से इंस्टॉल नहीं हुई हैं। इंटरनेट कनेक्शन रखें, फिर दोबारा जाँचें या डाउनलोड पुनः प्रयास करें।";
 "The microphone audio couldn't be converted for on-device speech recognition." = "माइक्रोफ़ोन ऑडियो को डिवाइस पर स्पीच रिकग्निशन के लिए परिवर्तित नहीं किया जा सका।";
 "The microphone stopped. Tap the mic to start again." = "माइक्रोफ़ोन बंद हो गया। फिर से शुरू करने के लिए माइक पर टैप करें।";
+"The offline voice %@ is not installed." = "ऑफ़लाइन वॉइस %@ इंस्टॉल नहीं है।";
+"The offline voice files could not be loaded: %@" = "ऑफ़लाइन वॉइस फ़ाइलें लोड नहीं की जा सकीं: %@";
+"The offline voice model is not loaded." = "ऑफ़लाइन वॉइस मॉडल लोड नहीं हुआ है।";
 "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "मूल आवाज़ अनुवादित पाठ को Soniox पर भेजती है और इंटरनेट की आवश्यकता होती है। ऑफ़लाइन पाठ बोले जाने पर भी दिखाई देता रहता है जबकि ऑडियो रुक जाता है। ";
 "The other language will appear when they speak." = "दूसरी भाषा तब दिखाई देगी जब वे बोलेंगे।";
 "The voice download details aren't valid. Update Lively and try again." = "आवाज़ डाउनलोड विवरण अमान्य हैं। Lively अपडेट करें और पुनः प्रयास करें।";
 "The voice download failed (HTTP %lld). Try again." = "आवाज़ डाउनलोड विफल रहा (HTTP %lld)। पुनः प्रयास करें।";
 "The voice files couldn't be verified. Retry the download." = "आवाज़ फ़ाइलों की सत्यापन नहीं हो सकी। डाउनलोड पुनः प्रयास करें।";
 "The voice preview could not play on the selected output." = "चयनित आउटपुट पर आवाज़ पूर्वावलोकन बजा नहीं जा सका।";
+"There is no text to speak." = "बोलने के लिए कोई पाठ नहीं है।";
 "They Speak" = "दूसरे व्यक्ति की भाषा";
 "They speak" = "दूसरे व्यक्ति की भाषा";
 "This Conversation" = "यह संवाद";
@@ -359,6 +367,8 @@
 "Use the volume buttons to adjust playback." = "प्लेबैक को समायोजित करने के लिए वॉल्यूम बटन का उपयोग करें।";
 "Using your location" = "आपकी स्थिति का उपयोग कर रहे हैं";
 "Verified" = "सत्यापित";
+"Voice %@ does not support %@." = "वॉइस %1$@, %2$@ का समर्थन नहीं करता है।";
+"Voice %@ unavailable: %@" = "वॉइस %1$@ अनुपलब्ध है: %2$@";
 "Voice Licenses" = "आवाज़ लाइसेंस";
 "Voice licenses" = "आवाज़ लाइसेंस";
 "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn." = "Voxtral रियल-टाइम में ट्रांसक्राइब और बारी का पता लगाता है; एक Mistral चैट मॉडल प्रत्येक बारी का अनुवाद करता है।";

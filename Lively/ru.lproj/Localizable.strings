@@ -56,7 +56,7 @@
 "Checking downloaded voices…" = "Проверка загруженных голосов…";
 "Checking this device…" = "Проверка этого устройства…";
 "Checking…" = "Проверка…";
-"Chinese script" = "Китайский текст";
+"Chinese script" = "Китайская письменность";
 "Choose Photo" = "Выбрать фото";
 "Choose a language" = "Выберите язык";
 "Choose a language pair in Settings for on-device translation." = "Выберите пару языков в настройках для перевода на устройстве.";
@@ -193,10 +193,13 @@
 "Offline Languages" = "Языки офлайн";
 "Offline Voice Library" = "Библиотека голосов офлайн";
 "Offline Voices" = "Офлайн-голоса";
+"Offline speech could not be generated: %@" = "Не удалось сгенерировать оффлайн-речь: %@";
+"Offline speech is not supported for %@." = "Оффлайн-режим речи недоступен для %@.";
 "Offline speech isn't supported for %@ on this device." = "Офлайн-распознавание речи для %@ на этом устройстве не поддерживается.";
 "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet." = "Офлайн-перевод на %@ пока недоступен. Скачайте оба языка в разделе «Настройки → Офлайн-языки» при подключении к интернету.";
 "Offline translation is usually slower and less accurate than online." = "Офлайн-перевод обычно медленнее и менее точен, чем онлайн.";
 "Offline voice downloads aren't configured in this build." = "Загрузка офлайн-голосов не настроена в этой версии приложения.";
+"Offline voice files are missing: %@." = "Отсутствуют оффлайн-файлы голоса: %@.";
 "Offline · holding audio" = "Офлайн · обработка аудио";
 "On all your devices" = "На всех ваших устройствах";
 "On-device" = "На устройстве";
@@ -284,6 +287,7 @@
 "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline." = "Распознавание речи и перевод текста выполняются на этом устройстве. Подготовьте оба языка в разделе «Офлайн-языки» перед переходом в офлайн-режим.";
 "Speech-to-Speech" = "Речь-в-речь";
 "Speed" = "Скорость";
+"Split this text into pieces of at most %lld characters." = "Разбейте этот текст на части длиной не более %lld символов.";
 "Spoken in %@" = "Говорится на %@";
 "Spoken voice" = "Озвученный голос";
 "Start" = "Начать";
@@ -310,12 +314,16 @@
 "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download." = "Языки ещё не установлены полностью. Подключитесь к интернету, затем проверьте снова или повторите загрузку.";
 "The microphone audio couldn't be converted for on-device speech recognition." = "Звук с микрофона не удалось преобразовать для распознавания речи на устройстве.";
 "The microphone stopped. Tap the mic to start again." = "Микрофон остановился. Нажмите на значок микрофона, чтобы начать снова.";
+"The offline voice %@ is not installed." = "Оффлайн-голос %@ не установлен.";
+"The offline voice files could not be loaded: %@" = "Не удалось загрузить оффлайн-файлы голоса: %@";
+"The offline voice model is not loaded." = "Оффлайн-голосовой модель не загружена.";
 "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "Оригинальный голос отправляет переведённый текст в Soniox и требует интернета. Офлайн-текст остаётся видимым, когда озвучка приостанавливается. ";
 "The other language will appear when they speak." = "Другой язык появится, когда собеседник заговорит.";
 "The voice download details aren't valid. Update Lively and try again." = "Сведения о загрузке голоса недействительны. Обновите Lively и попробуйте снова.";
 "The voice download failed (HTTP %lld). Try again." = "Загрузка голоса не удалась (HTTP %lld). Попробуйте снова.";
 "The voice files couldn't be verified. Retry the download." = "Не удалось проверить файлы голоса. Повторите загрузку.";
 "The voice preview could not play on the selected output." = "Предпросмотр голоса не воспроизводится на выбранном выходе звука.";
+"There is no text to speak." = "Нет текста для воспроизведения.";
 "They Speak" = "Язык собеседника";
 "They speak" = "Язык собеседника";
 "This Conversation" = "Этот разговор";
@@ -359,6 +367,8 @@
 "Use the volume buttons to adjust playback." = "Регулируйте громкость с помощью кнопок управления воспроизведением.";
 "Using your location" = "Определение местоположения";
 "Verified" = "Подтверждено";
+"Voice %@ does not support %@." = "Голос %1$@ не поддерживает %2$@.";
+"Voice %@ unavailable: %@" = "Голос %1$@ недоступен: %2$@";
 "Voice Licenses" = "Лицензии на голоса";
 "Voice licenses" = "Лицензии на голоса";
 "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn." = "Voxtral транскрибирует и определяет очередь; модель Mistral переводит каждое высказывание.";

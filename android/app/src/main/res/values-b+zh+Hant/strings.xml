@@ -35,7 +35,7 @@
     <string name="change_email">變更電子郵件</string>
     <string name="change_languages">變更語言</string>
     <string name="changing_language_notice">變更語言將開始新的對話。</string>
-    <string name="chinese_script">中文（繁體）</string>
+    <string name="chinese_script">中文書寫形式</string>
     <string name="choose_a_language">選擇語言</string>
     <string name="choose_a_pair">選擇一組</string>
     <string name="choose_a_place">選擇地點</string>
@@ -83,7 +83,7 @@
     <string name="email">電子郵件</string>
     <string name="email_failed">無法傳送驗證碼，請再試一次。</string>
     <string name="email_hidden">隱藏電子郵件</string>
-    <string name="email_me_a_code">寄驗證碼至我的信箱</string>
+    <string name="email_me_a_code">以電子郵件傳送驗證碼</string>
     <string name="engine">引擎</string>
     <string name="enter_the_code_we_emailed_to">輸入我們已寄送至的驗證碼</string>
     <string name="everything_the_mic_can_hear_even_far_away">麥克風可聽見的所有聲音，即使距離較遠也能收聽。</string>
@@ -161,7 +161,7 @@
     <string name="on_all_your_devices">在所有裝置上</string>
     <string name="onboarding_automatic_languages_body">選擇您閱讀與聆聽的語言。當他人說話時，Lively 會偵測另一種語言。自動偵測需使用網路。</string>
     <string name="onboarding_pair_languages_body">Lively 會監聽雙方並將彼此翻譯成對方語言。您可以隨時更改設定。</string>
-    <string name="onboarding_sign_in_body">選填，需幾秒鐘。登入可將免費翻譯時間加倍至每天兩小時。</string>
+    <string name="onboarding_sign_in_body">登入只需幾秒鐘，也可以略過。登入後，每天的免費翻譯時間會從一小時增加到兩小時。</string>
     <string name="onboarding_table_body">直接開口就好。Lively 會分辨誰在說話，兩人都能在各自的半邊螢幕上用自己的語言閱讀對話。</string>
     <string name="onboarding_welcome_body">面對面，和任何人交談。Lively 支援 %1$d 種語言，能在你們說話時為雙方即時翻譯。</string>
     <string name="open_in_maps">在地圖中開啟</string>
@@ -268,7 +268,7 @@
     <string name="todays_free_translation_time_is_used_up">今日免費翻譯時間已用完。</string>
     <string name="too_many_codes">驗證碼發送次數過多，請稍後再試。</string>
     <string name="traditional">繁體</string>
-    <string name="transcript_automatic_prompt">只需說話即可。Lively 會偵測另一種語言並雙向翻譯。您的語音保持為 %1$s。</string>
+    <string name="transcript_automatic_prompt">直接開口就好。Lively 會辨識對方的語言並雙向翻譯。您這邊的螢幕會持續以%1$s顯示。</string>
     <string name="transcript_pair_prompt">Lively 會監聽 %1$s 和 %2$s 並進行雙向翻譯。無需指定說話者。</string>
     <string name="transcript_view">文字稿檢視</string>
     <string name="transcription_error">轉錄錯誤</string>
@@ -282,8 +282,8 @@
     <string name="translation_service_no_response">翻譯服務沒有回應。</string>
     <string name="translation_service_unreachable">無法連線至翻譯服務。</string>
     <string name="try_again">再試一次</string>
-    <string name="two_free_hours_a_day_instead_of_one">每天兩小時免費，而非一小時</string>
-    <string name="two_hours_a_day_free">每天兩小時免費</string>
+    <string name="two_free_hours_a_day_instead_of_one">每日免費時數從一小時增至兩小時</string>
+    <string name="two_hours_a_day_free">每天免費翻譯兩小時</string>
     <string name="type_to_translate">輸入以進行翻譯</string>
     <string name="undeliverable_email">Lively 無法將郵件寄送至該地址。</string>
     <string name="up_to_10_hours_of_translation_a_day">每天最多可翻譯 10 小時。</string>

@@ -10,7 +10,7 @@ enum AudioModelError: LocalizedError {
         switch self {
         case let .modelLoadFailed(model, reason): "\(model): \(reason)"
         case let .inferenceFailed(operation, reason): "\(operation): \(reason)"
-        case let .voiceNotFound(voice, path): "Voice \(voice) unavailable: \(path)"
+        case let .voiceNotFound(voice, path): String(localized: "Voice \(voice) unavailable: \(path)")
         }
     }
 }

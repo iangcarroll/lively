@@ -83,7 +83,7 @@
     <string name="email">E-Mail</string>
     <string name="email_failed">Der Code konnte nicht gesendet werden. Versuchen Sie es erneut.</string>
     <string name="email_hidden">E-Mail ausgeblendet</string>
-    <string name="email_me_a_code">Senden Sie mir einen Code per E-Mail</string>
+    <string name="email_me_a_code">Code per E-Mail anfordern</string>
     <string name="engine">Engine</string>
     <string name="enter_the_code_we_emailed_to">Geben Sie den Code ein, den wir Ihnen per E-Mail gesendet haben</string>
     <string name="everything_the_mic_can_hear_even_far_away">Alles, was das Mikrofon hört, auch aus der Ferne.</string>
@@ -119,7 +119,7 @@
     <string name="languages">Sprachen</string>
     <string name="languages_and">%1$s und %2$s</string>
     <string name="languages_set_for_value">Sprachen für %1$s festgelegt.</string>
-    <string name="lay_it_flat_between_you">Legt das Handy zwischen euch</string>
+    <string name="lay_it_flat_between_you">Legen Sie das Handy zwischen sich</string>
     <string name="listening">Hört zu</string>
     <string name="listening_for_another_language">Hört auf eine andere Sprache</string>
     <string name="lively_couldnt_find_any_text_in_that_photo">Lively konnte keinen Text in diesem Foto finden.</string>
@@ -161,9 +161,9 @@
     <string name="on_all_your_devices">Auf allen Ihren Geräten</string>
     <string name="onboarding_automatic_languages_body">Wählen Sie die Sprache, die Sie lesen und hören. Lively erkennt die andere Sprache, wenn jemand spricht. Die automatische Erkennung nutzt das Internet.</string>
     <string name="onboarding_pair_languages_body">Lively hört auf beide Sprachen und übersetzt jede in die andere. Sie können diese jederzeit ändern.</string>
-    <string name="onboarding_sign_in_body">Optional, dauert einige Sekunden. Durch das Anmelden verdoppelt sich Ihre kostenlose Übersetzungszeit auf zwei Stunden pro Tag.</string>
-    <string name="onboarding_table_body">Sprecht einfach los. Lively erkennt, wer spricht. Jeder liest das Gespräch auf seiner Bildschirmhälfte in der eigenen Sprache.</string>
-    <string name="onboarding_welcome_body">Sprich mit jedem von Angesicht zu Angesicht. Lively übersetzt euer Gespräch in beide Richtungen und unterstützt %1$d Sprachen.</string>
+    <string name="onboarding_sign_in_body">Die Anmeldung ist freiwillig und dauert nur wenige Sekunden. Damit verdoppelt sich Ihre kostenlose Übersetzungszeit auf zwei Stunden pro Tag.</string>
+    <string name="onboarding_table_body">Sprechen Sie einfach los. Lively erkennt, wer spricht. Auf jeder Bildschirmhälfte erscheint das Gespräch in der jeweiligen Sprache.</string>
+    <string name="onboarding_welcome_body">Unterhalten Sie sich mit jedem Gegenüber. Lively übersetzt das Gespräch in beide Richtungen und unterstützt %1$d Sprachen.</string>
     <string name="open_in_maps">In Maps öffnen</string>
     <string name="open_settings">Einstellungen öffnen</string>
     <string name="or">oder</string>

@@ -35,7 +35,7 @@
     <string name="change_email">メールアドレスを変更</string>
     <string name="change_languages">言語を変更</string>
     <string name="changing_language_notice">言語を変更すると、新しい会話が開始されます。</string>
-    <string name="chinese_script">中国語（簡体字）</string>
+    <string name="chinese_script">中国語の表記</string>
     <string name="choose_a_language">言語を選択</string>
     <string name="choose_a_pair">ペアを選択</string>
     <string name="choose_a_place">場所を選択</string>
@@ -83,7 +83,7 @@
     <string name="email">メールアドレス</string>
     <string name="email_failed">コードを送信できませんでした。もう一度お試しください。</string>
     <string name="email_hidden">メールアドレスは非表示</string>
-    <string name="email_me_a_code">コードをメールで送信</string>
+    <string name="email_me_a_code">メールでコードを受け取る</string>
     <string name="engine">エンジン</string>
     <string name="enter_the_code_we_emailed_to">メールでお送りしたコードを入力してください</string>
     <string name="everything_the_mic_can_hear_even_far_away">マイクが拾えるすべての音、遠くのものも含みます。</string>
@@ -161,7 +161,7 @@
     <string name="on_all_your_devices">すべてのデバイスで</string>
     <string name="onboarding_automatic_languages_body">読む・聞く言語を選択します。Livelyは相手が話した言語を自動検出します。自動検出にはインターネットを使用します。</string>
     <string name="onboarding_pair_languages_body">Livelyは両方の言語を聞き取り、互いに翻訳します。いつでも変更できます。</string>
-    <string name="onboarding_sign_in_body">任意（数秒かかります）。サインインすると、無料翻訳時間が1日2時間に倍増します。</string>
+    <string name="onboarding_sign_in_body">サインインは任意で、数秒で完了します。サインインすると、無料で翻訳できる時間が1日1時間から2時間に増えます。</string>
     <string name="onboarding_table_body">そのまま話してください。Lively が話し手を聞き分け、それぞれの言語で画面の半分ずつに会話を表示します。</string>
     <string name="onboarding_welcome_body">誰とでも、顔を合わせて会話を。Lively は%1$d言語に対応し、二人の会話をその場で翻訳します。</string>
     <string name="open_in_maps">マップで開く</string>
@@ -268,7 +268,7 @@
     <string name="todays_free_translation_time_is_used_up">本日の無料翻訳時間が使い切られました。</string>
     <string name="too_many_codes">コードの発行回数が多すぎます。後でもう一度お試しください。</string>
     <string name="traditional">繁体字</string>
-    <string name="transcript_automatic_prompt">話すだけです。Livelyが相手の言語を検出し、双方向で翻訳します。あなたの発言は%1$sのままです。</string>
+    <string name="transcript_automatic_prompt">そのまま話してください。Lively が相手の言語を判別して双方向に翻訳します。手元の画面は%1$sで表示されます。</string>
     <string name="transcript_pair_prompt">Livelyは%1$sと%2$sを聞き取り、双方向に翻訳します。誰が発話しているかを指定する必要はありません。</string>
     <string name="transcript_view">文字起こしビュー</string>
     <string name="transcription_error">文字起こしエラー</string>
@@ -282,8 +282,8 @@
     <string name="translation_service_no_response">翻訳サービスから応答がありませんでした。</string>
     <string name="translation_service_unreachable">翻訳サービスに接続できませんでした。</string>
     <string name="try_again">再試行</string>
-    <string name="two_free_hours_a_day_instead_of_one">1時間ではなく、毎日無料の2時間</string>
-    <string name="two_hours_a_day_free">毎日無料の2時間</string>
+    <string name="two_free_hours_a_day_instead_of_one">無料の翻訳時間が1日1時間から2時間に</string>
+    <string name="two_hours_a_day_free">毎日2時間まで無料</string>
     <string name="type_to_translate">翻訳するには入力してください</string>
     <string name="undeliverable_email">Lively はそのアドレスにメールを送信できません。</string>
     <string name="up_to_10_hours_of_translation_a_day">1日最大10時間翻訳可能。</string>

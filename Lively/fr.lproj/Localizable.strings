@@ -193,10 +193,13 @@
 "Offline Languages" = "Langues hors ligne";
 "Offline Voice Library" = "Bibliothèque de voix hors ligne";
 "Offline Voices" = "Voix hors ligne";
+"Offline speech could not be generated: %@" = "Impossible de générer la parole hors ligne : %@";
+"Offline speech is not supported for %@." = "La parole hors ligne n’est pas prise en charge pour %@.";
 "Offline speech isn't supported for %@ on this device." = "La reconnaissance vocale hors ligne n'est pas prise en charge pour %@ sur cet appareil.";
 "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet." = "La traduction hors ligne vers %@ n'est pas prête. Téléchargez les deux langues dans Paramètres → Langues hors ligne, connecté à Internet.";
 "Offline translation is usually slower and less accurate than online." = "La traduction hors ligne est généralement plus lente et moins précise que la traduction en ligne.";
 "Offline voice downloads aren't configured in this build." = "Les téléchargements de voix hors ligne ne sont pas configurés dans cette version.";
+"Offline voice files are missing: %@." = "Fichiers vocaux hors ligne manquants : %@.";
 "Offline · holding audio" = "Hors ligne · audio en cours";
 "On all your devices" = "Sur tous vos appareils";
 "On-device" = "Sur l'appareil";
@@ -284,6 +287,7 @@
 "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline." = "La reconnaissance vocale et la traduction textuelle s'exécutent sur cet appareil. Préparez les deux langues dans Langues hors ligne avant de vous déconnecter.";
 "Speech-to-Speech" = "Parole à parole";
 "Speed" = "Vitesse";
+"Split this text into pieces of at most %lld characters." = "Découpez ce texte en segments d’au plus %lld caractères.";
 "Spoken in %@" = "Parlé en %@";
 "Spoken voice" = "Voix parlée";
 "Start" = "Démarrer";
@@ -310,12 +314,16 @@
 "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download." = "Les langues ne sont pas encore entièrement installées. Gardez une connexion internet, puis vérifiez à nouveau ou réessayez le téléchargement.";
 "The microphone audio couldn't be converted for on-device speech recognition." = "L’audio du microphone n’a pas pu être converti pour la reconnaissance vocale sur l’appareil.";
 "The microphone stopped. Tap the mic to start again." = "Le microphone s’est arrêté. Appuyez sur le micro pour reprendre.";
+"The offline voice %@ is not installed." = "La voix %@ n’est pas installée.";
+"The offline voice files could not be loaded: %@" = "Impossible de charger les fichiers vocaux hors ligne : %@";
+"The offline voice model is not loaded." = "Le modèle vocal hors ligne n’est pas chargé.";
 "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "La voix originale envoie le texte traduit à Soniox et nécessite internet. Le texte hors ligne reste visible lorsque la sortie vocale est en pause. ";
 "The other language will appear when they speak." = "L’autre langue apparaîtra lorsqu’ils parleront.";
 "The voice download details aren't valid. Update Lively and try again." = "Les détails du téléchargement de la voix ne sont pas valides. Mettez Lively à jour et réessayez.";
 "The voice download failed (HTTP %lld). Try again." = "Le téléchargement de la voix a échoué (HTTP %lld). Réessayez.";
 "The voice files couldn't be verified. Retry the download." = "Les fichiers vocaux n’ont pas pu être vérifiés. Réessayez le téléchargement.";
 "The voice preview could not play on the selected output." = "L’aperçu vocal ne peut pas être lu sur la sortie sélectionnée.";
+"There is no text to speak." = "Aucun texte à lire.";
 "They Speak" = "Langue de l’autre personne";
 "They speak" = "Langue de l’autre personne";
 "This Conversation" = "Cette conversation";
@@ -359,6 +367,8 @@
 "Use the volume buttons to adjust playback." = "Utilisez les boutons de volume pour ajuster la lecture.";
 "Using your location" = "Utilisation de votre position";
 "Verified" = "Vérifié";
+"Voice %@ does not support %@." = "La voix %1$@ ne prend pas en charge %2$@.";
+"Voice %@ unavailable: %@" = "Voix %1$@ indisponible : %2$@";
 "Voice Licenses" = "Licences vocales";
 "Voice licenses" = "Licences vocales";
 "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn." = "Voxtral transcrit et détecte les tours de parole en temps réel ; un modèle de chat Mistral traduit chaque tour.";

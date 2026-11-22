@@ -176,38 +176,46 @@ struct OnboardingView: View {
 // MARK: - Pages
 
 /// The page layout every step shares: a picture, then a title and a line or two.
-private struct OnboardingPage<Art: View>: View {
+private struct OnboardingPage<Art: View, Footer: View>: View {
     let title: String
     let message: String
-    var light = false
-    var containsControls = false
-    @ViewBuilder var art: Art
+    let light: Bool
+    let containsControls: Bool
+    let art: Art
+    let footer: Footer
+
+    init(title: String, message: String, light: Bool = false, containsControls: Bool = false,
+         @ViewBuilder footer: () -> Footer = { EmptyView() }, @ViewBuilder art: () -> Art) {
+        self.title = title
+        self.message = message
+        self.light = light
+        self.containsControls = containsControls
+        self.footer = footer()
+        self.art = art()
+    }
+
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.statusColumn) private var statusColumn
-    /// The picture's own height, and the height it has room for.
     @State private var artHeight: CGFloat = 0
-    @State private var room: CGFloat = 0
-
-    /// Scales the picture down to fit the space it's given (or up where
-    /// there's room), so it never runs into the words below. The unfolded
-    /// Duo is wide but short, so a fixed scale there overlapped the title.
-    private var artScale: CGFloat {
-        // iPad and the unfolded Duo have room for a bigger picture.
-        let grow: CGFloat = sizeClass == .regular ? 1.3 : 1
-        guard artHeight > 0, room > 0 else { return 1 }
-        return min(grow, room / artHeight)
-    }
+    @State private var captionHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
 
     var body: some View {
         GeometryReader { geometry in
+            // Reserve the caption's natural height first. A ScrollView proposes
+            // unbounded height, so the illustration needs an explicit allocation.
+            let minimum = containsControls ? artHeight : min(80, artHeight)
+            let room = max(minimum, geometry.size.height - captionHeight - footerHeight)
+            let growth: CGFloat = sizeClass == .regular ? 1.3 : 1
+            let scale = containsControls || artHeight == 0 ? 1 : min(growth, room / artHeight)
             ScrollView {
-                content.frame(minHeight: geometry.size.height)
+                content(room: room, scale: scale)
             }
             .scrollBounceBehavior(.basedOnSize)
         }
     }
 
-    private var content: some View {
+    private func content(room: CGFloat, scale: CGFloat) -> some View {
         VStack(spacing: 0) {
             art
                 // Beside the iPhone Duo's status icons, the picture keeps clear
@@ -215,9 +223,9 @@ private struct OnboardingPage<Art: View>: View {
                 .padding(.horizontal, statusColumn?.width ?? 0)
                 .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { artHeight = $0 }
-                .scaleEffect(containsControls ? 1 : artScale)
-                .frame(maxWidth: .infinity, minHeight: containsControls ? artHeight : min(120, artHeight), maxHeight: .infinity)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { room = $0 }
+                .scaleEffect(scale)
+                .frame(maxWidth: .infinity)
+                .frame(height: room)
             VStack(spacing: 12) {
                 Text(title)
                     .accessibilityIdentifier("tourTitle")
@@ -235,6 +243,9 @@ private struct OnboardingPage<Art: View>: View {
             .padding(.horizontal, 32)
             .padding(.top, 8)
             .padding(.bottom, 28)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
+            footer
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
         }
     }
 }
@@ -257,22 +268,22 @@ private struct TablePage: View {
     @Binding var onlineSelection: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            OnboardingPage(
-                title: String(localized: "Lay it flat between you"),
-                message: String(localized: "Just talk. Lively hears who's speaking, and each of you reads your own half, in your own language.")
-            ) {
-                TableDemo()
+        OnboardingPage(
+            title: String(localized: "Lay it flat between you"),
+            message: String(localized: "Just talk. Lively hears who's speaking, and each of you reads your own half, in your own language."),
+            footer: {
+                VStack(spacing: 8) {
+                    OnlineTranslationToggle(isOn: $onlineSelection)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .background(Color(.card), in: .rect(cornerRadius: 22))
+                    if !onlineSelection { OfflineTranslationNotice() }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 14)
             }
-            VStack(spacing: 8) {
-                OnlineTranslationToggle(isOn: $onlineSelection)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
-                    .background(Color(.card), in: .rect(cornerRadius: 22))
-                if !onlineSelection { OfflineTranslationNotice() }
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 14)
+        ) {
+            TableDemo()
         }
     }
 }

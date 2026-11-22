@@ -193,10 +193,13 @@
 "Offline Languages" = "Offline talen";
 "Offline Voice Library" = "Offline stembibliotheek";
 "Offline Voices" = "Offline-stemmen";
+"Offline speech could not be generated: %@" = "Offline spraak kon niet worden gegenereerd: %@";
+"Offline speech is not supported for %@." = "Offline spraak wordt niet ondersteund voor %@.";
 "Offline speech isn't supported for %@ on this device." = "Offline spraakondersteuning is niet beschikbaar voor %@ op dit apparaat.";
 "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet." = "Offline vertaling naar %@ is nog niet klaar. Download beide talen in Instellingen → Offline talen terwijl je verbonden bent met internet.";
 "Offline translation is usually slower and less accurate than online." = "Offline vertaling is meestal langzamer en minder nauwkeurig dan online.";
 "Offline voice downloads aren't configured in this build." = "Offline stemdownloads zijn niet geconfigureerd in deze build.";
+"Offline voice files are missing: %@." = "Ontbrekende offline spraakbestanden: %@.";
 "Offline · holding audio" = "Offline · audio vasthouden";
 "On all your devices" = "Op al je apparaten";
 "On-device" = "Op apparaat";
@@ -284,6 +287,7 @@
 "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline." = "Spraakherkenning en tekstvertaling draaien op dit apparaat. Bereid beide talen voor in Offline talen voordat je offline gaat.";
 "Speech-to-Speech" = "Spraak-naar-spraak";
 "Speed" = "Snelheid";
+"Split this text into pieces of at most %lld characters." = "Splits deze tekst in stukken van maximaal %lld tekens.";
 "Spoken in %@" = "Gesproken in %@";
 "Spoken voice" = "Gesproken stem";
 "Start" = "Start";
@@ -310,12 +314,16 @@
 "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download." = "De talen zijn nog niet volledig geïnstalleerd. Houd een internetverbinding aan, controleer het opnieuw of probeer de download opnieuw.";
 "The microphone audio couldn't be converted for on-device speech recognition." = "De microfoonaudio kon niet worden omgezet voor spraakherkenning op het apparaat.";
 "The microphone stopped. Tap the mic to start again." = "De microfoon is gestopt. Tik op de mic om opnieuw te starten.";
+"The offline voice %@ is not installed." = "De offline stem %@ is niet geïnstalleerd.";
+"The offline voice files could not be loaded: %@" = "De offline spraakbestanden konden niet worden geladen: %@";
+"The offline voice model is not loaded." = "Het offline spraakmodel is niet geladen.";
 "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "De originele stem stuurt vertaalde tekst naar Soniox en heeft internet nodig. Offline tekst blijft zichtbaar wanneer de gesproken uitvoering pauzeert. ";
 "The other language will appear when they speak." = "De andere taal verschijnt wanneer zij spreken.";
 "The voice download details aren't valid. Update Lively and try again." = "De details van de stemdownload zijn ongeldig. Werk Lively bij en probeer het opnieuw.";
 "The voice download failed (HTTP %lld). Try again." = "De stemdownload is mislukt (HTTP %lld). Probeer het opnieuw.";
 "The voice files couldn't be verified. Retry the download." = "De stembestanden konden niet worden geverifieerd. Probeer de download opnieuw.";
 "The voice preview could not play on the selected output." = "De stemvoorvertoning kon niet worden afgespeeld op de geselecteerde uitvoer.";
+"There is no text to speak." = "Er is geen tekst om uit te spreken.";
 "They Speak" = "Taal van de ander";
 "They speak" = "Taal van de ander";
 "This Conversation" = "Dit gesprek";
@@ -359,6 +367,8 @@
 "Use the volume buttons to adjust playback." = "Gebruik de volumeknoppen om het geluid aan te passen.";
 "Using your location" = "Locatie wordt gebruikt";
 "Verified" = "Geverifieerd";
+"Voice %@ does not support %@." = "Stem %1$@ ondersteunt %2$@ niet.";
+"Voice %@ unavailable: %@" = "Stem %1$@ niet beschikbaar: %2$@";
 "Voice Licenses" = "Stemlicenties";
 "Voice licenses" = "Stemlicenties";
 "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn." = "Voxtral transcribeert en detecteert beurtwisseling; een Mistral-chatmodel vertaalt elke beurt.";

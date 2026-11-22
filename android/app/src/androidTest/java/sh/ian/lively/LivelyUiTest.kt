@@ -189,7 +189,8 @@ class LivelyUiTest {
         // Swap by picking the other side's language.
         compose.onNodeWithText(context.getString(R.string.first_language)).performClick()
         waitForText(context.getString(R.string.swap))
-        compose.onNodeWithText(context.getString(R.string.swap)).performClick()
+        // The other language also appears alphabetically below the pinned pair.
+        compose.onAllNodesWithText(context.getString(R.string.swap))[0].performClick()
         waitForText(context.getString(R.string.first_language))
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
         val prefs = context.getSharedPreferences("lively", Context.MODE_PRIVATE)

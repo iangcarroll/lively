@@ -193,10 +193,13 @@
 "Offline Languages" = "اللغات بدون اتصال";
 "Offline Voice Library" = "مكتبة الأصوات بدون اتصال";
 "Offline Voices" = "الأصوات دون اتصال";
+"Offline speech could not be generated: %@" = "تعذّر إنشاء الكلام غير المتصل: %@";
+"Offline speech is not supported for %@." = "لا يدعم الكلام غير المتصل لـ %@.";
 "Offline speech isn't supported for %@ on this device." = "لا يدعم التعرف على الكلام دون الاتصال بـ %@ على هذا الجهاز.";
 "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet." = "الترجمة دون اتصال إلى %@ غير جاهزة. قم بتنزيل اللغتين من الإعدادات → اللغات دون الاتصال أثناء الاتصال بالإنترنت.";
 "Offline translation is usually slower and less accurate than online." = "عادةً ما تكون الترجمة دون اتصال أبطأ وأقل دقة من الترجمة عبر الإنترنت.";
 "Offline voice downloads aren't configured in this build." = "تنزيلات الأصوات دون اتصال غير مهيّئة في هذا الإصدار.";
+"Offline voice files are missing: %@." = "ملفات الصوت غير المتصلة مفقودة: %@.";
 "Offline · holding audio" = "دون اتصال · حفظ الصوت";
 "On all your devices" = "على جميع أجهزتك";
 "On-device" = "على الجهاز";
@@ -284,6 +287,7 @@
 "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline." = "يعمل التعرف على الكلام وترجمة النص على هذا الجهاز. جهز اللغتين في لغات عدم الاتصال قبل الانتقال إلى وضع عدم الاتصال.";
 "Speech-to-Speech" = "كلام إلى كلام";
 "Speed" = "السرعة";
+"Split this text into pieces of at most %lld characters." = "قسّم هذا النص إلى أجزاء لا تزيد عن %lld حرف.";
 "Spoken in %@" = "مُتحدث بها %@";
 "Spoken voice" = "الصوت المسموع";
 "Start" = "ابدأ";
@@ -310,12 +314,16 @@
 "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download." = "اللغات لم تُثبّت بالكامل بعد. حافظ على اتصال بالإنترنت، ثم تحقق مرة أخرى أو أعد محاولة التحميل.";
 "The microphone audio couldn't be converted for on-device speech recognition." = "تعذّر تحويل صوت الميكروفون للتعرف على الكلام على الجهاز.";
 "The microphone stopped. Tap the mic to start again." = "توقّف الميكروفون. اضغط على أيقونة الميكروفون لإعادة البدء.";
+"The offline voice %@ is not installed." = "الصوت غير المتصل %@ غير مُثبّت.";
+"The offline voice files could not be loaded: %@" = "تعذّر تحميل ملفات الصوت غير المتصلة: %@";
+"The offline voice model is not loaded." = "نموذج الصوت غير المتصل غير محمّل.";
 "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "يُرسِل الصوت الأصلي النص المترجم إلى Soniox ويحتاج إلى اتصال بالإنترنت. يبقى النص غير المترجم مرئياً عند توقف الإخراج الصوتي. ";
 "The other language will appear when they speak." = "ستظهر اللغة الأخرى عندما يتحدث الشخص الآخر.";
 "The voice download details aren't valid. Update Lively and try again." = "تفاصيل تحميل الصوت غير صالحة. حدّث Lively وأعد المحاولة.";
 "The voice download failed (HTTP %lld). Try again." = "فشل تحميل الصوت (HTTP %lld). أعد المحاولة.";
 "The voice files couldn't be verified. Retry the download." = "تعذّر التحقق من ملفات الصوت. أعد محاولة التحميل.";
 "The voice preview could not play on the selected output." = "تعذّر تشغيل معاينة الصوت على الإخراج المحدد.";
+"There is no text to speak." = "لا يوجد نص لقراءته.";
 "They Speak" = "لغة الطرف الآخر";
 "They speak" = "لغة الطرف الآخر";
 "This Conversation" = "هذه المحادثة";
@@ -359,6 +367,8 @@
 "Use the volume buttons to adjust playback." = "استخدم أزرار الصوت لضبط مستوى التشغيل.";
 "Using your location" = "جارٍ استخدام موقعك";
 "Verified" = "تم التحقق";
+"Voice %@ does not support %@." = "الصوت %1$@ لا يدعم %2$@.";
+"Voice %@ unavailable: %@" = "الصوت %1$@ غير متاح: %2$@";
 "Voice Licenses" = "تراخيص الأصوات";
 "Voice licenses" = "تراخيص الأصوات";
 "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn." = "يقوم Voxtral بالكتابة والكشف عن الأدوار؛ وترجمتها كل دور باستخدام نموذج محادثة Mistral.";

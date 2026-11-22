@@ -7,6 +7,14 @@ nonisolated final class LocalizedOnboardingTests: XCTestCase {
     @MainActor func testTraditionalChinese() throws { try tour("zh-Hant") }
     @MainActor func testGerman() throws { try tour("de") }
     @MainActor func testArabic() throws { try tour("ar") }
+    @MainActor func testDutch() throws { try tour("nl") }
+    @MainActor func testFrench() throws { try tour("fr") }
+    @MainActor func testHindi() throws { try tour("hi") }
+    @MainActor func testItalian() throws { try tour("it") }
+    @MainActor func testKorean() throws { try tour("ko") }
+    @MainActor func testPortuguese() throws { try tour("pt") }
+    @MainActor func testRussian() throws { try tour("ru") }
+    @MainActor func testSpanish() throws { try tour("es") }
 
     @MainActor private func tour(_ language: String) throws {
         let app = XCUIApplication()
@@ -69,6 +77,9 @@ nonisolated final class LocalizedOnboardingTests: XCTestCase {
                 XCTAssertGreaterThanOrEqual(element.frame.minX, app.frame.minX - 1)
                 XCTAssertLessThanOrEqual(element.frame.maxX, app.frame.maxX + 1)
                 XCTAssertGreaterThan(element.frame.height, 0)
+            }
+            if name == "On-device translation" {
+                XCTAssertLessThanOrEqual(body.frame.maxY, app.switches["onlineTranslationToggle"].frame.minY)
             }
             let category: UIContentSizeCategory = app.launchArguments.contains(UIContentSizeCategory.extraExtraExtraLarge.rawValue)
                 ? .extraExtraExtraLarge : .large

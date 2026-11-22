@@ -56,7 +56,7 @@
 "Checking downloaded voices…" = "다운로드된 음성 확인 중…";
 "Checking this device…" = "이 기기 확인 중…";
 "Checking…" = "확인 중…";
-"Chinese script" = "중국어 자막";
+"Chinese script" = "중국어 표기 방식";
 "Choose Photo" = "사진 선택";
 "Choose a language" = "언어 선택";
 "Choose a language pair in Settings for on-device translation." = "기기 내 번역을 위해 설정에서 언어 쌍을 선택하세요.";
@@ -193,10 +193,13 @@
 "Offline Languages" = "오프라인 언어";
 "Offline Voice Library" = "오프라인 음성 라이브러리";
 "Offline Voices" = "오프라인 음성";
+"Offline speech could not be generated: %@" = "오프라인 음성을 생성할 수 없습니다: %@";
+"Offline speech is not supported for %@." = "%@은(는) 오프라인 음성을 지원하지 않습니다.";
 "Offline speech isn't supported for %@ on this device." = "이 기기에서 %@은(는) 오프라인 음성을 지원하지 않습니다.";
 "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet." = "%@으로의 오프라인 번역이 준비되지 않았습니다. 인터넷에 연결된 상태에서 [설정] → [오프라인 언어]에서 두 언어를 모두 다운로드하세요.";
 "Offline translation is usually slower and less accurate than online." = "오프라인 번역은 일반적으로 온라인보다 느리고 정확도가 낮습니다.";
 "Offline voice downloads aren't configured in this build." = "이 빌드에서는 오프라인 음성 다운로드가 구성되지 않았습니다.";
+"Offline voice files are missing: %@." = "오프라인 음성 파일이 누락되었습니다: %@.";
 "Offline · holding audio" = "오프라인 · 오디오 대기 중";
 "On all your devices" = "모든 기기에서";
 "On-device" = "온디바이스";
@@ -284,6 +287,7 @@
 "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline." = "음성 인식 및 텍스트 번역은 이 기기에서 실행됩니다. 오프라인으로 전환하기 전에 [오프라인 언어]에서 두 언어를 모두 준비하세요.";
 "Speech-to-Speech" = "음성 대 음성";
 "Speed" = "속도";
+"Split this text into pieces of at most %lld characters." = "이 텍스트를 최대 %lld자씩 분할하세요.";
 "Spoken in %@" = "%@로 발화됨";
 "Spoken voice" = "발화 음성";
 "Start" = "시작";
@@ -310,12 +314,16 @@
 "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download." = "언어가 완전히 설치되지 않았습니다. 인터넷 연결을 유지한 후 다시 확인하거나 다운로드를 재시도하세요.";
 "The microphone audio couldn't be converted for on-device speech recognition." = "마이크 오디오를 온디바이스 음성 인식용으로 변환할 수 없습니다.";
 "The microphone stopped. Tap the mic to start again." = "마이크가 중지되었습니다. 마이크를 탭하여 다시 시작하세요.";
+"The offline voice %@ is not installed." = "오프라인 음성 %@이(가) 설치되지 않았습니다.";
+"The offline voice files could not be loaded: %@" = "오프라인 음성 파일을 로드할 수 없습니다: %@";
+"The offline voice model is not loaded." = "오프라인 음성 모델이 로드되지 않았습니다.";
 "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "원본 음성은 번역된 텍스트를 Soniox로 전송하며 인터넷 연결이 필요합니다. 오프라인 상태에서는 음성 출력이 일시 중단되어도 텍스트는 계속 표시됩니다. ";
 "The other language will appear when they speak." = "상대가 말하면 다른 언어가 표시됩니다.";
 "The voice download details aren't valid. Update Lively and try again." = "음성 다운로드 정보가 유효하지 않습니다. Lively를 업데이트하고 다시 시도하세요.";
 "The voice download failed (HTTP %lld). Try again." = "음성 다운로드에 실패했습니다 (HTTP %lld). 다시 시도하세요.";
 "The voice files couldn't be verified. Retry the download." = "음성 파일을 검증할 수 없습니다. 다운로드를 재시도하세요.";
 "The voice preview could not play on the selected output." = "선택한 출력 장치에서 음성 미리보기를 재생할 수 없습니다.";
+"There is no text to speak." = "읽을 텍스트가 없습니다.";
 "They Speak" = "상대방의 언어";
 "They speak" = "상대방의 언어";
 "This Conversation" = "이 대화";
@@ -359,6 +367,8 @@
 "Use the volume buttons to adjust playback." = "볼륨 버튼으로 재생 볼륨을 조절하세요.";
 "Using your location" = "위치 정보 사용 중";
 "Verified" = "검증됨";
+"Voice %@ does not support %@." = "음성 %1$@은(는) %2$@을(를) 지원하지 않습니다.";
+"Voice %@ unavailable: %@" = "음성 %1$@ 사용 불가: %2$@";
 "Voice Licenses" = "음성 라이선스";
 "Voice licenses" = "음성 라이선스";
 "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn." = "Voxtral은 실시간으로 음성을 전사하고 턴을 감지하며, Mistral 채팅 모델이 각 턴을 번역합니다.";

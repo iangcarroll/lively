@@ -375,7 +375,12 @@ private struct SignInForm: View {
 
             Button(action: sendCode) {
                 ZStack {
-                    Text("Email Me a Code").opacity(working ? 0 : 1)
+                    Text("Email Me a Code")
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                        .opacity(working ? 0 : 1)
                     if working { ProgressView().tint(.white) }
                 }
                 .font(.body.weight(.semibold))

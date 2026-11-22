@@ -193,10 +193,13 @@
 "Offline Languages" = "Offline Languages";
 "Offline Voice Library" = "Offline Voice Library";
 "Offline Voices" = "Offline Voices";
+"Offline speech could not be generated: %@" = "Offline speech could not be generated: %@";
+"Offline speech is not supported for %@." = "Offline speech is not supported for %@.";
 "Offline speech isn't supported for %@ on this device." = "Offline speech isn't supported for %@ on this device.";
 "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet." = "Offline translation into %@ isn't ready. Download both languages in Settings → Offline Languages while connected to the internet.";
 "Offline translation is usually slower and less accurate than online." = "Offline translation is usually slower and less accurate than online.";
 "Offline voice downloads aren't configured in this build." = "Offline voice downloads aren't configured in this build.";
+"Offline voice files are missing: %@." = "Offline voice files are missing: %@.";
 "Offline · holding audio" = "Offline · holding audio";
 "On all your devices" = "On all your devices";
 "On-device" = "On-device";
@@ -284,6 +287,7 @@
 "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline." = "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline.";
 "Speech-to-Speech" = "Speech-to-Speech";
 "Speed" = "Speed";
+"Split this text into pieces of at most %lld characters." = "Split this text into pieces of at most %lld characters.";
 "Spoken in %@" = "Spoken in %@";
 "Spoken voice" = "Spoken voice";
 "Start" = "Start";
@@ -310,12 +314,16 @@
 "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download." = "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download.";
 "The microphone audio couldn't be converted for on-device speech recognition." = "The microphone audio couldn't be converted for on-device speech recognition.";
 "The microphone stopped. Tap the mic to start again." = "The microphone stopped. Tap the mic to start again.";
+"The offline voice %@ is not installed." = "The offline voice %@ is not installed.";
+"The offline voice files could not be loaded: %@" = "The offline voice files could not be loaded: %@";
+"The offline voice model is not loaded." = "The offline voice model is not loaded.";
 "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. ";
 "The other language will appear when they speak." = "The other language will appear when they speak.";
 "The voice download details aren't valid. Update Lively and try again." = "The voice download details aren't valid. Update Lively and try again.";
 "The voice download failed (HTTP %lld). Try again." = "The voice download failed (HTTP %lld). Try again.";
 "The voice files couldn't be verified. Retry the download." = "The voice files couldn't be verified. Retry the download.";
 "The voice preview could not play on the selected output." = "The voice preview could not play on the selected output.";
+"There is no text to speak." = "There is no text to speak.";
 "They Speak" = "They Speak";
 "They speak" = "They speak";
 "This Conversation" = "This Conversation";
@@ -359,6 +367,8 @@
 "Use the volume buttons to adjust playback." = "Use the volume buttons to adjust playback.";
 "Using your location" = "Using your location";
 "Verified" = "Verified";
+"Voice %@ does not support %@." = "Voice %@ does not support %@.";
+"Voice %@ unavailable: %@" = "Voice %@ unavailable: %@";
 "Voice Licenses" = "Voice Licenses";
 "Voice licenses" = "Voice licenses";
 "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn." = "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn.";
