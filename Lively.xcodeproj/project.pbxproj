@@ -27,6 +27,13 @@
 			remoteGlobalIDString = A10000000000000000000006;
 			remoteInfo = Lively;
 		};
+		D40000000000000000000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000009 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000006;
+			remoteInfo = Lively;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -48,6 +55,7 @@
 		A10000000000000000000001 /* Lively.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lively.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000010 /* LivelyWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LivelyWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C30000000000000000000001 /* LivelyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LivelyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D40000000000000000000001 /* LivelyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LivelyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -85,6 +93,11 @@
 			path = LivelyTests;
 			sourceTree = "<group>";
 		};
+		D40000000000000000000002 /* LivelyUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LivelyUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,6 +123,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D40000000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -120,6 +140,7 @@
 				A10000000000000000000011 /* LivelyWidgets */,
 				A10000000000000000000012 /* Shared */,
 				C30000000000000000000002 /* LivelyTests */,
+				D40000000000000000000002 /* LivelyUITests */,
 				C30000000000000000000021 /* Lively.storekit */,
 				A10000000000000000000005 /* Products */,
 			);
@@ -131,6 +152,7 @@
 				A10000000000000000000001 /* Lively.app */,
 				A10000000000000000000010 /* LivelyWidgets.appex */,
 				C30000000000000000000001 /* LivelyTests.xctest */,
+				D40000000000000000000001 /* LivelyUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -210,6 +232,29 @@
 			productReference = C30000000000000000000001 /* LivelyTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		D40000000000000000000003 /* LivelyUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D40000000000000000000009 /* Build configuration list for PBXNativeTarget "LivelyUITests" */;
+			buildPhases = (
+				D40000000000000000000004 /* Sources */,
+				D40000000000000000000005 /* Frameworks */,
+				D40000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D40000000000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D40000000000000000000002 /* LivelyUITests */,
+			);
+			name = LivelyUITests;
+			packageProductDependencies = (
+			);
+			productName = LivelyUITests;
+			productReference = D40000000000000000000001 /* LivelyUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -238,7 +283,19 @@
 			knownRegions = (
 				en,
 				Base,
+				ar,
+				de,
+				es,
+				fr,
+				hi,
+				it,
+				ja,
+				ko,
+				nl,
+				pt,
+				ru,
 				"zh-Hans",
+				"zh-Hant",
 			);
 			mainGroup = A10000000000000000000004;
 			minimizedProjectReferenceProxies = 1;
@@ -253,6 +310,7 @@
 				A10000000000000000000006 /* Lively */,
 				A10000000000000000000013 /* LivelyWidgets */,
 				C30000000000000000000003 /* LivelyTests */,
+				D40000000000000000000003 /* LivelyUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -280,6 +338,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D40000000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -304,6 +369,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D40000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -317,6 +389,11 @@
 			isa = PBXTargetDependency;
 			target = A10000000000000000000006 /* Lively */;
 			targetProxy = C30000000000000000000007 /* PBXContainerItemProxy */;
+		};
+		D40000000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000006 /* Lively */;
+			targetProxy = D40000000000000000000007 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -555,6 +632,25 @@
 			};
 			name = Debug;
 		};
+		D4000000000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JYM7F5DWS2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = hk.cautela.lively.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				TEST_TARGET_NAME = Lively;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		C3000000000000000000000B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -573,6 +669,25 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				"TEST_HOST[sdk=iphone*]" = "$(BUILT_PRODUCTS_DIR)/Lively.app/Lively";
 				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Lively.app/Contents/MacOS/Lively";
+			};
+			name = Release;
+		};
+		D4000000000000000000000B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JYM7F5DWS2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = hk.cautela.lively.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				TEST_TARGET_NAME = Lively;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -611,6 +726,15 @@
 			buildConfigurations = (
 				C3000000000000000000000A /* Debug */,
 				C3000000000000000000000B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D40000000000000000000009 /* Build configuration list for PBXNativeTarget "LivelyUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4000000000000000000000A /* Debug */,
+				D4000000000000000000000B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

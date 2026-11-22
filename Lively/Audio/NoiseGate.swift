@@ -13,18 +13,18 @@ enum PickupRange: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .auto: "Auto"
-        case .close: "Close"
-        case .nearby: "Nearby"
-        case .room: "Whole room"
+        case .auto: String(localized: "Auto")
+        case .close: String(localized: "pickup.close", defaultValue: "Close", comment: "Short microphone pickup range")
+        case .nearby: String(localized: "Nearby")
+        case .room: String(localized: "Whole room")
         }
     }
     var summary: String {
         switch self {
-        case .auto: "Follows how loud the room is, and only hears people noticeably louder than the background."
-        case .close: "Only the people right by the phone. For loud places like restaurants and stations."
-        case .nearby: "People around the table. Conversations across the room are ignored."
-        case .room: "Everything the mic can hear, even far away."
+        case .auto: String(localized: "Follows how loud the room is, and only hears people noticeably louder than the background.")
+        case .close: String(localized: "Only the people right by the phone. For loud places like restaurants and stations.")
+        case .nearby: String(localized: "People around the table. Conversations across the room are ignored.")
+        case .room: String(localized: "Everything the mic can hear, even far away.")
         }
     }
 }

@@ -28,6 +28,7 @@ import sh.ian.lively.net.RegionProber
 import sh.ian.lively.net.SonioxKeyProvider
 import sh.ian.lively.support.DebugFlags
 import sh.ian.lively.support.KeystoreSecretStore
+import sh.ian.lively.support.modelResources
 import sh.ian.lively.support.RegionLocator
 import sh.ian.lively.support.SharedPreferencesStore
 import java.util.UUID
@@ -39,6 +40,7 @@ class LivelyApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        modelResources = resources
         installPlatformText(this)
         graph = Graph(this)
         if (!BuildConfig.DEBUG && BuildConfig.KEY_BROKER_URL.isNotEmpty()) {

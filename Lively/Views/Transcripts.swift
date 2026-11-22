@@ -39,8 +39,8 @@ struct ParallelTranscript: View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 if store.isAutomaticLanguageMode {
-                    header(store.listenerLanguage, role: "Your language")
-                    header(store.detectedPartnerLanguage, role: "Other language")
+                    header(store.listenerLanguage, role: String(localized: "Your language"))
+                    header(store.detectedPartnerLanguage, role: String(localized: "Other language"))
                 } else {
                     header(AppSettings.shared.languages.first)
                     header(AppSettings.shared.languages.second)
@@ -75,7 +75,7 @@ struct ParallelTranscript: View {
             Capsule().fill(language?.ink ?? .secondary).frame(width: 18, height: 4)
             VStack(alignment: .leading, spacing: 2) {
                 if let role { Text(role).font(.caption).foregroundStyle(.secondary) }
-                Text(language?.nativeName ?? "Automatic")
+                Text(language?.nativeName ?? String(localized: "Automatic"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(language?.ink ?? .secondary)
             }
@@ -241,7 +241,7 @@ struct EmptyConversation: View {
                         if let partner = store.detectedPartnerLanguage {
                             Text(prompt(in: partner)).font(.title3.weight(.semibold)).foregroundStyle(partner.ink)
                         } else {
-                            Text(isListening ? "Listening for another language" : "Other language · Automatic")
+                            Text(isListening ? String(localized: "Listening for another language") : String(localized: "Other language · Automatic"))
                                 .font(.title3.weight(.semibold)).foregroundStyle(.secondary)
                         }
                     } else {
@@ -275,11 +275,11 @@ struct EmptyConversation: View {
     private var explanation: String {
         if store.isAutomaticLanguageMode {
             return store.isOnline
-                ? "Just talk. Lively detects the other language and translates both ways. Your side stays in \(store.listenerLanguage.englishName)."
-                : "Automatic detection needs internet. Choose a language pair and the On-device engine in Settings to translate offline."
+                ? String(localized: "Just talk. Lively detects the other language and translates both ways. Your side stays in \(store.listenerLanguage.displayName).")
+                : String(localized: "Automatic detection needs internet. Choose a language pair and the On-device engine in Settings to translate offline.")
         }
         let languages = AppSettings.shared.languages
-        return "Lively hears \(languages.first.englishName) and \(languages.second.englishName) and translates both ways. No need to say who's speaking."
+        return String(localized: "Lively hears \(languages.first.displayName) and \(languages.second.displayName) and translates both ways. No need to say who's speaking.")
     }
 
     private func prompt(in language: Language) -> String {

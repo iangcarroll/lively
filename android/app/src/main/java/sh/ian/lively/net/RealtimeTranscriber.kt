@@ -1,5 +1,7 @@
 package sh.ian.lively.net
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import android.util.Base64
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonPrimitive
@@ -94,7 +96,7 @@ class RealtimeTranscriber(
 
     override val endOfAudioMessage = WsMessage.json(buildJsonObject { put("type", "input_audio.end") })
     override val readyWhenOpen = false
-    override val rejectedKeyMessage = "Your Mistral API key was rejected. Check it in Settings."
+    override val rejectedKeyMessage = modelString(R.string.mistral_key_rejected) { "Your Mistral API key was rejected. Check it in Settings." }
 
     override fun sessionDidReset(stream: SocketStream) = onEvent(SpeechEvent.SessionReset)
 
@@ -108,10 +110,10 @@ class RealtimeTranscriber(
             "turn.resume" -> onEvent(SpeechEvent.TurnResumed)
             "turn.end" -> onEvent(SpeechEvent.TurnEnded)
             // The server finished this session (e.g. a duration limit). Start a fresh one.
-            "transcription.done" -> return SocketSignal.Retry("Session ended")
+            "transcription.done" -> return SocketSignal.Retry(modelString(R.string.session_ended) { "Session ended" })
             "error" -> {
                 val error = json.obj("error")
-                val text = error?.string("message") ?: "Transcription error"
+                val text = error?.string("message") ?: modelString(R.string.transcription_error) { "Transcription error" }
                 val code = (error?.get("code") as? JsonPrimitive)?.content.orEmpty()
                 if (code.contains("401") || text.contains("api key", ignoreCase = true) ||
                     text.contains("unauthorized", ignoreCase = true)

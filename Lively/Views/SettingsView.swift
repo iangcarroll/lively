@@ -71,10 +71,10 @@ struct SettingsView: View {
                                 Label { Text("Your language") } icon: { LanguageIcon(language: settings.speechListenerLanguage) }
                             }
                         }
-                        LabeledContent("Other language", value: "Automatic")
+                        LabeledContent("Other language", value: String(localized: "Automatic"))
                     } else {
-                        languageLink("First language", side: .first)
-                        languageLink("Second language", side: .second)
+                        languageLink(String(localized: "First language"), side: .first)
+                        languageLink(String(localized: "Second language"), side: .second)
                     }
                     if settings.usesAutomaticLanguageDetection || settings.languages.contains(.chinese) {
                         Picker(selection: $settings.chineseScript) {
@@ -87,10 +87,10 @@ struct SettingsView: View {
                     Text("Languages")
                 } footer: {
                     Text(settings.usesAutomaticLanguageDetection
-                         ? "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection needs internet."
+                         ? String(localized: "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection needs internet.")
                          : settings.providerID == SpeechProvider.soniox.id
-                             ? "Lively listens for this pair and translates both ways."
-                             : "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine.")
+                             ? String(localized: "Lively listens for this pair and translates both ways.")
+                             : String(localized: "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine."))
                 }
 
                 // Location chooses a pair, which automatic detection doesn't use.
@@ -149,7 +149,7 @@ struct SettingsView: View {
                             if let voicePreviewStatus, !voicePreviewStatus.isEmpty {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(spacing: 12) {
-                                        if voicePreviewStatus.hasPrefix("Playing") { Image(systemName: "waveform") }
+                                        if voicePreview?.player.isAudible == true { Image(systemName: "waveform") }
                                         else { ProgressView() }
                                         Text(voicePreviewStatus).font(.callout)
                                     }
@@ -173,7 +173,7 @@ struct SettingsView: View {
                     if SpeechPlayer.supportsDirectionalOutput && !settings.usesAutomaticLanguageDetection {
                         Picker("Your language", selection: $settings.speechListenerLanguage) {
                             ForEach(settings.languages.all) { language in
-                                Text(language.englishName).tag(language)
+                                Text(language.displayName).tag(language)
                             }
                         }
                     }
@@ -294,42 +294,42 @@ struct SettingsView: View {
     }
 
     private var proStatus: String {
-        if Pro.shared.isSubscribed { return "Active" }
-        if Account.shared?.hasFreePro == true { return "Included" }
-        return "Upgrade"
+        if Pro.shared.isSubscribed { return String(localized: "Active") }
+        if Account.shared?.hasFreePro == true { return String(localized: "Included") }
+        return String(localized: "Upgrade")
     }
 
     private var engineFooter: String {
         var lines = [provider.id == SpeechProvider.onDevice.id
-            ? "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline."
+            ? String(localized: "Speech recognition and text translation run on this device. Prepare both languages in Offline Languages before going offline.")
             : provider.summary]
         lines += provider.credentials.map(\.help)
-        if !provider.credentials.isEmpty { lines.append("Keys are stored in the Keychain on this device.") }
+        if !provider.credentials.isEmpty { lines.append(String(localized: "Keys are stored in the Keychain on this device.")) }
         if provider.options.contains(.speed) {
-            lines.append("Faster speed shows words sooner; Accurate waits a little longer for better transcripts.")
+            lines.append(String(localized: "Faster speed shows words sooner; Accurate waits a little longer for better transcripts."))
         }
         return lines.joined(separator: " ")
     }
 
     private var speechFooter: String {
         let voice = settings.speechSource == .original
-            ? "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. "
-            : "Downloaded voices speak on this device after installation. Previews pause listening. "
+            ? String(localized: "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. ")
+            : String(localized: "Downloaded voices speak on this device after installation. Previews pause listening. ")
         if settings.usesAutomaticLanguageDetection {
             if SpeechPlayer.supportsDirectionalOutput {
-                return voice + "Translations into \(settings.speechListenerLanguage.englishName) play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback."
+                return voice + String(localized: "Translations into \(settings.speechListenerLanguage.displayName) play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback.")
             }
-            return voice + "Translations play through your current audio output. Listening pauses during speaker playback."
+            return voice + String(localized: "Translations play through your current audio output. Listening pauses during speaker playback.")
         }
         if SpeechPlayer.supportsDirectionalOutput {
-            let incoming = settings.speechListenerLanguage.englishName
-            let outgoing = settings.languages.other(than: settings.speechListenerLanguage).englishName
-            return voice + "Incoming \(incoming) plays through headphones; outgoing \(outgoing) uses the device speaker. "
-                + "Incoming audio stays silent without a compatible headset with a microphone. "
-                + "Listening pauses during speaker playback."
+            let incoming = settings.speechListenerLanguage.displayName
+            let outgoing = settings.languages.other(than: settings.speechListenerLanguage).displayName
+            return voice + String(localized: "Incoming \(incoming) plays through headphones; outgoing \(outgoing) uses the device speaker. ")
+                + String(localized: "Incoming audio stays silent without a compatible headset with a microphone. ")
+                + String(localized: "Listening pauses during speaker playback.")
         }
-        return voice + "Translations into \(settings.languages.second.englishName) play through your current audio output. "
-            + "Listening pauses during speaker playback."
+        return voice + String(localized: "Translations into \(settings.languages.second.displayName) play through your current audio output. ")
+            + String(localized: "Listening pauses during speaker playback.")
     }
 
     private func previewVoice(_ voice: NeuralVoice) async throws {
@@ -339,7 +339,7 @@ struct SettingsView: View {
         let token = UUID()
         voicePreviewOperation = token
         defer { if voicePreviewOperation == token { voicePreviewStatus = nil } }
-        voicePreviewStatus = "Preparing audio…"
+        voicePreviewStatus = String(localized: "Preparing audio…")
         AudioSessionUsers.setDirectionalSpeechEnabled(SpeechPlayer.supportsDirectionalOutput)
         try await voicePreviewSession.prepare()
         try Task.checkCancellation()
@@ -418,8 +418,8 @@ struct OwnLanguageList: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(language.nativeName).environment(\.locale, language.locale)
-                        if language.nativeName != language.englishName {
-                            Text(language.englishName).font(.subheadline).foregroundStyle(.secondary)
+                        if language.hasDistinctDisplayName {
+                            Text(language.displayName).font(.subheadline).foregroundStyle(.secondary)
                         }
                     }
                     Spacer()
@@ -445,11 +445,11 @@ struct OwnLanguageList: View {
     }
 
     private var languages: [Language] {
-        let all = Language.soniox.sorted { $0.englishName < $1.englishName }
+        let all = Language.soniox.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
         let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !search.isEmpty else { return all }
         return all.filter {
-            $0.englishName.localizedStandardContains(search) || $0.nativeName.localizedStandardContains(search)
+            $0.displayName.localizedStandardContains(search) || $0.englishName.localizedStandardContains(search) || $0.nativeName.localizedStandardContains(search)
                 || $0.rawValue == search.lowercased()
         }
     }
@@ -476,11 +476,11 @@ private struct AccountRow: View {
             .foregroundStyle(.white)
             .frame(width: 56, height: 56)
             VStack(alignment: .leading, spacing: 2) {
-                Text(email.map(Account.displayName(for:)) ?? "Sign in to Lively")
+                Text(email.map(Account.displayName(for:)) ?? String(localized: "Sign in to Lively"))
                     .font(.title3.weight(.semibold))
-                    .lineLimit(1)
+                    .lineLimit(email == nil ? nil : 1)
                     .truncationMode(.middle)
-                Text(email == nil ? "Two free hours a day instead of one" : "Account")
+                Text(email == nil ? String(localized: "Two free hours a day instead of one") : String(localized: "Account"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -543,7 +543,7 @@ struct LanguageList: View {
         #else
         .searchable(text: $query, prompt: "Search languages")
         #endif
-        .navigationTitle(title ?? (side == .first ? "First Language" : "Second Language"))
+        .navigationTitle(title ?? (side == .first ? String(localized: "First Language") : String(localized: "Second Language")))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -566,11 +566,11 @@ struct LanguageList: View {
     private var other: Language { settings.languages.other(than: current) }
 
     private var languages: [Language] {
-        let all = settings.provider.languages.sorted { $0.englishName < $1.englishName }
+        let all = settings.provider.languages.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
         let query = query.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return all }
         return all.filter {
-            $0.englishName.localizedStandardContains(query) || $0.nativeName.localizedStandardContains(query) || $0.rawValue == query.lowercased()
+            $0.displayName.localizedStandardContains(query) || $0.englishName.localizedStandardContains(query) || $0.nativeName.localizedStandardContains(query) || $0.rawValue == query.lowercased()
         }
     }
 
@@ -580,8 +580,8 @@ struct LanguageList: View {
                 Text(language.nativeName)
                     .font(.body)
                     .environment(\.locale, language.locale)
-                if language.englishName != language.nativeName {
-                    Text(language.englishName)
+                if language.hasDistinctDisplayName {
+                    Text(language.displayName)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

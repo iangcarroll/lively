@@ -506,7 +506,7 @@ final class ResilientSocket {
                 self.connection(connection, failed: .fail(message))
             } catch {
                 guard let connection, !connection.isClosed else { return }
-                self.connection(connection, failed: .retry("Couldn't connect"))
+                self.connection(connection, failed: .retry(String(localized: "Couldn't connect")))
             }
         })
     }
@@ -547,7 +547,7 @@ final class ResilientSocket {
                     try await socket.send(message)
                 } catch {
                     guard let self, let connection, connection.socket === socket else { return }
-                    self.connection(connection, failed: .retry("Send failed"))
+                    self.connection(connection, failed: .retry(String(localized: "Send failed")))
                     return
                 }
             }
@@ -568,7 +568,7 @@ final class ResilientSocket {
                     self.connection(connection, received: signal)
                 } catch {
                     guard let self, let connection, connection.socket === socket else { return }
-                    self.connection(connection, failed: .retry("Receive failed"))
+                    self.connection(connection, failed: .retry(String(localized: "Receive failed")))
                     return
                 }
             }
@@ -581,7 +581,7 @@ final class ResilientSocket {
                 // A Soniox offer can win the race with the open delegate.
                 if !connection.isReady {
                     guard opened else {
-                        self.connection(connection, failed: .retry("Handshake timed out"))
+                        self.connection(connection, failed: .retry(String(localized: "Handshake timed out")))
                         return
                     }
                     self.debugLog("stream \(connection.stream.id) opened after \(connection.createdAt.duration(to: .now))")
@@ -595,7 +595,7 @@ final class ResilientSocket {
                 let alive = await Self.ping(socket, timeout: .seconds(5))
                 guard let self, let connection, connection.socket === socket else { return }
                 if !alive {
-                    self.connection(connection, failed: .retry("Ping timed out"))
+                    self.connection(connection, failed: .retry(String(localized: "Ping timed out")))
                     return
                 }
             }
@@ -607,7 +607,7 @@ final class ResilientSocket {
                     try? await Task.sleep(for: .milliseconds(250))
                     guard let self, let connection, connection.socket === socket else { return }
                     if !connection.isSuspended, let since = connection.awaitingReplySince, since.duration(to: .now) > timeout {
-                        self.connection(connection, failed: .retry("No reply from the server"))
+                        self.connection(connection, failed: .retry(String(localized: "No reply from the server")))
                         return
                     }
                 }

@@ -1,5 +1,7 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -63,29 +65,29 @@ fun LanguageListScreen(
     settings: AppSettings,
     side: LanguageSide,
     onDone: () -> Unit,
-    title: String = if (side == LanguageSide.FIRST) "First language" else "Second language",
+    title: String = if (side == LanguageSide.FIRST) stringResource(R.string.first_language) else stringResource(R.string.second_language),
     closeIcon: Boolean = false,
 ) {
     val current = settings.languages[side]
     val other = settings.languages.other(current)
-    val all = remember(settings.providerID) { settings.provider.languages.sortedBy { it.englishName } }
+    val all = remember(settings.providerID) { settings.provider.languages.sortedWith(compareBy(java.text.Collator.getInstance()) { it.displayName }) }
     fun pick(language: Language) {
         settings.setLanguage(language, side)
         onDone()
     }
     LanguageSearchList(title, all, onDone, closeIcon, pinned = {
-        item { SectionHeader("This conversation") }
+        item { SectionHeader(stringResource(R.string.this_conversation)) }
         items(settings.languages.all, key = { "pair-${it.code}" }) { LanguageRow(it, current, other, settings) { pick(it) } }
-        item { SectionHeader("All languages") }
+        item { SectionHeader(stringResource(R.string.all_languages)) }
     }) { LanguageRow(it, current, other, settings) { pick(it) } }
 }
 
 /** The reader's saved language is independent of any conversation partner. */
 @Composable
 fun OwnLanguageListScreen(settings: AppSettings, onDone: () -> Unit, closeIcon: Boolean = false) {
-    val all = remember { Language.SONIOX.sortedBy { it.englishName } }
+    val all = remember { Language.SONIOX.sortedWith(compareBy(java.text.Collator.getInstance()) { it.displayName }) }
     val current = settings.speechListenerLanguage
-    LanguageSearchList("Your language", all, onDone, closeIcon) {
+    LanguageSearchList(stringResource(R.string.your_language), all, onDone, closeIcon) {
         LanguageRow(it, current, other = null, settings) {
             settings.speechListenerLanguage = it
             onDone()
@@ -110,7 +112,7 @@ private fun LanguageSearchList(
     var query by rememberSaveable { mutableStateOf("") }
     val trimmed = query.trim()
     val matches = if (trimmed.isEmpty()) languages else languages.filter {
-        it.englishName.contains(trimmed, ignoreCase = true) ||
+        it.displayName.contains(trimmed, ignoreCase = true) || it.englishName.contains(trimmed, ignoreCase = true) ||
             it.nativeName.contains(trimmed, ignoreCase = true) ||
             it.code == trimmed.lowercase()
     }
@@ -123,7 +125,7 @@ private fun LanguageSearchList(
                     title = { Text(title) },
                     navigationIcon = {
                         if (closeIcon) {
-                            IconButton(onClick = onDone) { Icon(Icons.Rounded.Close, "Close") }
+                            IconButton(onClick = onDone) { Icon(Icons.Rounded.Close, stringResource(R.string.close)) }
                         } else {
                             BackButton(onDone)
                         }
@@ -133,10 +135,10 @@ private fun LanguageSearchList(
                 TextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Search languages") },
+                    placeholder = { Text(stringResource(R.string.search_languages)) },
                     leadingIcon = { Icon(Icons.Rounded.Search, null) },
                     trailingIcon = {
-                        if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Rounded.Close, "Clear search") }
+                        if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Rounded.Close, stringResource(R.string.clear_search)) }
                     },
                     singleLine = true,
                     shape = CircleShape,
@@ -170,7 +172,7 @@ private fun LanguageSearchList(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Icon(Icons.Rounded.SearchOff, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(40.dp))
-                        Text("No results for “$trimmed”", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                        Text(stringResource(R.string.no_results_for_value, trimmed), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                     }
                 }
             }
@@ -204,16 +206,16 @@ private fun LanguageRow(language: Language, current: Language, other: Language?,
     ) {
         Column(Modifier.weight(1f)) {
             Text(language.nativeName, style = MaterialTheme.typography.bodyLarge.copy(localeList = language.localeList()))
-            if (language.englishName != language.nativeName) {
-                Text(language.englishName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (language.hasDistinctDisplayName) {
+                Text(language.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         if (isCurrent) {
-            Icon(Icons.Rounded.Check, "Selected", tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Rounded.Check, stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary)
         } else if (language == other) {
             val ink = language.ink(settings.languages)
             Text(
-                "Swap",
+                stringResource(R.string.swap),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = ink,

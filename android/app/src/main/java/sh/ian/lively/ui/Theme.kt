@@ -1,5 +1,8 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.res.stringResource
+import sh.ian.lively.support.modelString
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -189,7 +192,7 @@ enum class TranscriptRole {
 }
 
 val Utterance.unidentifiedLanguageTitle: String
-    get() = if (isFinal) "Language not identified" else "Identifying language"
+    get() = if (isFinal) modelString(R.string.language_not_identified) { "Language not identified" } else modelString(R.string.identifying_language) { "Identifying language" }
 
 val Utterance.showsLanguagePrompt: Boolean
     get() {
@@ -211,7 +214,7 @@ fun OptionalLanguageTag(
     showsIcon: Boolean = true,
     /** On for a tag that's a button opening the language choice. */
     showsChevron: Boolean = false,
-    unknownTitle: String = "Automatic",
+    unknownTitle: String = stringResource(R.string.automatic),
 ) {
     if (language != null) {
         LanguageTag(language, pair, modifier, spoken = spoken, showsIcon = showsIcon, showsChevron = showsChevron)
@@ -239,13 +242,13 @@ fun PendingLanguageLabel(utterance: Utterance, onTranslate: (() -> Unit)? = null
     when {
         utterance.isSourceOnly -> {}
         state is TranslationState.Failed ->
-            if (onTranslate != null) RetryButton("Retry translation", onTranslate)
-            else Caption(Icons.Rounded.ErrorOutline, "Translation failed", color = Lively.colors.warning)
-        state == TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, "Waiting for connection")
+            if (onTranslate != null) RetryButton(stringResource(R.string.retry_translation), onTranslate)
+            else Caption(Icons.Rounded.ErrorOutline, stringResource(R.string.translation_failed), color = Lively.colors.warning)
+        state == TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, stringResource(R.string.waiting_for_connection))
         utterance.sourceLanguage == null -> Caption(Icons.Rounded.LanguageGlobe, utterance.unidentifiedLanguageTitle)
-        utterance.waitsForAutomaticPartner -> Caption(Icons.Rounded.LanguageGlobe, "Waiting for other language")
-        utterance.target == null -> Caption(Icons.Rounded.GraphicEq, if (utterance.isFinal) "Finishing transcript" else "Listening")
-        onTranslate != null -> CaptionButton(Icons.Rounded.Translate, "Translate", MaterialTheme.colorScheme.primary, onTranslate)
-        else -> Text("Ready to translate", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        utterance.waitsForAutomaticPartner -> Caption(Icons.Rounded.LanguageGlobe, stringResource(R.string.waiting_for_other_language))
+        utterance.target == null -> Caption(Icons.Rounded.GraphicEq, if (utterance.isFinal) stringResource(R.string.finishing_transcript) else stringResource(R.string.listening))
+        onTranslate != null -> CaptionButton(Icons.Rounded.Translate, stringResource(R.string.translate), MaterialTheme.colorScheme.primary, onTranslate)
+        else -> Text(stringResource(R.string.ready_to_translate), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

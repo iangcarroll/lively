@@ -1,5 +1,8 @@
 package sh.ian.lively.model
 
+import sh.ian.lively.support.localizedBrokerMessage
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -77,7 +80,7 @@ class Account(
     suspend fun signIn(email: String, code: String) {
         if (isDemo()) {
             delay(600)
-            if (code != "123456") throw AccountException("That code didn't work. Try again.")
+            if (code != "123456") throw AccountException(modelString(R.string.that_code_didnt_work_try_again) { "That code didn't work. Try again." })
             this.email = email
             return
         }
@@ -98,9 +101,9 @@ class Account(
     }
 
     private fun adopt(body: JsonObject, email: String?) {
-        val newToken = body.string("token") ?: throw AccountException("Something went wrong. Try again.")
+        val newToken = body.string("token") ?: throw AccountException(modelString(R.string.something_went_wrong_try_again) { "Something went wrong. Try again." })
         val user = body.obj("user")
-        val confirmed = user?.string("email") ?: email ?: throw AccountException("Something went wrong. Try again.")
+        val confirmed = user?.string("email") ?: email ?: throw AccountException(modelString(R.string.something_went_wrong_try_again) { "Something went wrong. Try again." })
         secrets.write(newToken, TOKEN_ACCOUNT)
         secrets.write(confirmed, EMAIL_ACCOUNT)
         token = newToken
@@ -136,11 +139,11 @@ class Account(
             val response = try {
                 client.fetch(request)
             } catch (e: IOException) {
-                throw AccountException("Couldn't reach Lively. Check your connection and try again.")
+                throw AccountException(modelString(R.string.lively_unreachable) { "Couldn't reach Lively. Check your connection and try again." })
             }
             // 401: the session, and so maybe the account, is already gone.
             if (response.code != 200 && response.code != 401) {
-                throw AccountException(brokerMessage(response.body) ?: "Couldn't delete your account. Try again.")
+                throw AccountException(brokerMessage(response.body) ?: modelString(R.string.couldnt_delete_your_account_try_again) { "Couldn't delete your account. Try again." })
             }
         }
         forget()
@@ -185,14 +188,14 @@ class Account(
         val response = try {
             client.fetch(request)
         } catch (e: IOException) {
-            throw AccountException("Couldn't reach Lively. Check your connection and try again.")
+            throw AccountException(modelString(R.string.lively_unreachable) { "Couldn't reach Lively. Check your connection and try again." })
         }
-        if (response.code != 200) throw AccountException(brokerMessage(response.body) ?: "Something went wrong. Try again.")
+        if (response.code != 200) throw AccountException(brokerMessage(response.body) ?: modelString(R.string.something_went_wrong_try_again) { "Something went wrong. Try again." })
         return runCatching { Json.parseToJsonElement(response.body) as JsonObject }.getOrElse { JsonObject(emptyMap()) }
     }
 
     private fun brokerMessage(body: String): String? =
-        runCatching { (Json.parseToJsonElement(body) as JsonObject).string("message") }.getOrNull()
+        runCatching { (Json.parseToJsonElement(body) as JsonObject).string("message")?.localizedBrokerMessage() }.getOrNull()
 
     companion object {
         /**
@@ -202,7 +205,7 @@ class Account(
         fun hidesEmail(email: String): Boolean = email.lowercase().endsWith("@privaterelay.appleid.com")
 
         /** What to call the account: its email, unless Apple hides it. */
-        fun displayName(email: String): String = if (hidesEmail(email)) "Apple Account" else email
+        fun displayName(email: String): String = if (hidesEmail(email)) modelString(R.string.apple_account) { "Apple Account" } else email
 
         private const val TOKEN_ACCOUNT = "lively-session-token"
         private const val EMAIL_ACCOUNT = "lively-account-email"

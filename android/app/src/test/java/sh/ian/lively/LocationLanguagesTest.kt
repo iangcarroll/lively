@@ -72,7 +72,7 @@ class LocationLanguagesTest {
     }
 
     private val memory = MemoryStore()
-    private val provider = SpeechProvider(SpeechProviders.SONIOX_ID, "x", "", emptyList(), emptySet(), Language.SONIOX) { error("unused") }
+    private val provider = SpeechProvider(SpeechProviders.SONIOX_ID, "x", R.string.engine, emptyList(), emptySet(), Language.SONIOX) { error("unused") }
     private val settings = AppSettings(memory, memory, listOf(provider))
     private val locator = FakeLocator("JP")
     private val english = { Language.ENGLISH to ChineseScript.SIMPLIFIED }

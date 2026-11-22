@@ -22,12 +22,12 @@ struct ProView: View {
         Group {
             if pro.isSubscribed {
                 status(
-                    title: "You have Lively Pro",
-                    detail: pro.subscription?.expirationDate.map { "Active through \($0.formatted(date: .abbreviated, time: .omitted))." } ?? "",
+                    title: String(localized: "You have Lively Pro"),
+                    detail: pro.subscription?.expirationDate.map { String(localized: "Active through \($0.formatted(date: .abbreviated, time: .omitted)).") } ?? "",
                     manage: pro.subscription != nil
                 )
             } else if Account.shared?.hasFreePro == true {
-                status(title: "You have Lively Pro", detail: "It's included free with your account.", manage: false)
+                status(title: String(localized: "You have Lively Pro"), detail: String(localized: "It's included free with your account."), manage: false)
             } else {
                 store
             }
@@ -58,10 +58,10 @@ struct ProView: View {
                     // The subtitle says what Pro gives; the rows would only
                     // push the plans off a small screen.
                     ProHeader(
-                        title: "That's today's free time",
+                        title: String(localized: "That's today's free time"),
                         subtitle: signInAccount == nil
-                            ? "Free translation is back tomorrow. Lively Pro gives you 10 hours a day."
-                            : "Free translation is back tomorrow. Sign in for another hour today, or get 10 hours a day with Pro.",
+                            ? String(localized: "Free translation is back tomorrow. Lively Pro gives you 10 hours a day.")
+                            : String(localized: "Free translation is back tomorrow. Sign in for another hour today, or get 10 hours a day with Pro."),
                         showsBenefits: false
                     )
                 } else {
@@ -142,7 +142,7 @@ struct ProView: View {
                     .frame(minHeight: 36)
             }
             HStack(spacing: 18) {
-                Button(restoring ? "Restoring…" : "Restore Purchases", action: restore)
+                Button(restoring ? String(localized: "Restoring…") : String(localized: "Restore Purchases"), action: restore)
                     .disabled(restoring)
                 Link("Terms of Use", destination: Links.terms)
                 Link("Privacy Policy", destination: Links.privacy)
@@ -174,7 +174,7 @@ struct ProView: View {
                 #endif
                 switch try await purchase(product, options: options) {
                 case .success(.verified(let transaction)): await pro.didBuy(offer, transaction: transaction)
-                case .success(.unverified): errorMessage = "The App Store couldn't verify that purchase."
+                case .success(.unverified): errorMessage = String(localized: "The App Store couldn't verify that purchase.")
                 // Waiting on Ask to Buy, or closed without buying.
                 case .pending, .userCancelled: break
                 @unknown default: break
@@ -191,7 +191,7 @@ struct ProView: View {
         Task {
             await pro.restore()
             restoring = false
-            if !pro.isSubscribed { errorMessage = "No Lively Pro subscription was found for this Apple Account." }
+            if !pro.isSubscribed { errorMessage = String(localized: "No Lively Pro subscription was found for this Apple Account.") }
         }
     }
 
@@ -278,7 +278,7 @@ enum Links {
 
 private struct ProHeader: View {
     var title = "Lively Pro"
-    var subtitle = "Translate for hours, every day."
+    var subtitle = String(localized: "Translate for hours, every day.")
     var showsBenefits = true
 
     var body: some View {
@@ -306,9 +306,9 @@ private struct ProHeader: View {
             }
             if showsBenefits {
                 VStack(alignment: .leading, spacing: 16) {
-                    row("timer", .orange, "10 hours a day", "Free gives you an hour a day, or two when you're signed in.")
-                    row("iphone.gen3", .blue, "On all your devices", "Pro comes with your Apple Account. No sign-in needed.")
-                    row("arrow.uturn.backward", .green, "Cancel anytime", "Manage it in your Apple Account's Subscriptions.")
+                    row("timer", .orange, String(localized: "10 hours a day"), String(localized: "Free gives you an hour a day, or two when you're signed in."))
+                    row("iphone.gen3", .blue, String(localized: "On all your devices"), String(localized: "Pro comes with your Apple Account. No sign-in needed."))
+                    row("arrow.uturn.backward", .green, String(localized: "Cancel anytime"), String(localized: "Manage it in your Apple Account's Subscriptions."))
                 }
                 .frame(maxWidth: 420, alignment: .leading)
             }

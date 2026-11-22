@@ -1,5 +1,6 @@
 package sh.ian.lively.net
 
+import sh.ian.lively.support.localizedBrokerMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -56,7 +57,7 @@ class BrokerTranslator(
             try {
                 chatCompletionStream(client, request(body, token)) { code, response ->
                     if (code == 401 && token != null) return@chatCompletionStream TokenRejected(token)
-                    val message = runCatching { (Json.parseToJsonElement(response) as? JsonObject)?.string("message") }.getOrNull()
+                    val message = runCatching { (Json.parseToJsonElement(response) as? JsonObject)?.string("message")?.localizedBrokerMessage() }.getOrNull()
                     message?.let { BrokerTranslationException(it, isPermanent = code != 502) } ?: TranslationException(code)
                 }.collect { emit(it) }
             } catch (e: TokenRejected) {

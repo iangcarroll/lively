@@ -1,5 +1,6 @@
 package sh.ian.lively.model
 
+import androidx.annotation.StringRes
 import sh.ian.lively.net.SpeechEngine
 import sh.ian.lively.net.TranslationService
 
@@ -14,7 +15,7 @@ class SpeechProvider(
     /** Stable, persisted in preferences. */
     val id: String,
     val name: String,
-    val summary: String,
+    @get:StringRes val summaryRes: Int,
     /** API keys this provider needs, in the order Settings shows them. */
     val credentials: List<ProviderCredential>,
     /** App settings that affect this provider, so Settings shows only those. */
@@ -33,8 +34,8 @@ class SpeechProvider(
 data class ProviderCredential(
     /** Secret store account name. */
     val id: String,
-    val name: String,
-    val help: String,
+    @get:StringRes val nameRes: Int,
+    @get:StringRes val helpRes: Int,
     /** Settings may leave it empty, because the app can get keys another way. */
     val isOptional: Boolean = false,
 )

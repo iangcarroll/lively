@@ -62,7 +62,7 @@ struct AddressLookupView: View {
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Address language, \(store.language.englishName)")
+                    .accessibilityLabel("Address language, \(store.language.displayName)")
 
                     Button(action: find) {
                         Label("Find address", systemImage: "magnifyingglass")
@@ -78,7 +78,7 @@ struct AddressLookupView: View {
 
                 if store.isBusy {
                     Section {
-                        ProgressView(store.phase == .searching ? "Finding places…" : "Finding address…")
+                        ProgressView(store.phase == .searching ? String(localized: "Finding places…") : String(localized: "Finding address…"))
                         Button("Cancel lookup", role: .cancel) { store.close() }
                             .frame(minHeight: 44)
                     }
@@ -115,7 +115,7 @@ struct AddressLookupView: View {
                             .buttonStyle(.plain)
                         }
                     } header: {
-                        Text(store.matches.count == 1 ? "Confirm the place" : "Choose a place")
+                        Text(store.matches.count == 1 ? String(localized: "Confirm the place") : String(localized: "Choose a place"))
                     }
                 }
 
@@ -135,7 +135,7 @@ struct AddressLookupView: View {
                         .padding(.vertical, 4)
 
                         Button(action: copyAddress) {
-                            Label(copied ? "Copied" : "Copy address", systemImage: copied ? "checkmark" : "doc.on.doc")
+                            Label(copied ? String(localized: "Copied") : String(localized: "Copy address"), systemImage: copied ? "checkmark" : "doc.on.doc")
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                 .contentShape(.rect)
                         }
@@ -146,7 +146,7 @@ struct AddressLookupView: View {
                         }
                         if let mapError { Text(mapError).foregroundStyle(.red) }
                     } header: {
-                        Text("Address in \(store.language.englishName)")
+                        Text("Address in \(store.language.displayName)")
                     } footer: {
                         Text("Names and address details depend on available map data. Some places may keep their local spelling.")
                     }
@@ -214,7 +214,7 @@ struct AddressLookupView: View {
             .frame(height: 220)
             .listRowInsets(EdgeInsets())
         } header: {
-            Text(store.phase == .choosing ? "Locations" : "Selected place")
+            Text(store.phase == .choosing ? String(localized: "Locations") : String(localized: "Selected place"))
         }
     }
 
@@ -266,7 +266,7 @@ struct AddressLookupView: View {
             address: nil
         )
         item.name = place.name
-        if !item.openInMaps() { mapError = "Couldn’t open Maps. Try again." }
+        if !item.openInMaps() { mapError = String(localized: "Couldn’t open Maps. Try again.") }
     }
 }
 
@@ -288,8 +288,8 @@ private struct AddressLanguagePicker: View {
                                 Text(language.nativeName)
                                     .foregroundStyle(.primary)
                                     .environment(\.locale, language.locale)
-                                if language.englishName.caseInsensitiveCompare(language.nativeName) != .orderedSame {
-                                    Text(language.englishName)
+                                if language.displayName.caseInsensitiveCompare(language.nativeName) != .orderedSame {
+                                    Text(language.displayName)
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                 }
@@ -329,7 +329,7 @@ private struct AddressLanguagePicker: View {
         let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return AddressLanguage.all }
         return AddressLanguage.all.filter {
-            $0.englishName.localizedStandardContains(value)
+            $0.displayName.localizedStandardContains(value) || $0.englishName.localizedStandardContains(value)
                 || $0.nativeName.localizedStandardContains(value)
                 || $0.code.localizedStandardContains(value)
         }

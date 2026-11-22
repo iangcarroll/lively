@@ -1,5 +1,7 @@
 package sh.ian.lively.net
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import kotlinx.coroutines.flow.Flow
 import sh.ian.lively.model.ChineseScript
 import sh.ian.lively.model.Language
@@ -133,9 +135,9 @@ interface TranslationService {
 class TranslationException(val code: Int) : Exception() {
     override val message: String
         get() = when (code) {
-            401, 403 -> "API key rejected"
-            429 -> "Rate limited"
-            else -> "Server error $code"
+            401, 403 -> modelString(R.string.api_key_rejected) { "API key rejected" }
+            429 -> modelString(R.string.rate_limited) { "Rate limited" }
+            else -> modelString(R.string.server_error_value, code) { "Server error $code" }
         }
 
     /** Errors that won't fix themselves by retrying. */

@@ -7,7 +7,7 @@ import os
 // engine here also verifies that listening cannot initiate an asset download.
 enum Language: String, Hashable, Sendable {
     case english = "en", chinese = "zh", french = "fr"
-    var englishName: String { switch self { case .english: "English"; case .chinese: "Chinese"; case .french: "French" } }
+    var displayName: String { switch self { case .english: "English"; case .chinese: "Chinese"; case .french: "French" } }
 }
 struct LanguagePair {
     var first: Language = .english

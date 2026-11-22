@@ -1,5 +1,7 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.res.stringResource
 import android.content.ClipData
 import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
@@ -184,7 +186,7 @@ fun UtteranceBubble(
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             menu = true
                         },
-                        onLongClickLabel = if (onDelete != null) "Copy, share, edit or delete" else "Copy or share",
+                        onLongClickLabel = if (onDelete != null) stringResource(R.string.copy_share_edit_or_delete) else stringResource(R.string.copy_or_share),
                     )
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -227,14 +229,14 @@ private fun Block(utterance: Utterance, language: Language?, pair: LanguagePair,
     val ink = language?.ink(pair) ?: MaterialTheme.colorScheme.onSurfaceVariant
     InLanguage(language) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            OptionalLanguageTag(language, pair, spoken = spoken, unknownTitle = if (spoken) utterance.unidentifiedLanguageTitle else "Automatic")
+            OptionalLanguageTag(language, pair, spoken = spoken, unknownTitle = if (spoken) utterance.unidentifiedLanguageTitle else stringResource(R.string.automatic))
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     if (missingSource) "—" else text,
                     style = (if (spoken) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleLarge).inLanguage(language),
                     fontWeight = if (spoken) FontWeight.Normal else FontWeight.Medium,
                     color = if (spoken) MaterialTheme.colorScheme.onSurface else ink,
-                    modifier = Modifier.weight(1f, fill = false).then(MissingSourceLabel.takeIf { missingSource } ?: Modifier),
+                    modifier = Modifier.weight(1f, fill = false).then(missingSourceLabel().takeIf { missingSource } ?: Modifier),
                 )
                 if (spoken && !utterance.isFinal) TypingDots(ink, Modifier.padding(bottom = 6.dp))
             }
@@ -243,15 +245,19 @@ private fun Block(utterance: Utterance, language: Language?, pair: LanguagePair,
 }
 
 /** Read out for the dash that stands in for a turn whose own words never arrived. */
-private val MissingSourceLabel = Modifier.semantics { contentDescription = "Original transcript unavailable" }
+@Composable
+private fun missingSourceLabel(): Modifier {
+    val label = stringResource(R.string.original_transcript_unavailable)
+    return Modifier.semantics { contentDescription = label }
+}
 
 @Composable
 private fun StatusLine(utterance: Utterance, onRetry: () -> Unit) {
     when (val state = utterance.translationState) {
         TranslationState.AwaitingPartner -> PendingLanguageLabel(utterance, onTranslate = onRetry)
-        TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, "Waiting for connection")
-        is TranslationState.Failed -> RetryButton("${state.message} · Retry", onRetry)
-        else -> if (utterance.isLate) Caption(Icons.Rounded.History, "Delayed transcription")
+        TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, stringResource(R.string.waiting_for_connection))
+        is TranslationState.Failed -> RetryButton(stringResource(R.string.value_retry, state.message), onRetry)
+        else -> if (utterance.isLate) Caption(Icons.Rounded.History, stringResource(R.string.delayed_transcription))
     }
 }
 
@@ -286,20 +292,20 @@ private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Uttera
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, shape = RoundedCornerShape(16.dp)) {
         if (utterance.trimmedSource.isNotEmpty()) {
             DropdownMenuItem(
-                text = { Text(utterance.sourceLanguage?.let { "Copy ${it.nativeName}" } ?: "Copy original") },
+                text = { Text(utterance.sourceLanguage?.let { stringResource(R.string.copy_value, it.nativeName) } ?: stringResource(R.string.copy_original)) },
                 leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) },
                 onClick = { copy(utterance.trimmedSource) },
             )
         }
         if (utterance.translation.isNotEmpty()) {
             DropdownMenuItem(
-                text = { Text(utterance.target?.let { "Copy ${it.nativeName}" } ?: "Copy translation") },
+                text = { Text(utterance.target?.let { stringResource(R.string.copy_value, it.nativeName) } ?: stringResource(R.string.copy_translation)) },
                 leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) },
                 onClick = { copy(utterance.translation) },
             )
         }
         DropdownMenuItem(
-            text = { Text("Share") },
+            text = { Text(stringResource(R.string.share)) },
             leadingIcon = { Icon(Icons.Rounded.Share, null) },
             onClick = {
                 onDismiss()
@@ -319,7 +325,7 @@ private fun CopyMenu(expanded: Boolean, onDismiss: () -> Unit, utterance: Uttera
 @Composable
 private fun EditMenuItem(onClick: () -> Unit) {
     DropdownMenuItem(
-        text = { Text("Edit") },
+        text = { Text(stringResource(R.string.edit)) },
         leadingIcon = { Icon(Icons.Rounded.Edit, null) },
         onClick = onClick,
     )
@@ -328,7 +334,7 @@ private fun EditMenuItem(onClick: () -> Unit) {
 @Composable
 private fun DeleteMenuItem(onClick: () -> Unit) {
     DropdownMenuItem(
-        text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+        text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
         leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
         onClick = onClick,
     )
@@ -383,8 +389,8 @@ fun ParallelTranscript(
     Column(modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
         Row(Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp)) {
             if (store.isAutomaticLanguageMode) {
-                Header(store.listenerLanguage, pair, Modifier.weight(1f), role = "Your language")
-                Header(store.detectedPartnerLanguage, pair, Modifier.weight(1f), role = "Other language")
+                Header(store.listenerLanguage, pair, Modifier.weight(1f), role = stringResource(R.string.your_language))
+                Header(store.detectedPartnerLanguage, pair, Modifier.weight(1f), role = stringResource(R.string.other_language))
             } else {
                 Header(pair.first, pair, Modifier.weight(1f))
                 Header(pair.second, pair, Modifier.weight(1f))
@@ -416,7 +422,7 @@ private fun Header(language: Language?, pair: LanguagePair, modifier: Modifier, 
         Box(Modifier.size(width = 18.dp, height = 4.dp).background(ink, CircleShape))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (role != null) Text(role, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(language?.nativeName ?: "Automatic", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
+            Text(language?.nativeName ?: stringResource(R.string.automatic), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
         }
     }
 }
@@ -435,7 +441,7 @@ private fun ParallelRow(utterance: Utterance, pair: LanguagePair, onRetry: () ->
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         menu = true
                     },
-                    onLongClickLabel = "Edit or delete",
+                    onLongClickLabel = stringResource(R.string.edit_or_delete),
                 )
                 .padding(vertical = 14.dp),
         ) {
@@ -475,7 +481,7 @@ private fun RowScope.ParallelCell(utterance: Utterance, language: Language?, pai
             OptionalLanguageTag(language, pair, spoken = spoken)
             if (text.isEmpty()) {
                 if (utterance.isFinal && !utterance.showsLanguagePrompt && ((spoken && utterance.source.isEmpty()) || language == null)) {
-                    Text("—", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = MissingSourceLabel)
+                    Text("—", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = missingSourceLabel())
                 } else if (utterance.showsLanguagePrompt) {
                     PendingLanguageLabel(utterance, onTranslate = onRetry)
                 } else if (utterance.hasTranslationProblem) {
@@ -563,15 +569,15 @@ fun EmptyConversation(
         if (partner != null) {
             Prompt(prompt(partner), partner.ink(pair), partner)
         } else {
-            Prompt(if (isListening) "Listening for another language" else "Other language · Automatic", MaterialTheme.colorScheme.onSurfaceVariant)
+            Prompt(if (isListening) stringResource(R.string.listening_for_another_language) else stringResource(R.string.other_language_automatic), MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(12.dp))
         Text(
             when {
-                !automatic -> "Lively hears ${pair.first.englishName} and ${pair.second.englishName} and translates both ways. No need to say who's speaking."
-                store.isOnline -> "Just talk. Lively detects the other language and translates both ways. Your side stays in ${store.listenerLanguage.englishName}."
+                !automatic -> stringResource(R.string.transcript_pair_prompt, pair.first.displayName, pair.second.displayName)
+                store.isOnline -> stringResource(R.string.transcript_automatic_prompt, store.listenerLanguage.displayName)
                 // iOS goes on to point at its On-device engine, which Android doesn't have.
-                else -> "Automatic detection needs internet."
+                else -> stringResource(R.string.automatic_detection_needs_internet)
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

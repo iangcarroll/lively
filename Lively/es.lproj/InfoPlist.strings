@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "Lively lee el texto de las fotos que tomas para poder traducirlo.";
+"NSLocationWhenInUseUsageDescription" = "Lively busca el país en el que estás para elegir el idioma local adecuado.";
+"NSMicrophoneUsageDescription" = "Lively escucha tu conversación para transcribirla y traducirla en tiempo real.";
+"NSMotionUsageDescription" = "Lively detecta cuando giras o entregas el teléfono para indicar brevemente que el micrófono está escuchando.";
+"NSSpeechRecognitionUsageDescription" = "Lively transcribe en el dispositivo cuando no puede conectar con un servicio de voz.";

@@ -1,5 +1,7 @@
 package sh.ian.lively.model
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -71,11 +73,11 @@ class AddressLookupStore(
         reset()
         if (input.isEmpty()) return
         if (input.codePointCount(0, input.length) > 1_000) {
-            errorMessage = "Use a shorter address or place name."
+            errorMessage = modelString(R.string.use_a_shorter_address_or_place_name) { "Use a shorter address or place name." }
             return
         }
         if (input.startsWith("https://", ignoreCase = true) || input.startsWith("http://", ignoreCase = true)) {
-            errorMessage = "Paste an address or place name instead of a map link."
+            errorMessage = modelString(R.string.address_map_link_error) { "Paste an address or place name instead of a map link." }
             return
         }
         phase = Phase.SEARCHING
@@ -86,7 +88,7 @@ class AddressLookupStore(
                 if (!isCurrent(token)) return@launch
                 matches = places.filter { it.hasValidCoordinate }.take(8)
                 phase = if (matches.isEmpty()) Phase.IDLE else Phase.CHOOSING
-                if (matches.isEmpty()) errorMessage = "No places found. Add a city or country and try again."
+                if (matches.isEmpty()) errorMessage = modelString(R.string.address_no_places) { "No places found. Add a city or country and try again." }
             } catch (error: Exception) {
                 if (!isCurrent(token)) return@launch
                 phase = Phase.IDLE
@@ -148,7 +150,7 @@ class AddressLookupStore(
     private fun CoroutineScope.isCurrent(token: Any) = operation === token && isActive
 
     private fun message(error: Exception): String =
-        (error as? AddressLookupException)?.error?.message ?: "Couldn’t look up this place. Try again."
+        (error as? AddressLookupException)?.error?.message ?: modelString(R.string.couldnt_look_up_this_place_try_again) { "Couldn’t look up this place. Try again." }
 
     private companion object {
         /** Unicode white space, including the no-break and ideographic spaces `\s` leaves out. */

@@ -1,5 +1,7 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -152,7 +154,7 @@ fun SettingsScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             LargeTopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = { BackButton(onBack) },
                 scrollBehavior = scroll,
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -178,33 +180,33 @@ fun SettingsScreen(
                 }
 
                 if (hasBroker) {
-                    Group(footer = if (!pro.isPro) "Up to 10 hours of translation a day." else null) {
+                    Group(footer = if (!pro.isPro) stringResource(R.string.up_to_10_hours_of_translation_a_day) else null) {
                         Item(
                             icon = { SettingsIcon(Icons.Rounded.Star, Orange) },
                             title = "Lively Pro",
                             value = when {
-                                pro.isSubscribed -> "Active"
-                                account?.hasFreePro == true -> "Included"
-                                else -> "Upgrade"
+                                pro.isSubscribed -> stringResource(R.string.active)
+                                account?.hasFreePro == true -> stringResource(R.string.included)
+                                else -> stringResource(R.string.upgrade)
                             },
                             onClick = onPro,
                         )
                     }
                 }
 
-                Group(header = "Languages", footer = languagesFooter(settings)) {
+                Group(header = stringResource(R.string.languages), footer = languagesFooter(settings)) {
                     // Automatic detection is the online engine's; other engines only take a pair.
                     if (settings.providerID == SpeechProviders.SONIOX_ID) {
                         Item(
                             icon = { SettingsIcon(Icons.Rounded.Forum, Indigo) },
-                            title = "Conversation",
-                            value = settings.conversationMode.label,
+                            title = stringResource(R.string.conversation),
+                            value = stringResource(settings.conversationMode.labelRes),
                             onClick = { choosingConversation = true },
                         )
                         Divider()
                     }
                     if (automatic) {
-                        LanguageItem("Your language", settings.speechListenerLanguage, settings, onClick = onOwnLanguage)
+                        LanguageItem(stringResource(R.string.your_language), settings.speechListenerLanguage, settings, onClick = onOwnLanguage)
                         Divider()
                         Row(
                             Modifier
@@ -215,13 +217,13 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             SettingsIcon(Icons.Rounded.LanguageGlobe, Gray)
-                            Text("Other language", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                            Text("Automatic", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            Text(stringResource(R.string.other_language), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Text(stringResource(R.string.automatic), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                         }
                     } else {
-                        LanguageItem("First language", settings.languages.first, settings, onClick = { onLanguage(LanguageSide.FIRST) })
+                        LanguageItem(stringResource(R.string.first_language), settings.languages.first, settings, onClick = { onLanguage(LanguageSide.FIRST) })
                         Divider()
-                        LanguageItem("Second language", settings.languages.second, settings, onClick = { onLanguage(LanguageSide.SECOND) })
+                        LanguageItem(stringResource(R.string.second_language), settings.languages.second, settings, onClick = { onLanguage(LanguageSide.SECOND) })
                     }
                     if (automatic || Language.CHINESE in settings.languages) {
                         Divider()
@@ -231,7 +233,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             SettingsIcon(Icons.Rounded.Translate, Teal)
-                            Text("Chinese script", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Text(stringResource(R.string.chinese_script), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         }
                         ScriptPicker(settings, Modifier.padding(start = 68.dp, end = 16.dp, bottom = 14.dp))
                     }
@@ -254,23 +256,23 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             SettingsIcon(Icons.Rounded.LocationOn, Blue)
-                            Text("Set from location", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Text(stringResource(R.string.set_from_location), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                             Switch(checked = settings.usesLocationLanguages, onCheckedChange = null)
                         }
                     }
                 }
 
-                Group(header = "Microphone", footer = settings.pickupRange.summary) {
+                Group(header = stringResource(R.string.microphone), footer = stringResource(settings.pickupRange.summaryRes)) {
                     Item(
                         icon = { SettingsIcon(Icons.Rounded.Hearing, Green) },
-                        title = "Pickup range",
-                        value = settings.pickupRange.label,
+                        title = stringResource(R.string.pickup_range),
+                        value = stringResource(settings.pickupRange.labelRes),
                         onClick = { choosingPickupRange = true },
                     )
                 }
 
                 val canSpeak = hasBroker || settings.credential(SpeechProviders.sonioxCredential(false)).isNotBlank()
-                Group(header = "Speech-to-speech", footer = speechFooter(settings, canSpeak)) {
+                Group(header = stringResource(R.string.speech_to_speech), footer = speechFooter(settings, canSpeak)) {
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -285,22 +287,22 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         SettingsIcon(Icons.AutoMirrored.Rounded.VolumeUp, Blue)
-                        Text("Speak translations aloud", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.speak_translations_aloud), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Switch(checked = settings.speaksTranslations, onCheckedChange = null, enabled = canSpeak)
                     }
                 }
 
-                Group(header = "Speech engine", footer = engineFooter(settings)) {
+                Group(header = stringResource(R.string.speech_engine), footer = engineFooter(settings)) {
                     Item(
                         icon = { SettingsIcon(Icons.Rounded.GraphicEq, Purple) },
-                        title = "Engine",
+                        title = stringResource(R.string.engine),
                         value = provider.name,
                         onClick = { choosingEngine = true },
                     )
                     for (credential in provider.credentials) {
                         Divider()
                         KeyField(
-                            label = credential.name,
+                            label = stringResource(credential.nameRes),
                             value = drafts[credential.id].orEmpty(),
                             onValueChange = { drafts[credential.id] = it },
                             onDone = save,
@@ -314,7 +316,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             SettingsIcon(Icons.Rounded.Speed, Orange)
-                            Text("Speed", style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(R.string.speed), style = MaterialTheme.typography.bodyLarge)
                         }
                         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp, bottom = 14.dp)) {
                             Latency.entries.forEachIndexed { index, latency ->
@@ -322,7 +324,7 @@ fun SettingsScreen(
                                     selected = settings.latency == latency,
                                     onClick = { settings.latency = latency },
                                     shape = SegmentedButtonDefaults.itemShape(index, Latency.entries.size),
-                                    label = { Text("${latency.label}\n${latency.milliseconds} ms", textAlign = TextAlign.Center, fontSize = 13.sp, lineHeight = 15.sp) },
+                                    label = { Text("${stringResource(latency.labelRes)}\n${latency.milliseconds} ms", textAlign = TextAlign.Center, fontSize = 13.sp, lineHeight = 15.sp) },
                                 )
                             }
                         }
@@ -338,7 +340,7 @@ fun SettingsScreen(
                             OutlinedTextField(
                                 value = settings.translationModel,
                                 onValueChange = { settings.translationModel = it },
-                                label = { Text("Model") },
+                                label = { Text(stringResource(R.string.model)) },
                                 placeholder = { Text(AppSettings.DEFAULT_TRANSLATION_MODEL) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
@@ -349,11 +351,11 @@ fun SettingsScreen(
                 }
 
                 Group {
-                    Item(icon = { SettingsIcon(Icons.Rounded.AutoAwesome, Pink) }, title = "Welcome tour", onClick = onWelcome, chevron = false)
+                    Item(icon = { SettingsIcon(Icons.Rounded.AutoAwesome, Pink) }, title = stringResource(R.string.welcome_tour), onClick = onWelcome, chevron = false)
                     Divider()
                     Item(
                         icon = { SettingsIcon(Icons.Rounded.DeleteOutline, Red) },
-                        title = "Clear conversation",
+                        title = stringResource(R.string.clear_conversation),
                         titleColor = MaterialTheme.colorScheme.error,
                         onClick = onClear,
                         chevron = false,
@@ -374,8 +376,8 @@ fun SettingsScreen(
 
     if (choosingPickupRange) {
         ChoiceDialog(
-            title = "Pickup range",
-            options = PickupRange.entries.map { it to it.label },
+            title = stringResource(R.string.pickup_range),
+            options = PickupRange.entries.map { it to stringResource(it.labelRes) },
             selected = settings.pickupRange,
             onSelect = { settings.pickupRange = it; choosingPickupRange = false },
             onDismiss = { choosingPickupRange = false },
@@ -384,8 +386,8 @@ fun SettingsScreen(
 
     if (choosingConversation) {
         ChoiceDialog(
-            title = "Conversation",
-            options = ConversationMode.entries.map { it to it.label },
+            title = stringResource(R.string.conversation),
+            options = ConversationMode.entries.map { it to stringResource(it.labelRes) },
             selected = settings.conversationMode,
             onSelect = { settings.conversationMode = it; choosingConversation = false },
             onDismiss = { choosingConversation = false },
@@ -394,7 +396,7 @@ fun SettingsScreen(
 
     if (choosingEngine) {
         ChoiceDialog(
-            title = "Engine",
+            title = stringResource(R.string.engine),
             options = settings.providers.map { it.id to it.name },
             selected = settings.providerID,
             onSelect = { settings.providerID = it; choosingEngine = false },
@@ -403,29 +405,32 @@ fun SettingsScreen(
     }
 }
 
+@Composable
 private fun languagesFooter(settings: AppSettings) = when {
     settings.usesAutomaticLanguageDetection ->
-        "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection needs internet."
-    settings.providerID == SpeechProviders.SONIOX_ID -> "Lively listens for this pair and translates both ways."
-    else -> "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine."
+        stringResource(R.string.settings_automatic_languages_footer)
+    settings.providerID == SpeechProviders.SONIOX_ID -> stringResource(R.string.settings_pair_languages_footer)
+    else -> stringResource(R.string.settings_pair_only_footer)
 }
 
+@Composable
 private fun speechFooter(settings: AppSettings, canSpeak: Boolean): String {
-    if (!canSpeak) return "Speaking translations aloud needs a Soniox API key."
+    if (!canSpeak) return stringResource(R.string.speech_playback_requires_key)
     // Android speaks only the outgoing direction: away from the listener's language in Automatic.
-    val spoken = if (settings.usesAutomaticLanguageDetection) "Translations into the detected other language" else "Translations into ${settings.languages.second.englishName}"
-    return "$spoken are read aloud through the speaker as they arrive. " +
-        "Lively doesn't listen while it speaks, so it won't translate itself, unless you're using headphones. " +
-        "You can also turn it on and off from the ⋮ menu in face-to-face."
+    val spoken = if (settings.usesAutomaticLanguageDetection) stringResource(R.string.playback_detected_language) else stringResource(R.string.playback_named_language, settings.languages.second.displayName)
+    return spoken + " " +
+        stringResource(R.string.speech_playback_listening_footer) +
+        stringResource(R.string.face_to_face_playback_menu_hint)
 }
 
+@Composable
 private fun engineFooter(settings: AppSettings): String {
     val provider = settings.provider
-    val lines = mutableListOf(provider.summary)
-    lines += provider.credentials.map { it.help }
-    lines += "Keys are encrypted with the Android Keystore on this device."
+    val lines = mutableListOf(stringResource(provider.summaryRes))
+    lines += provider.credentials.map { stringResource(it.helpRes) }
+    lines += stringResource(R.string.credential_storage_footer)
     if (ProviderOption.SPEED in provider.options) {
-        lines += "Faster speed shows words sooner; Accurate waits a little longer for better transcripts."
+        lines += stringResource(R.string.speed_footer)
     }
     return lines.joinToString(" ")
 }
@@ -448,7 +453,7 @@ fun ScriptPicker(settings: AppSettings, modifier: Modifier = Modifier) {
                 selected = settings.chineseScript == script,
                 onClick = { settings.chineseScript = script },
                 shape = SegmentedButtonDefaults.itemShape(index, ChineseScript.entries.size),
-                label = { Text(script.label, maxLines = 1) },
+                label = { Text(stringResource(script.labelRes), textAlign = TextAlign.Center) },
             )
         }
     }
@@ -506,7 +511,7 @@ fun Item(
         icon()
         Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor, modifier = Modifier.weight(1f))
         if (value != null) {
-            Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f, fill = false), textAlign = TextAlign.End)
         }
         if (chevron) Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -560,7 +565,7 @@ private fun KeyField(label: String, value: String, onValueChange: (String) -> Un
             keyboardActions = KeyboardActions(onDone = { onDone() }),
             trailingIcon = {
                 IconButton(onClick = { visible = !visible }) {
-                    Icon(if (visible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (visible) "Hide key" else "Show key")
+                    Icon(if (visible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (visible) stringResource(R.string.hide_key) else stringResource(R.string.show_key))
                 }
             },
             modifier = Modifier.weight(1f),
@@ -596,14 +601,14 @@ private fun AccountRow(email: String?, onClick: () -> Unit) {
         }
         Column(Modifier.weight(1f)) {
             Text(
-                email?.let(Account::displayName) ?: "Sign in to Lively",
+                email?.let(Account::displayName) ?: stringResource(R.string.sign_in_to_lively),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.MiddleEllipsis,
             )
             Text(
-                if (email == null) "Two free hours a day instead of one" else "Account",
+                if (email == null) stringResource(R.string.two_free_hours_a_day_instead_of_one) else stringResource(R.string.account),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -638,6 +643,6 @@ fun <T> ChoiceDialog(title: String, options: List<Pair<T, String>>, selected: T,
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

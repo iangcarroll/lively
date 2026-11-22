@@ -82,7 +82,7 @@ struct FaceToFaceScreen: View {
                         StatusPill(status: store.status, isListening: store.isListening, compact: true, onDevice: store.isUsingOnDevice)
                             .fixedSize()
                     }
-                    GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
+                    GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: String(localized: "Type to translate")) {
                         onSetTextInput(!showsTextInput)
                     }
                 }
@@ -95,7 +95,7 @@ struct FaceToFaceScreen: View {
                     store.stopListening()
                 }
                 HStack(spacing: narrow ? 6 : 10) {
-                    GlassIconButton(systemImage: "trash", label: "Clear conversation") {
+                    GlassIconButton(systemImage: "trash", label: String(localized: "Clear conversation")) {
                         withAnimation(.snappy) { store.clear() }
                     }
                     .disabled(store.utterances.isEmpty)
@@ -111,6 +111,7 @@ struct FaceToFaceScreen: View {
                         SpeakAloudToggle(store: store)
                         Divider()
                         Button("Settings", systemImage: "gearshape", action: onShowSettings)
+                            .accessibilityIdentifier("conversationSettings")
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 17, weight: .semibold))
@@ -121,6 +122,7 @@ struct FaceToFaceScreen: View {
                     .buttonStyle(.plain)
                     .glassEffect(.regular.interactive(), in: .circle)
                     .accessibilityLabel("More")
+                    .accessibilityIdentifier("conversationMenu")
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -223,7 +225,7 @@ private struct FaceToFaceHalf: View {
         Button(action: onShowLanguages) {
             VStack(alignment: .leading, spacing: 4) {
                 if let role {
-                    Text(role == .listener ? "Your language" : "Other language")
+                    Text(role == .listener ? String(localized: "Your language") : String(localized: "Other language"))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
                 OptionalLanguageTag(language: language, showsIcon: false, showsChevron: true)
@@ -233,7 +235,7 @@ private struct FaceToFaceHalf: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Change languages")
-        .accessibilityValue(language?.nativeName ?? "Automatic")
+        .accessibilityValue(language?.nativeName ?? String(localized: "Automatic"))
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding([.horizontal, .top], 4)
@@ -255,7 +257,7 @@ private struct FaceToFaceHalf: View {
         if !(utterance.isSourceOnly && role == .listener) {
             VStack(alignment: .leading, spacing: 4) {
                 if role != nil && (neutral || rowLanguage != language) {
-                    OptionalLanguageTag(language: neutral ? nil : rowLanguage, spoken: ownWords, unknownTitle: neutral ? utterance.unidentifiedLanguageTitle : "Automatic")
+                    OptionalLanguageTag(language: neutral ? nil : rowLanguage, spoken: ownWords, unknownTitle: neutral ? utterance.unidentifiedLanguageTitle : String(localized: "Automatic"))
                 }
                 if text.isEmpty {
                     if !ownWords && !neutral && utterance.hasTranslationProblem {
@@ -299,13 +301,13 @@ private struct FaceToFaceHalf: View {
         case .awaitingPartner:
             PendingLanguageLabel(utterance: utterance, onTranslate: { store.retryTranslation(utterance) })
         case .waitingForNetwork:
-            Label(language?.phrases.waitingForConnection ?? "Waiting for connection", systemImage: "wifi.slash")
+            Label(language?.phrases.waitingForConnection ?? String(localized: "Waiting for connection"), systemImage: "wifi.slash")
                 .font(.caption).foregroundStyle(.secondary)
         case .failed:
             Button {
                 store.retryTranslation(utterance)
             } label: {
-                Label(language?.phrases.translationFailed ?? "Translation failed", systemImage: "arrow.clockwise")
+                Label(language?.phrases.translationFailed ?? String(localized: "Translation failed"), systemImage: "arrow.clockwise")
                     .font(.caption)
             }
             .buttonStyle(.borderless)
@@ -336,16 +338,16 @@ private struct FaceToFaceHalf: View {
     }
 
     private var emptyPrompt: String {
-        if store.isAutomaticLanguageMode && !store.isOnline { return "Automatic detection needs internet" }
-        guard let language else { return store.isListening ? "Listening for another language" : "Automatic" }
+        if store.isAutomaticLanguageMode && !store.isOnline { return String(localized: "Automatic detection needs internet") }
+        guard let language else { return store.isListening ? String(localized: "Listening for another language") : String(localized: "Automatic") }
         if store.isListening && store.status == .offline { return language.phrases.waitingForConnection }
         return store.isConnecting ? language.phrases.connecting
             : store.isListening ? language.phrases.listening : language.phrases.tapToStart
     }
 
     private var emptyHint: String {
-        if store.isAutomaticLanguageMode && !store.isOnline { return "Choose a language pair in Settings for on-device translation." }
-        return language?.phrases.speakHint ?? "The other language will appear when they speak."
+        if store.isAutomaticLanguageMode && !store.isOnline { return String(localized: "Choose a language pair in Settings for on-device translation.") }
+        return language?.phrases.speakHint ?? String(localized: "The other language will appear when they speak.")
     }
 }
 

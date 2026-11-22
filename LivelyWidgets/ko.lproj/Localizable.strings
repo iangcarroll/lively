@@ -1,0 +1,9 @@
+"Auto" = "자동";
+"Automatic" = "자동 감지";
+"Automatic language detection. Your language: %@" = "자동 언어 감지. 사용자 언어: %@";
+"Listen" = "듣기";
+"Start translating a conversation with one tap." = "한 번의 탭으로 대화를 번역하세요.";
+"Tap to translate" = "탭하여 번역";
+"Translate" = "번역";
+"Translate %@ and %@" = "%1$@ 및 %2$@ 번역";
+"Type" = "입력";

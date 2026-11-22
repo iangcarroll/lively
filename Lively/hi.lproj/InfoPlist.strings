@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "Lively आपके द्वारा ली गई तस्वीरों में टेक्स्ट पढ़ता है ताकि उसे अनुवाद किया जा सके।";
+"NSLocationWhenInUseUsageDescription" = "Lively यह पता लगाता है कि आप किस देश में हैं ताकि वह आपके लिए स्थानीय भाषा चुन सके।";
+"NSMicrophoneUsageDescription" = "Lively आपकी बातचीत को सुनता है ताकि उसे लाइव ट्रांसक्राइब और अनुवाद किया जा सके।";
+"NSMotionUsageDescription" = "Lively तब नोटिस करता है जब आप फ़ोन को घुमाते हैं या किसी को दिखाते हैं, यह संकेत देने के लिए कि माइक्रोफ़ोन सुन रहा है।";
+"NSSpeechRecognitionUsageDescription" = "Lively जब किसी स्पीच सर्विस तक पहुंच नहीं पाता, तो डिवाइस पर ही ट्रांसक्राइब करता है।";

@@ -1,5 +1,7 @@
 package sh.ian.lively.support
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import android.content.Context
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -34,13 +36,13 @@ object GoogleSignIn {
         } catch (e: GetCredentialCancellationException) {
             return null
         } catch (e: GetCredentialException) {
-            throw Failed("Couldn't sign in with Google. Try again, or use your email.")
+            throw Failed(modelString(R.string.google_sign_in_failed_email_fallback) { "Couldn't sign in with Google. Try again, or use your email." })
         }
         if (credential !is CustomCredential || credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-            throw Failed("Couldn't sign in with Google. Try again, or use your email.")
+            throw Failed(modelString(R.string.google_sign_in_failed_email_fallback) { "Couldn't sign in with Google. Try again, or use your email." })
         }
         val token = runCatching { GoogleIdTokenCredential.createFrom(credential.data).idToken }
-            .getOrElse { throw Failed("Couldn't sign in with Google. Try again, or use your email.") }
+            .getOrElse { throw Failed(modelString(R.string.google_sign_in_failed_email_fallback) { "Couldn't sign in with Google. Try again, or use your email." }) }
         return Result(token, nonce)
     }
 }

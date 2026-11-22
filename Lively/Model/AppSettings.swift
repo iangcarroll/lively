@@ -229,8 +229,8 @@ enum ConversationMode: String, CaseIterable, Identifiable, Sendable {
 
     var label: String {
         switch self {
-        case .automatic: "Automatic"
-        case .pair: "Choose a pair"
+        case .automatic: String(localized: "Automatic")
+        case .pair: String(localized: "Choose a pair")
         }
     }
 }
@@ -240,8 +240,8 @@ enum SpeechSource: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .original: "Original voice · online"
-        case .downloaded: "Downloaded voices · offline"
+        case .original: String(localized: "Original voice · online")
+        case .downloaded: String(localized: "Downloaded voices · offline")
         }
     }
 }

@@ -7,13 +7,13 @@ nonisolated struct NeuralVoice: Identifiable, Hashable, Sendable {
     let localeIdentifier: String
 
     var embeddingPath: String { "voices/\(id).json" }
-    var languageName: String { NeuralVoiceCatalog.language(with: languageCode)?.name ?? languageCode }
+    var languageName: String { NeuralVoiceCatalog.language(with: languageCode)?.displayName ?? languageCode }
     var nativeLanguageName: String { NeuralVoiceCatalog.language(with: languageCode)?.nativeName ?? languageCode }
     var accent: String? {
         switch localeIdentifier {
-        case "en-US": "American"
-        case "en-GB": "British"
-        case "pt-BR": "Brazilian"
+        case "en-US": String(localized: "American")
+        case "en-GB": String(localized: "British")
+        case "pt-BR": String(localized: "Brazilian")
         default: nil
         }
     }
@@ -24,6 +24,10 @@ nonisolated struct NeuralVoiceLanguage: Identifiable, Hashable, Sendable {
     let name: String
     let nativeName: String
     let defaultVoiceID: String
+    var displayName: String { Locale.current.localizedString(forLanguageCode: id) ?? name }
+    var pickerName: String {
+        displayName.localizedCaseInsensitiveCompare(nativeName) == .orderedSame ? nativeName : "\(displayName) · \(nativeName)"
+    }
     var voices: [NeuralVoice] { NeuralVoiceCatalog.voices.filter { $0.languageCode == id } }
 }
 

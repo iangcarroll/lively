@@ -1,5 +1,7 @@
 package sh.ian.lively.net
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
@@ -55,7 +57,7 @@ class OnDeviceTranslator : TranslationService {
     }
 }
 
-class OnDeviceTranslationException(language: Language) : Exception("${language.englishName} isn't available on this device")
+class OnDeviceTranslationException(language: Language) : Exception(modelString(R.string.value_isnt_available_on_this_device, language.displayName) { "${language.displayName} isn't available on this device" })
 
 /** Waits for a Play services task, such as an ML Kit result. */
 internal suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { continuation ->

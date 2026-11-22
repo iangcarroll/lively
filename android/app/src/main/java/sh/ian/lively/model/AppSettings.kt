@@ -1,5 +1,7 @@
 package sh.ian.lively.model
 
+import sh.ian.lively.R
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -194,9 +196,9 @@ class AppSettings(
     }
 }
 
-enum class ConversationMode(val id: String, val label: String) {
-    AUTOMATIC("automatic", "Automatic"),
-    PAIR("pair", "Choose a pair");
+enum class ConversationMode(val id: String, @get:StringRes val labelRes: Int) {
+    AUTOMATIC("automatic", R.string.automatic),
+    PAIR("pair", R.string.choose_a_pair);
 
     companion object {
         /**

@@ -1,5 +1,8 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
@@ -123,6 +126,7 @@ fun AddressLookupScreen(initialLanguage: Language, onBack: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (AddressLanguage) -> Unit, onBack: () -> Unit) {
+    val resources = LocalResources.current
     var showsLanguages by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(store) { onDispose { store.close() } }
     if (showsLanguages) {
@@ -156,7 +160,7 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Address") },
+                title = { Text(stringResource(R.string.address)) },
                 navigationIcon = { BackButton(onBack) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
@@ -171,11 +175,11 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
-                Group(header = "Location", footer = "Requires internet. Places are looked up with your phone’s location service.") {
+                Group(header = stringResource(R.string.location), footer = stringResource(R.string.address_service_footer)) {
                     TextField(
                         value = store.query,
                         onValueChange = { store.query = it },
-                        placeholder = { Text("Address or place name") },
+                        placeholder = { Text(stringResource(R.string.address_or_place_name)) },
                         minLines = 2,
                         maxLines = 5,
                         keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Search),
@@ -189,7 +193,7 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
                         modifier = Modifier.fillMaxWidth().testTag("address-query"),
                     )
                     RowDivider()
-                    ActionRow(Icons.Rounded.ContentPaste, "Paste") {
+                    ActionRow(Icons.Rounded.ContentPaste, stringResource(R.string.paste)) {
                         scope.launch {
                             val clip = clipboard.getClipEntry()?.clipData?.takeIf { it.itemCount > 0 } ?: return@launch
                             store.query = clip.getItemAt(0).coerceToText(context).toString()
@@ -207,7 +211,7 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text("Address language", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.address_language), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Text(
                             store.language.nativeName,
                             style = MaterialTheme.typography.bodyMedium.copy(localeList = store.language.localeList()),
@@ -217,7 +221,7 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
                     }
                 }
                 PillButton(
-                    "Find address",
+                    stringResource(R.string.find_address),
                     onClick = ::find,
                     enabled = store.canSearch,
                     modifier = Modifier.padding(top = 20.dp).testTag("address-find"),
@@ -232,12 +236,12 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
                         ) {
                             CircularProgressIndicator(strokeWidth = 2.5.dp, modifier = Modifier.size(22.dp))
                             Text(
-                                if (store.phase == AddressLookupStore.Phase.SEARCHING) "Finding places…" else "Finding address…",
+                                if (store.phase == AddressLookupStore.Phase.SEARCHING) stringResource(R.string.finding_places) else stringResource(R.string.finding_address),
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                         }
                         RowDivider()
-                        ActionRow(Icons.Rounded.Close, "Cancel lookup") { store.close() }
+                        ActionRow(Icons.Rounded.Close, stringResource(R.string.cancel_lookup)) { store.close() }
                     }
                 }
 
@@ -250,7 +254,7 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
                             modifier = Modifier.padding(16.dp).testTag("address-error"),
                         )
                         RowDivider()
-                        ActionRow(Icons.Rounded.Refresh, "Try again") {
+                        ActionRow(Icons.Rounded.Refresh, stringResource(R.string.try_again)) {
                             focus.clearFocus()
                             store.retry()
                         }
@@ -258,7 +262,7 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
                 }
 
                 if (store.phase == AddressLookupStore.Phase.CHOOSING) {
-                    Group(header = if (store.matches.size == 1) "Confirm the place" else "Choose a place") {
+                    Group(header = if (store.matches.size == 1) stringResource(R.string.confirm_the_place) else stringResource(R.string.choose_a_place)) {
                         store.matches.forEachIndexed { index, place ->
                             if (index > 0) RowDivider()
                             Row(
@@ -285,8 +289,8 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
                 val address = store.copyValue
                 if (place != null && address != null) {
                     Group(
-                        header = "Address in ${store.language.englishName}",
-                        footer = "Names and address details depend on available map data. Some places may keep their local spelling.",
+                        header = stringResource(R.string.address_in_value, store.language.displayName),
+                        footer = stringResource(R.string.localized_address_footer),
                     ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             PlaceLabel(place)
@@ -304,20 +308,20 @@ internal fun AddressLookupContent(store: AddressLookupStore, onLanguage: (Addres
                             }
                         }
                         RowDivider()
-                        ActionRow(if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy, if (copied) "Copied" else "Copy address") {
+                        ActionRow(if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy, if (copied) stringResource(R.string.copied) else stringResource(R.string.copy_address)) {
                             scope.launch {
                                 clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Lively", address)))
                                 copied = true
                             }
                         }
                         RowDivider()
-                        ActionRow(Icons.Rounded.Map, "Open in Maps") {
+                        ActionRow(Icons.Rounded.Map, stringResource(R.string.open_in_maps)) {
                             // The coordinates of the chosen place, labelled with its name, in any maps app.
                             val uri = "geo:0,0?q=${place.latitude},${place.longitude}(${Uri.encode(place.name)})".toUri()
                             try {
                                 context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                             } catch (_: ActivityNotFoundException) {
-                                mapError = "Couldn’t open Maps. Try again."
+                                mapError = resources.getString(R.string.couldnt_open_maps_try_again)
                             }
                         }
                         mapError?.let {
@@ -376,7 +380,7 @@ private fun AddressLanguagePicker(selection: AddressLanguage, onSelect: (Address
     var query by rememberSaveable { mutableStateOf("") }
     val trimmed = query.trim()
     val languages = if (trimmed.isEmpty()) AddressLanguage.all else AddressLanguage.all.filter {
-        it.englishName.contains(trimmed, ignoreCase = true) ||
+        it.displayName.contains(trimmed, ignoreCase = true) || it.englishName.contains(trimmed, ignoreCase = true) ||
             it.nativeName.contains(trimmed, ignoreCase = true) ||
             it.code.contains(trimmed, ignoreCase = true)
     }
@@ -386,17 +390,17 @@ private fun AddressLanguagePicker(selection: AddressLanguage, onSelect: (Address
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("Address language") },
+                    title = { Text(stringResource(R.string.address_language)) },
                     navigationIcon = { BackButton(onDone) },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 )
                 TextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Search languages") },
+                    placeholder = { Text(stringResource(R.string.search_languages)) },
                     leadingIcon = { Icon(Icons.Rounded.Search, null) },
                     trailingIcon = {
-                        if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Rounded.Close, "Clear search") }
+                        if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Rounded.Close, stringResource(R.string.clear_search)) }
                     },
                     singleLine = true,
                     shape = CircleShape,
@@ -435,11 +439,11 @@ private fun AddressLanguagePicker(selection: AddressLanguage, onSelect: (Address
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(language.nativeName, style = MaterialTheme.typography.bodyLarge.copy(localeList = language.localeList()))
-                        if (!language.englishName.equals(language.nativeName, ignoreCase = true)) {
-                            Text(language.englishName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (!language.displayName.equals(language.nativeName, ignoreCase = true)) {
+                            Text(language.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    if (isSelected) Icon(Icons.Rounded.Check, "Selected", tint = MaterialTheme.colorScheme.primary)
+                    if (isSelected) Icon(Icons.Rounded.Check, stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary)
                 }
             }
             if (languages.isEmpty()) {
@@ -450,7 +454,7 @@ private fun AddressLanguagePicker(selection: AddressLanguage, onSelect: (Address
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Icon(Icons.Rounded.SearchOff, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(40.dp))
-                        Text("No results for “$trimmed”", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                        Text(stringResource(R.string.no_results_for_value, trimmed), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                     }
                 }
             }

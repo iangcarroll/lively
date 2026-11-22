@@ -1,5 +1,8 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -131,7 +134,7 @@ fun TypeToTranslateBar(
             TextField(
                 value = field,
                 onValueChange = { field = it },
-                placeholder = { Text(if (editing == null) "Type to translate" else "Fix what was heard") },
+                placeholder = { Text(if (editing == null) stringResource(R.string.type_to_translate) else stringResource(R.string.fix_what_was_heard)) },
                 singleLine = true,
                 // Corrections are often names, which autocorrect would undo.
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send, autoCorrectEnabled = editing == null),
@@ -155,7 +158,7 @@ fun TypeToTranslateBar(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         if (editing == null) Icons.AutoMirrored.Rounded.Send else Icons.Rounded.Check,
-                        contentDescription = if (editing == null) "Translate" else "Save and translate again",
+                        contentDescription = if (editing == null) stringResource(R.string.translate) else stringResource(R.string.save_and_translate_again),
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -163,7 +166,7 @@ fun TypeToTranslateBar(
             IconButton(onClick = close, modifier = Modifier.padding(end = 2.dp)) {
                 Icon(
                     Icons.Rounded.Close,
-                    contentDescription = if (editing == null) "Close text input" else "Cancel editing",
+                    contentDescription = if (editing == null) stringResource(R.string.close_text_input) else stringResource(R.string.cancel_editing),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -177,6 +180,7 @@ fun TypeToTranslateBar(
  */
 @Composable
 private fun PhotoButton(store: ConversationStore, languages: LanguagePair?, language: Language) {
+    val resources = LocalResources.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var readsPhoto by remember { mutableStateOf(false) }
@@ -188,14 +192,14 @@ private fun PhotoButton(store: ConversationStore, languages: LanguagePair?, lang
             try {
                 val text = TextRecognizer.text(context, photo, languages)
                 if (text.isEmpty()) {
-                    store.alert = "Lively couldn't find any text in that photo."
+                    store.alert = resources.getString(R.string.lively_couldnt_find_any_text_in_that_photo)
                 } else {
                     store.submitTyped(text, language)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                store.alert = "Lively couldn't read that photo."
+                store.alert = resources.getString(R.string.lively_couldnt_read_that_photo)
             } finally {
                 readsPhoto = false
             }
@@ -230,14 +234,14 @@ private fun PhotoButton(store: ConversationStore, languages: LanguagePair?, lang
             IconButton(onClick = { if (hasCamera) showsMenu = true else choose() }) {
                 Icon(
                     Icons.Rounded.PhotoCamera,
-                    contentDescription = "Translate a photo",
+                    contentDescription = stringResource(R.string.translate_a_photo),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
         DropdownMenu(expanded = showsMenu, onDismissRequest = { showsMenu = false }) {
             DropdownMenuItem(
-                text = { Text("Take photo") },
+                text = { Text(stringResource(R.string.take_photo)) },
                 leadingIcon = { Icon(Icons.Rounded.PhotoCamera, contentDescription = null) },
                 onClick = {
                     showsMenu = false
@@ -245,7 +249,7 @@ private fun PhotoButton(store: ConversationStore, languages: LanguagePair?, lang
                 },
             )
             DropdownMenuItem(
-                text = { Text("Choose photo") },
+                text = { Text(stringResource(R.string.choose_photo)) },
                 leadingIcon = { Icon(Icons.Rounded.PhotoLibrary, contentDescription = null) },
                 onClick = {
                     showsMenu = false

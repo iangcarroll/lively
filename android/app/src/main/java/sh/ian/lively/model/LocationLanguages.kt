@@ -1,5 +1,7 @@
 package sh.ian.lively.model
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -51,11 +53,11 @@ class LocationLanguages(
         val message: String?
             get() = when (this) {
                 Idle -> null
-                Locating -> "Finding where you are…"
-                is Applied -> "Languages set for ${nameOfRegion(region)}."
-                is Unchanged -> "No different language to suggest for ${nameOfRegion(region)}, so your languages stay as they are."
-                Denied -> "Lively doesn't have location access. Allow it in the system settings, then turn this on again."
-                Failed -> "Couldn't find where you are. Lively will try again the next time it opens."
+                Locating -> modelString(R.string.finding_where_you_are) { "Finding where you are…" }
+                is Applied -> modelString(R.string.languages_set_for_value, nameOfRegion(region)) { "Languages set for ${nameOfRegion(region)}." }
+                is Unchanged -> modelString(R.string.no_local_language_suggestion, nameOfRegion(region)) { "No different language to suggest for ${nameOfRegion(region)}, so your languages stay as they are." }
+                Denied -> modelString(R.string.location_permission_denied) { "Lively doesn't have location access. Allow it in the system settings, then turn this on again." }
+                Failed -> modelString(R.string.location_not_found) { "Couldn't find where you are. Lively will try again the next time it opens." }
             }
     }
 
@@ -132,8 +134,8 @@ class LocationLanguages(
     )
 
     companion object {
-        const val SUMMARY = "Sets your language and the local language when you arrive in another country. " +
-            "Lively uses your approximate location only to look up the country."
+        val SUMMARY get() = modelString(R.string.location_travel_summary) { "Sets your language and the local language when you arrive in another country. " } +
+            modelString(R.string.location_country_lookup) { "Lively uses your approximate location only to look up the country." }
 
         /**
          * The pair for someone whose system language is [own], in [region] (an
@@ -170,7 +172,7 @@ class LocationLanguages(
         }
 
         fun nameOfRegion(region: String): String =
-            Locale.Builder().setRegion(region).build().getDisplayCountry(Locale.ENGLISH).ifEmpty { region }
+            Locale.Builder().setRegion(region).build().getDisplayCountry(Locale.getDefault()).ifEmpty { region }
 
         private val TRADITIONAL_REGIONS = setOf("TW", "HK", "MO")
 
