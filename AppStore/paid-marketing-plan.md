@@ -8,7 +8,7 @@ Prioritize English-speaking US travelers who need to ask a real question and und
 
 | When | Action | How to decide |
 | --- | --- | --- |
-| Days 1–2 | Record the US search baseline for each custom page, then assign **Japanese** to **Japanese for your trip** and **Chinese** to **English and Chinese conversations**. Both words are already in the approved US listing. | Record the assignment date. Review page impressions, first-time downloads and conversion at days 7 and 14. Search totals include Apple Ads, so read each page alongside its paid ad group and check the trend again after the December 6 cutoff. [Apple’s keyword setup](https://developer.apple.com/help/app-store-connect/create-custom-product-pages/configure-multiple-product-page-versions) · [Apple’s acquisition reporting](https://developer.apple.com/videos/play/wwdc2026/8010/) |
+| Completed November 22 Pacific | Recorded the US search baseline and assigned **Japanese** to **Japanese for your trip** and **Chinese** to **English and Chinese conversations**. | Review impressions, first-time downloads and conversion after 7 and 14 full UTC days. Search totals include Apple Ads, so read each page alongside its paid ad group and check the trend again after the December 6 cutoff. [Apple’s keyword setup](https://developer.apple.com/help/app-store-connect/create-custom-product-pages/configure-multiple-product-page-versions) · [Apple’s acquisition reporting](https://developer.apple.com/videos/play/wwdc2026/8010/) |
 | Days 1–7 | Produce one English demo. Show two people at a station sharing an iPhone, then show the translated answer facing the person who needs it. Use it in the Seats.aero placement proposal and the searchable Kyoto guide. Give each its own link to the Japanese page. | Record which placements go live, visits and first-time downloads per link. Use the channel thresholds below before making another destination demo. |
 | At 48 hours after ad activation | If the exact-match groups still have zero impressions, test **voice translator** at **US$2.76 max per tap** for 24 hours. Keep **live translator** at US$1.00 as a comparison. | Record each keyword’s impressions, taps and spend before and during the test. Restore the US$1.00 bid at the end and review whether the higher bid bought delivery. Category averages US$12/day within the US$1,000 authorization. [Apple’s bid guidance](https://ads.apple.com/app-store/help/bids-and-budget/0076-considerations-for-keyword-bids) |
 | Days 7–14 | Review the Japanese and Chinese pages, the two placements and the existing screenshot test. Prepare a subtitle or first-screenshot change only if there is a specific problem to address. | If people reach a page but rarely download, test how clearly the first screenshot shows the conversation. If few people reach it, work on distribution first. Review paid subscriptions again when the 35-day cohorts mature. |
@@ -45,14 +45,25 @@ The November 22 evening eligibility check found all five campaigns, eight ad gro
 
 ## App Store search and creative
 
-App Store Connect showed the following **en-US organic search keyword assignments on November 22**. All four pages were approved and visible, and all four were configured as ad destinations. Apple lets a page appear for a unique selection of keywords from the latest approved version. Assignments influence which page a searcher sees. Search rank and traffic still need to be measured. [Lively’s product pages](https://appstoreconnect.apple.com/apps/6835590432/distribution/productpages) · [Apple’s custom product pages](https://developer.apple.com/app-store/custom-product-pages/)
+**Pre-assignment baseline, November 22, 2026 Pacific.** In App Store Connect Metrics, select **United States** and **App Store Search**, then group by **Product Page**. The latest available report covered August 24–November 21 UTC, including Lively’s November 19 launch. Apple showed **Not Enough Data** for all four custom pages across the measures below. November 22 UTC had not yet been reported. Apple begins showing custom-page results after five individual Apple Accounts make first-time downloads on that page. A dash is an unreported value. [App Store Connect Analytics](https://appstoreconnect.apple.com/apps/6835590432/analytics/metrics) · [Apple’s reporting threshold](https://developer.apple.com/help/app-store-connect-analytics/acquisition/custom-product-pages/)
 
-| Existing page | Currently assigned | Next action |
-| --- | --- | --- |
-| Japanese for your trip | None | Assign **Japanese**. Reuse the Kyoto conversation in the guide and store artwork. |
-| English and Chinese conversations | None | Assign **Chinese**. Use the existing Taipei ticket conversation. A mainland China guide needs its own tested scenario. |
-| Face-to-face conversations | **conversation**, **interpreter** | Keep both. Use this page for demos of two people sharing a phone. |
-| Offline travel translation | **offline**, **travel** | Keep both. Show the advance download and a supported language pair working in airplane mode. |
+| US App Store Search before assignment | Impressions | Product page views | First-time downloads | Conversion rate |
+| --- | ---: | ---: | ---: | ---: |
+| Japanese for your trip | — | — | — | — |
+| English and Chinese conversations | — | — | — | — |
+| Face-to-face conversations | — | — | — | — |
+| Offline travel translation | — | — | — | — |
+
+At **7:13 p.m. Pacific on November 22 (03:13 UTC November 23)**, we added the two keywords to the approved en-US pages and verified each assignment by reading it back from App Store Connect. All four pages were visible and configured as ad destinations. Apple lets a page appear for a unique selection of keywords from the latest approved version. Assignments influence which page a searcher sees. Search rank and traffic still need to be measured. [Lively’s product pages](https://appstoreconnect.apple.com/apps/6835590432/distribution/productpages) · [Apple’s custom product pages](https://developer.apple.com/app-store/custom-product-pages/)
+
+| Existing page | Before | Verified after | Next use |
+| --- | --- | --- | --- |
+| Japanese for your trip | None | **Japanese** | Reuse the Kyoto conversation in the guide and store artwork. |
+| English and Chinese conversations | None | **Chinese** | Use the existing Taipei ticket conversation. A mainland China guide needs its own tested scenario. |
+| Face-to-face conversations | conversation, interpreter | **conversation**, **interpreter** | Use this page for demos of two people sharing a phone. |
+| Offline travel translation | offline, travel | **offline**, **travel** | Show the advance download and a supported language pair working in airplane mode. |
+
+When November 22 UTC becomes available, add it as the last complete pre-change day. November 23 UTC contains time both before and after assignment. Compare the first seven full days (November 24–30 UTC) and the first fourteen (November 24–December 7 UTC) with the pre-change baseline once Apple reports them. Record the corresponding Apple Ads results for the Japanese and Chinese ad groups alongside each window.
 
 Keep **Lively: Live Translator** for this test. DigitalSail’s similarly named US app has about 23,000 ratings. Give travelers a reason to choose Lively in the subtitle and the first screenshot. At the next metadata revision, consider the English subtitle **Talk face to face on one phone**. Use the 100-character keyword field for relevant terms missing from the name and subtitle. Try specific phrases such as “offline Japanese translator” in guides first, then use actual search and download data to choose terms for the next listing revision. Omit third-party brands such as AirPods. Test Cantonese speech end to end before targeting it. Traditional Chinese text output alone establishes script support. [Competitor’s US listing](https://apps.apple.com/us/app/live-translator-ai-translate/id6740606431) · [Apple’s metadata guidance](https://developer.apple.com/app-store/product-page/) · [Lively’s listing](https://apps.apple.com/us/app/lively-live-translator/id6835590432)
 
