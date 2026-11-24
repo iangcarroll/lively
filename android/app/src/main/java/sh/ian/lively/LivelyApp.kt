@@ -9,6 +9,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.view.textclassifier.TextClassificationManager
 import android.view.textclassifier.TextLanguage
+import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -21,6 +22,7 @@ import sh.ian.lively.model.LocationLanguages
 import sh.ian.lively.model.Pro
 import sh.ian.lively.model.ScriptConverter
 import sh.ian.lively.model.SpeechProviders
+import sh.ian.lively.net.AppUsage
 import sh.ian.lively.net.BrokerTranslator
 import sh.ian.lively.net.RegionProber
 import sh.ian.lively.net.SonioxKeyProvider
@@ -39,6 +41,11 @@ class LivelyApp : Application() {
         super.onCreate()
         installPlatformText(this)
         graph = Graph(this)
+        if (!BuildConfig.DEBUG && BuildConfig.KEY_BROKER_URL.isNotEmpty()) {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(
+                AppUsage(noBackupFilesDir.resolve("app-usage.json"), BuildConfig.KEY_BROKER_URL, graph.scope)
+            )
+        }
     }
 
     class Graph(context: Context) {

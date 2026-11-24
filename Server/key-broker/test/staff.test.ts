@@ -178,7 +178,7 @@ describe("staff access", () => {
 
 describe("staff reports through the console", () => {
   beforeEach(async () => {
-    await env.DB.batch(["users", "subscription_observations", "apple_ads_installs"].map(t => env.DB.prepare("DELETE FROM " + t)));
+    await env.DB.batch(["users", "subscription_observations", "apple_ads_installs", "app_usage_days"].map(t => env.DB.prepare("DELETE FROM " + t)));
   });
 
   it("finds just the requested user and reports usable sessions without exposing stored credentials", async () => {
@@ -249,6 +249,43 @@ describe("staff reports through the console", () => {
     expect(overview).toMatchObject({ accounts: timestamps.length, grants: 2, stores: [{ store: "play", count: 1 }] });
     expect(overview.days.map(d => d.count)).toEqual([1, ...Array(12).fill(0), 2]);
     expect(await (await get("/overview", analyst)).text()).not.toContain("@example.com");
+  });
+
+  it("turns offline lifecycle uploads into distinct UTC cohorts and completed sessions on the analyst overview", async () => {
+    const today = Math.floor(Date.now() / 86_400_000);
+    const ios = crypto.randomUUID();
+    const day = (offset: number, opens = 1, closes = 0, seconds = 0) => ({ day: today + offset, opens, closes, seconds });
+    async function upload(platform: string, days: ReturnType<typeof day>[], id: string = crypto.randomUUID()) {
+      return broker.fetch(new Request("https://lively.cautela.hk/v1/app-usage", {
+        method: "POST", headers: { "Lively-Usage-ID": id }, body: JSON.stringify({ platform, days }),
+      }), env);
+    }
+
+    expect(await (await get("/overview", analyst)).text()).toContain("No app activity received in the last 30 days.");
+    expect((await upload("macos", [day(-30), day(-29)])).status).toBe(204);
+    expect(await (await get("/overview", analyst)).text()).toContain("No app activity received for today.");
+    for (const offset of [-7, -6]) await upload("android", [day(offset)]);
+    await upload("ios", [day(-6, 2), day(0, 3, 2, 150)], ios);
+    // Stale replay, differently cased ID, and a retry after a lost acknowledgement.
+    await upload("ios", [day(0)], ios.toUpperCase());
+    await upload("ios", [day(0, 3, 2, 150)], ios);
+    // A foreground session that crosses midnight can be active with zero opens today.
+    await upload("android", [day(-1), day(0, 0, 1, 450)]);
+    await upload("macos", [day(1)]);
+    const { usage } = await reports.overview();
+    expect(usage).toMatchObject({ dau: 2, wau: 3, mau: 5 });
+    expect(usage.days.map(d => d.count)).toEqual([0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 1, 2]);
+    expect(usage.today).toEqual([
+      { platform: "android", installs: 1, opens: 0, closes: 1, seconds: 450 },
+      { platform: "ios", installs: 1, opens: 3, closes: 2, seconds: 150 },
+    ]);
+    const html = await (await get("/overview", analyst)).text();
+    expect(html).toContain("3m 20s"); // (150 + 450) / 3 completed sessions
+    expect(html).not.toContain(ios);
+    const stored = await env.DB.prepare("SELECT * FROM app_usage_days").all();
+    expect(JSON.stringify(stored.results)).not.toContain(ios.toLowerCase());
+    expect(stored.results.every(r => Number(r.day) >= today - 29)).toBe(true);
+    expect((await get("/overview", support)).status).toBe(403);
   });
 
   it("retains recent or unexpired observations during scheduled cleanup", async () => {

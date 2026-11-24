@@ -156,7 +156,7 @@ export function regionOrder(request: Request, env: Env): Region[] {
   return first ? [first, ...configured.filter((r) => r !== first)] : [];
 }
 
-const INSTALL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const INSTALL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 
 /** Who's asking, for limits: the install, and the account and subscription if any. */

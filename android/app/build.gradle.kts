@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 /** A UTC timestamp, like the iOS build numbers: 2026102301 for 01:00 on Oct 23 2026, minus the minutes. */
