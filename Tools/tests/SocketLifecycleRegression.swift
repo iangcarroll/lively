@@ -13,6 +13,8 @@ final class LocalDialect: SocketDialect {
     let readyAtHandshake: Bool
     let tracksFinalized: Bool
     let supportsSideStreams: Bool
+    var nativeReconnect: Bool { endpoint.lastPathComponent == "soniox" }
+    var resets = 0
     var requests = 0
     var opened = 0
     var finals: [[Int]] = []
@@ -36,10 +38,14 @@ final class LocalDialect: SocketDialect {
         // stale setup completions rather than rely on a cooperative broker.
         try? await Task.sleep(for: setupDelay)
         let destination = stream.isCatchUp ? endpoint.appendingPathComponent("catchup") : endpoint
-        return URLRequest(url: destination)
+        var request = URLRequest(url: destination)
+        if nativeReconnect { request.setValue("Bearer test-\(requests)", forHTTPHeaderField: "Authorization") }
+        return request
     }
 
-    func openingMessages() -> [URLSessionWebSocketTask.Message] { [.string("configure")] }
+    func openingMessages() -> [URLSessionWebSocketTask.Message] {
+        nativeReconnect ? [.json(["enable_reconnect": true])] : [.string("configure")]
+    }
     func audioMessage(_ chunk: Data) -> URLSessionWebSocketTask.Message { .data(chunk) }
     var endOfAudioMessage: URLSessionWebSocketTask.Message? { .string("") }
     var keepaliveMessage: URLSessionWebSocketTask.Message? { keepsWarm ? .string("keepalive") : nil }
@@ -48,7 +54,7 @@ final class LocalDialect: SocketDialect {
     var rejectedKeyMessage: String { "Local test server has no credentials" }
     var reportsFinalizedAudio: Bool { tracksFinalized }
     func finalizedAudio(on stream: SocketStream) -> TimeInterval { finalized[stream] ?? 0 }
-    func sessionDidReset(_ stream: SocketStream) {}
+    func sessionDidReset(_ stream: SocketStream) { resets += 1 }
     func sessionDidOpen(_ stream: SocketStream) { opened += 1 }
 
     func receive(_ message: URLSessionWebSocketTask.Message, on stream: SocketStream) -> SocketSignal {
@@ -114,6 +120,30 @@ struct SocketLifecycleRegression {
         guard CommandLine.arguments.count == 2, let base = URL(string: CommandLine.arguments[1]) else {
             fatalError("Pass local WebSocket base URL")
         }
+
+        let native = LocalDialect(base.appendingPathComponent("soniox"), keepsWarm: true,
+                                  readyAtHandshake: true, tracksFinalized: true)
+        let nativeSocket = ResilientSocket(dialect: native)
+        nativeSocket.start()
+        await wait("native stream opens") { native.opened == 1 }
+        nativeSocket.send(pcm(1_000))
+        await wait("first response received") { native.audio == [1_000] }
+        nativeSocket.send(pcm(2_000))
+        nativeSocket.networkAvailable = false
+        nativeSocket.send(pcm(3_000))
+        nativeSocket.pause()
+        nativeSocket.resume()
+        nativeSocket.send(pcm(4_000))
+        nativeSocket.networkAvailable = true
+        await wait("lost response and retained requests recovered in order") {
+            native.audio == [1_000, 1_500, 2_000, 3_000, 4_000]
+        }
+        check(native.audioByStream.count == 1 && native.requests == 1 && native.resets == 0,
+              "a lost reconnect attempt preserves the logical stream and original credential")
+        nativeSocket.networkPathChanged()
+        await wait("refused rotated token falls back to a fresh stream") { native.opened == 2 }
+        check(native.requests == 2 && native.resets == 1, "fresh-stream fallback resets the parser once")
+        nativeSocket.stop()
 
         let warm = LocalDialect(base.appendingPathComponent("warm"), keepsWarm: true,
                                 setupDelay: .milliseconds(150))

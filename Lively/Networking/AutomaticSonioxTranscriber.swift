@@ -120,6 +120,7 @@ final class AutomaticSonioxTranscriber: SpeechEngine, SocketDialect {
             .json(
                 [
                     "model": config.model,
+                    "enable_reconnect": true,
                     "audio_format": "pcm_s16le",
                     "sample_rate": Int(MicCapture.sampleRate),
                     "num_channels": 1,
@@ -138,7 +139,7 @@ final class AutomaticSonioxTranscriber: SpeechEngine, SocketDialect {
     func audioMessage(_ chunk: Data) -> URLSessionWebSocketTask.Message { .data(chunk) }
     /// An empty text frame ends the stream; an empty binary frame wouldn't.
     var endOfAudioMessage: URLSessionWebSocketTask.Message? { .string("") }
-    /// Soniox only replies when it has tokens, so there's no session ack.
+    /// Audio can start at handshake, even when the server omits the reconnect offer.
     var readyWhenOpen: Bool { true }
     var rejectedKeyMessage: String { "Your Soniox API key was rejected. Check it in Settings." }
     /// Soniox replies about every 0.12 s while audio flows, and within 1.1 s

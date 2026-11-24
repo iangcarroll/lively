@@ -109,7 +109,8 @@ struct SocketStream: Hashable {
 ///   speech isn't stuck behind it (Soniox works through a burst at only about
 ///   1.15× real time). Dialects without side streams replay the retained
 ///   speech on the primary before new live audio.
-/// - When the network path changes, a second socket opens on the new path and
+/// - Soniox resumes the same stream across path changes and short transport losses.
+///   When no reconnect is offered, a second socket opens on the new path and
 ///   audio moves to it at the next utterance boundary (make-before-break).
 /// - Audio the server hasn't finalized is kept until it is. When a session
 ///   drops, that audio goes back in the backlog and is sent again, so words
@@ -196,12 +197,16 @@ final class ResilientSocket {
                 reconnectTask = nil
                 hedgeTask?.cancel()
                 dropStandby()
-                tearDownPrimary(keepingAudio: true)
+                if let primary, primary.reconnect?.resumeRequest != nil {
+                    suspend(primary)
+                } else {
+                    tearDownPrimary(keepingAudio: true)
+                }
                 side.forEach { closeSide($0) }
                 if isRunning, isPaused { schedulePauseDrainDeadline() }
                 if isRunning { status = .reconnecting }
             } else if isRunning, !isPaused, primary == nil || status == .reconnecting {
-                connect()
+                if let primary, primary.isSuspended { retryResume(primary) } else { connect() }
             }
             resumeCatchUpRetries()
         }
@@ -270,8 +275,7 @@ final class ResilientSocket {
         }
     }
 
-    /// The device moved to a different network interface. Opens a socket on
-    /// the new path before letting go of the old one.
+    /// Move a resumable stream to the new path, or prepare a fresh standby.
     func networkPathChanged() {
         // A paused session finds out from its pings if the old path died.
         guard isRunning, !isPaused, networkAvailable else { return }
@@ -281,6 +285,10 @@ final class ResilientSocket {
                 failures = 0
                 connect()
             }
+            return
+        }
+        if primary.reconnect?.resumeRequest != nil {
+            if !primary.isSuspended { suspend(primary) }
             return
         }
         guard dialect.supportsSideStreams, standby == nil else { return }
@@ -299,6 +307,7 @@ final class ResilientSocket {
         dropStandby()
         if let primary, primary.isReady, !primary.isEnding {
             finishPausedAudio(on: primary)
+            if !networkAvailable { schedulePauseDrainDeadline() }
         } else {
             schedulePauseDrainDeadline()
         }
@@ -344,7 +353,7 @@ final class ResilientSocket {
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.keepaliveInterval)
                 guard !Task.isCancelled, let primary, !primary.isClosed else { return }
-                primary.send(message)
+                if primary.reconnect?.resumeRequest == nil { primary.send(message) }
             }
         }
     }
@@ -368,6 +377,10 @@ final class ResilientSocket {
             return
         }
         // A prewarmed session still connecting: audio waits in the backlog.
+        if primary.isSuspended {
+            if networkAvailable, primary.socket == nil { retryResume(primary) }
+            return
+        }
         guard primary.isReady else { return }
         debugLog("resumed stream \(primary.stream.id)")
         status = .live
@@ -387,6 +400,9 @@ final class ResilientSocket {
     private final class Connection {
         let stream: SocketStream
         var socket: URLSessionWebSocketTask?
+        var reconnect: SonioxReconnect?
+        var isSuspended: Bool { reconnect?.deadline != nil }
+        var sentBeforeDrop = 0
         var outbox: AsyncStream<URLSessionWebSocketTask.Message>.Continuation?
         var tasks: [Task<Void, Never>] = []
         var isReady = false
@@ -414,16 +430,21 @@ final class ResilientSocket {
         }
 
         func send(_ message: URLSessionWebSocketTask.Message) {
-            outbox?.yield(message)
+            reconnect?.record(message)
+            if !isSuspended { outbox?.yield(message) }
         }
 
         func close() {
             isClosed = true
+            disconnect(with: .normalClosure)
+        }
+
+        func disconnect(with code: URLSessionWebSocketTask.CloseCode) {
             tasks.forEach { $0.cancel() }
             tasks.removeAll()
             outbox?.finish()
             outbox = nil
-            socket?.cancel(with: .normalClosure, reason: nil)
+            socket?.cancel(with: code, reason: nil)
             socket = nil
         }
     }
@@ -499,9 +520,23 @@ final class ResilientSocket {
 
         let (stream, continuation) = AsyncStream<URLSessionWebSocketTask.Message>.makeStream()
         connection.outbox = continuation
-        if dialect.readyWhenOpen { opens.expect(socket) }
+        let resuming = connection.isSuspended
+        if dialect.readyWhenOpen && !resuming { opens.expect(socket) }
         socket.resume()
-        dialect.openingMessages().forEach { continuation.yield($0) }
+        if resuming, let reconnect = connection.reconnect {
+            continuation.yield(reconnect.handshake)
+            connection.tasks.append(Task { [weak self, weak connection] in
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled, let self, let connection, connection.isSuspended else { return }
+                self.suspend(connection)
+            })
+        } else {
+            let opening = dialect.openingMessages()
+            if opening.first?.jsonObject?["enable_reconnect"] as? Bool == true {
+                connection.reconnect = SonioxReconnect(request: request, capacity: Self.maxBacklog)
+            }
+            opening.forEach { continuation.yield($0) }
+        }
 
         connection.tasks.append(Task { [weak self, weak connection] in
             for await message in stream {
@@ -511,7 +546,7 @@ final class ResilientSocket {
                 do {
                     try await socket.send(message)
                 } catch {
-                    guard let self, let connection, !connection.isClosed else { return }
+                    guard let self, let connection, connection.socket === socket else { return }
                     self.connection(connection, failed: .retry("Send failed"))
                     return
                 }
@@ -522,16 +557,17 @@ final class ResilientSocket {
             while !Task.isCancelled {
                 do {
                     let message = try await socket.receive()
-                    guard let self, let connection, !connection.isClosed else { return }
+                    guard let self, let connection, connection.socket === socket else { return }
                     #if DEBUG
                     if self.isBlackholed { continue }
                     #endif
+                    if self.handleReconnectMessage(message, on: connection) { continue }
                     connection.awaitingReplySince = nil
                     let signal = self.dialect.receive(message, on: connection.stream)
                     self.confirmAudio(on: connection)
                     self.connection(connection, received: signal)
                 } catch {
-                    guard let self, let connection, !connection.isClosed else { return }
+                    guard let self, let connection, connection.socket === socket else { return }
                     self.connection(connection, failed: .retry("Receive failed"))
                     return
                 }
@@ -539,21 +575,23 @@ final class ResilientSocket {
         })
 
         connection.tasks.append(Task { [weak self, weak connection, opens, readyWhenOpen = dialect.readyWhenOpen] in
-            if readyWhenOpen {
+            if readyWhenOpen && !resuming {
                 let opened = await opens.waitForOpen(socket, timeout: .seconds(5))
-                guard let self, let connection, !connection.isClosed else { return }
+                guard let self, let connection, connection.socket === socket else { return }
                 guard opened else {
                     self.connection(connection, failed: .retry("Handshake timed out"))
                     return
                 }
+                if connection.isReady { return }
                 self.debugLog("stream \(connection.stream.id) opened after \(connection.createdAt.duration(to: .now))")
                 self.connection(connection, received: .ready)
             }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(4))
                 guard !Task.isCancelled else { return }
+                if connection?.reconnect?.resumeRequest != nil { continue }
                 let alive = await Self.ping(socket, timeout: .seconds(5))
-                guard let self, let connection, !connection.isClosed else { return }
+                guard let self, let connection, connection.socket === socket else { return }
                 if !alive {
                     self.connection(connection, failed: .retry("Ping timed out"))
                     return
@@ -565,13 +603,124 @@ final class ResilientSocket {
             connection.tasks.append(Task { [weak self, weak connection] in
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .milliseconds(250))
-                    guard let self, let connection, !connection.isClosed else { return }
-                    if let since = connection.awaitingReplySince, since.duration(to: .now) > timeout {
+                    guard let self, let connection, connection.socket === socket else { return }
+                    if !connection.isSuspended, let since = connection.awaitingReplySince, since.duration(to: .now) > timeout {
                         self.connection(connection, failed: .retry("No reply from the server"))
                         return
                     }
                 }
             })
+        }
+    }
+
+    // MARK: - Soniox stream reconnect
+
+    private func handleReconnectMessage(_ message: URLSessionWebSocketTask.Message, on connection: Connection) -> Bool {
+        guard let state = connection.reconnect, let json = message.jsonObject else { return false }
+        let type = json["type"] as? String
+        if connection.isSuspended {
+            guard type == "reconnected",
+                  let replay = state.acceptResume(json, sentBeforeDrop: connection.sentBeforeDrop) else {
+                abandonResume(connection)
+                return true
+            }
+            replay.forEach { connection.outbox?.yield($0) }
+            connection.awaitingReplySince = replay.isEmpty || isPaused ? nil : .now
+            startSonioxPings(on: connection)
+            if connection === primary { status = .live }
+            return true
+        }
+        if type == "reconnect" {
+            if state.acceptOffer(json) {
+                startSonioxPings(on: connection)
+                if !connection.isReady { self.connection(connection, received: .ready) }
+            } else {
+                connection.reconnect = nil
+            }
+            return true
+        }
+        if type == "pong" {
+            state.pong(json["id"] as? Int)
+            return true
+        }
+        if json["error_type"] as? String == "connection_replaced" {
+            abandonResume(connection)
+            return true
+        }
+        if state.token == nil {
+            // A server can accept the start request without offering reconnect.
+            connection.reconnect = nil
+        } else if let sequence = json["seq"] as? Int {
+            if sequence <= state.lastSequence { return true }
+            guard sequence == state.lastSequence + 1 else {
+                suspend(connection)
+                return true
+            }
+            state.lastSequence = sequence
+        }
+        return false
+    }
+
+    private func startSonioxPings(on connection: Connection) {
+        connection.tasks.append(Task { [weak self, weak connection] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled, let self, let connection, let state = connection.reconnect else { return }
+                guard let ping = state.ping() else {
+                    self.suspend(connection)
+                    return
+                }
+                connection.outbox?.yield(ping)
+            }
+        })
+    }
+
+    /// Keep the logical stream, parser and ordered outbox through a transport loss.
+    private func suspend(_ connection: Connection) {
+        guard let state = connection.reconnect else { return }
+        let retrying = connection.isSuspended
+        if !retrying {
+            state.deadline = .now + .seconds(20)
+            connection.sentBeforeDrop = state.requestCount
+        }
+        connection.disconnect(with: .goingAway)
+        if connection === primary {
+            hedgeTask?.cancel()
+            dropStandby()
+            status = .reconnecting
+        }
+        guard networkAvailable else { return }
+        if retrying {
+            connection.tasks.append(Task { [weak self, weak connection] in
+                try? await Task.sleep(for: .milliseconds(300))
+                guard !Task.isCancelled, let connection else { return }
+                self?.retryResume(connection)
+            })
+        } else {
+            retryResume(connection)
+        }
+    }
+
+    private func retryResume(_ connection: Connection) {
+        guard !connection.isClosed, networkAvailable, connection.socket == nil,
+              let state = connection.reconnect, let deadline = state.deadline,
+              let request = state.resumeRequest else { return }
+        guard ContinuousClock.now < deadline else {
+            abandonResume(connection)
+            return
+        }
+        start(connection, request: request)
+    }
+
+    private func abandonResume(_ connection: Connection) {
+        connection.reconnect = nil
+        if connection === primary {
+            tearDownPrimary(keepingAudio: true)
+            handleFailure()
+        } else if connection === standby {
+            dropStandby()
+        } else {
+            closeSide(connection)
         }
     }
 
@@ -608,6 +757,15 @@ final class ResilientSocket {
 
     private func connection(_ connection: Connection, failed signal: SocketSignal) {
         if case .retry(let reason, _) = signal { debugLog("stream \(connection.stream.id) failed: \(reason)") }
+        if connection.reconnect?.resumeRequest != nil, case .retry = signal {
+            if connection.isSuspended, let response = connection.socket?.response as? HTTPURLResponse,
+               (400..<500).contains(response.statusCode) {
+                abandonResume(connection)
+            } else {
+                suspend(connection)
+            }
+            return
+        }
         if !connection.isReady { dialect.connectFailed(connection.stream) }
         if connection === primary {
             handlePrimary(signal)
