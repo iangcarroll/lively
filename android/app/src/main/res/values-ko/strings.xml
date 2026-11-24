@@ -129,11 +129,10 @@
     <string name="localized_address_footer">이름 및 주소 정보는 사용 가능한 지도 데이터에 따라 다릅니다. 일부 장소는 현지 표기를 유지할 수 있습니다.</string>
     <string name="localized_address_unavailable">이 장소에 대해 이 언어의 주소가 제공되지 않았습니다. 다른 언어나 더 구체적인 주소를 시도하세요.</string>
     <string name="location">위치</string>
-    <string name="location_country_lookup">Lively는 대략적인 위치 정보만 나라 확인에 사용합니다.</string>
     <string name="location_not_found">현재 위치를 찾을 수 없습니다. Lively가 다음에 열릴 때 다시 시도합니다.</string>
     <string name="location_offer_body">Lively가 현재 국가의 현지 언어와 당신의 언어를 자동으로 선택하며, 여행 시에도 다시 선택합니다. 설정에서 변경할 수 있습니다.</string>
     <string name="location_permission_denied">Lively에 위치 권한이 없습니다. 시스템 설정에서 허용한 후 다시 켜세요.</string>
-    <string name="location_travel_summary">"다른 국가에 도착하면 기본 언어와 현지 언어가 설정됩니다. "</string>
+    <string name="location_travel_summary">다른 국가에 도착하면 기본 언어와 현지 언어가 설정됩니다. Lively는 대략적인 위치 정보만 나라 확인에 사용합니다.</string>
     <string name="manage_play_subscription_help">Google Play › 결제 및 구독에서 관리하세요.</string>
     <string name="manage_subscription">구독 관리</string>
     <string name="microphone">마이크</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">번역 결과 소리 내어 읽기</string>
     <string name="speech_engine">음성 엔진</string>
     <string name="speech_failed">음성 처리에 실패했습니다.</string>
-    <string name="speech_playback_listening_footer">"Lively는 말하는 동안 듣지 않으므로, 이어폰을 사용하지 않는 한 스스로 번역하지 않습니다. "</string>
+    <string name="speech_playback_listening_footer">Lively는 말하는 동안 듣지 않으므로, 이어폰을 사용하지 않는 한 스스로 번역하지 않습니다.</string>
     <string name="speech_playback_requires_key">번역 결과를 소리 내어 읽으려면 Soniox API 키가 필요합니다.</string>
     <string name="speech_to_speech">음성 대 음성</string>
     <string name="speed">속도</string>

@@ -129,11 +129,10 @@
     <string name="localized_address_footer">名前や住所の詳細は利用可能な地図データに依存します。一部の地名は現地の表記のまま保持されることがあります。</string>
     <string name="localized_address_unavailable">この場所にはこの言語の住所がありませんでした。別の言語や、より具体的な住所をお試しください。</string>
     <string name="location">場所</string>
-    <string name="location_country_lookup">Livelyは国を特定するために大まかな位置情報のみを使用します。</string>
     <string name="location_not_found">現在地が見つかりませんでした。次回起動時に再試行します。</string>
     <string name="location_offer_body">Livelyは現在の国で使われている言語とあなたの言語を自動選択し、旅行先でも再設定できます。これは[設定]で変更可能です。</string>
     <string name="location_permission_denied">Livelyには位置情報へのアクセス権がありません。システム設定で許可し、再度有効にしてください。</string>
-    <string name="location_travel_summary">"他の国に到着した際、あなたの言語と現地の言語が自動的に設定されます。 "</string>
+    <string name="location_travel_summary">他の国に到着した際、あなたの言語と現地の言語が自動的に設定されます。 Livelyは国を特定するために大まかな位置情報のみを使用します。</string>
     <string name="manage_play_subscription_help">Google Play の「支払いとサブスクリプション」で管理してください。</string>
     <string name="manage_subscription">サブスクリプションの管理</string>
     <string name="microphone">マイク</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">翻訳を音声で読み上げる</string>
     <string name="speech_engine">音声エンジン</string>
     <string name="speech_failed">音声処理に失敗しました。</string>
-    <string name="speech_playback_listening_footer">"Livelyは発話中に聴取を行わないため、イヤホンを使用していない限り自身を翻訳することはありません。 "</string>
+    <string name="speech_playback_listening_footer">Livelyは発話中に聴取を行わないため、イヤホンを使用していない限り自身を翻訳することはありません。</string>
     <string name="speech_playback_requires_key">翻訳の音声読み上げにはSoniox APIキーが必要です。</string>
     <string name="speech_to_speech">音声対音声</string>
     <string name="speed">速度</string>

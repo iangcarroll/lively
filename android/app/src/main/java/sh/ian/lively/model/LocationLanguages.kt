@@ -134,8 +134,9 @@ class LocationLanguages(
     )
 
     companion object {
-        val SUMMARY get() = modelString(R.string.location_travel_summary) { "Sets your language and the local language when you arrive in another country. " } +
-            modelString(R.string.location_country_lookup) { "Lively uses your approximate location only to look up the country." }
+        val SUMMARY get() = modelString(R.string.location_travel_summary) {
+            "Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country."
+        }
 
         /**
          * The pair for someone whose system language is [own], in [region] (an

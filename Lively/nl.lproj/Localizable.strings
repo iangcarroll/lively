@@ -104,7 +104,7 @@
 "Download the shared voice pack before using offline voices." = "Download het gedeelde spraakpakket voordat je offline stemmen gebruikt.";
 "Download voice pack" = "Spraakpakket downloaden";
 "Download voices in Settings → Offline Voice Library." = "Stemmen downloaden via Instellingen → Offline stembibliotheek.";
-"Downloaded voices speak on this device after installation. Previews pause listening. " = "Gedownloade stemmen worden op dit apparaat afgespeeld na installatie. Voorbeelden pauzeren het luisteren. ";
+"Downloaded voices speak on this device after installation. Previews pause listening." = "Gedownloade stemmen worden op dit apparaat afgespeeld na installatie. Voorbeelden pauzeren het luisteren.";
 "Downloaded voices · offline" = "Gedownloade stemmen · offline";
 "Downloading %@ speech…" = "%@ spraak downloaden…";
 "Downloading…" = "Downloaden…";
@@ -137,8 +137,7 @@
 "Identifying language" = "Taal identificeren";
 "Included" = "Inbegrepen";
 "Included free with your account" = "Gratis inbegrepen bij je account";
-"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. " = "Inkomende %1$@ wordt afgespeeld via koptelefoon; uitgaande %2$@ gebruikt de luidspreker van het apparaat. ";
-"Incoming audio stays silent without a compatible headset with a microphone. " = "Inkomende audio blijft stil zonder een compatibele headset met microfoon. ";
+"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "Inkomende %1$@ wordt afgespeeld via koptelefoon; uitgaande %2$@ gebruikt de luidspreker van het apparaat. Inkomende audio blijft stil zonder een compatibele headset met microfoon. Luisteren pauzeert tijdens speakerweergave.";
 "Input language" = "Invoertaal";
 "It's included free with your account." = "Het is gratis inbegrepen bij je account.";
 "Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "Gewoon praten. Lively detecteert de andere taal en vertaalt beide kanten op. Jouw kant blijft in %@.";
@@ -151,7 +150,6 @@
 "Lay it flat between you" = "Leg de telefoon tussen jullie in";
 "Listening" = "Aan het luisteren";
 "Listening for another language" = "Luistert naar een andere taal";
-"Listening pauses during speaker playback." = "Luisteren pauzeert tijdens speakerweergave.";
 "Lively Pro isn't available from the App Store on this device yet." = "Lively Pro is nog niet beschikbaar via de App Store op dit apparaat.";
 "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings." = "Lively kan je taal en de lokale taal van het land waarin je bent kiezen, en opnieuw wanneer je reist. Je kunt dit wijzigen in Instellingen.";
 "Lively couldn't find any text in that photo." = "Lively kon geen tekst vinden in die foto.";
@@ -164,7 +162,6 @@
 "Lively listens for this pair and translates both ways." = "Lively luistert naar dit paar en vertaalt in beide richtingen.";
 "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine." = "Lively luistert naar dit paar en vertaalt in beide richtingen. Het automatisch detecteren van de andere taal vereist Soniox als engine.";
 "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone." = "Lively heeft microfoontoegang nodig. Je kunt dit inschakelen in Instellingen › Privacy & beveiliging › Microfoon.";
-"Lively uses your approximate location only to look up the country." = "Lively gebruikt je geschatte locatie alleen om het land op te zoeken.";
 "Lively's key service turned down the request." = "De sleuteldienst van Lively heeft het verzoek afgewezen.";
 "Location" = "Locatie";
 "Locations" = "Locaties";
@@ -265,7 +262,7 @@
 "Set from location" = "Instellen op basis van locatie";
 "Set languages from your location?" = "Talen instellen op basis van je locatie?";
 "Sets the languages for the country you're in" = "Stelt de talen in voor het land waar je je bevindt.";
-"Sets your language and the local language when you arrive in another country. " = "Stelt je taal en de lokale taal in wanneer je een ander land binnenkomt. ";
+"Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country." = "Stelt je taal en de lokale taal in wanneer je een ander land binnenkomt. Lively gebruikt je geschatte locatie alleen om het land op te zoeken.";
 "Settings" = "Instellingen";
 "Sign Out" = "Afmelden";
 "Sign in for another free hour" = "Meld je aan voor nog een gratis uur";
@@ -317,7 +314,7 @@
 "The offline voice %@ is not installed." = "De offline stem %@ is niet geïnstalleerd.";
 "The offline voice files could not be loaded: %@" = "De offline spraakbestanden konden niet worden geladen: %@";
 "The offline voice model is not loaded." = "Het offline spraakmodel is niet geladen.";
-"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "De originele stem stuurt vertaalde tekst naar Soniox en heeft internet nodig. Offline tekst blijft zichtbaar wanneer de gesproken uitvoering pauzeert. ";
+"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses." = "De originele stem stuurt vertaalde tekst naar Soniox en heeft internet nodig. Offline tekst blijft zichtbaar wanneer de gesproken uitvoering pauzeert.";
 "The other language will appear when they speak." = "De andere taal verschijnt wanneer zij spreken.";
 "The voice download details aren't valid. Update Lively and try again." = "De details van de stemdownload zijn ongeldig. Werk Lively bij en probeer het opnieuw.";
 "The voice download failed (HTTP %lld). Try again." = "De stemdownload is mislukt (HTTP %lld). Probeer het opnieuw.";
@@ -344,7 +341,7 @@
 "Translation failed" = "Vertaling mislukt";
 "Translation interrupted. Tap to retry." = "Vertaling onderbroken. Tik om opnieuw te proberen.";
 "Translations into %@ play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "Vertalingen naar %@ worden afgespeeld via koptelefoon; vertalingen naar de gedetecteerde andere taal gebruiken de apparaatluidspreker. Inkomende audio blijft stil zonder een compatibele headset met microfoon. Luisteren pauzeert tijdens luidsprekerweergave.";
-"Translations into %@ play through your current audio output. " = "Vertalingen naar %@ worden afgespeeld via je huidige audio-uitvoer. ";
+"Translations into %@ play through your current audio output. Listening pauses during speaker playback." = "Vertalingen naar %@ worden afgespeeld via je huidige audio-uitvoer. Luisteren pauzeert tijdens speakerweergave.";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "Vertalingen worden afgespeeld via uw huidige audio-uitvoer. Luisteren pauzeert tijdens luidsprekerweergave.";
 "Try again" = "Opnieuw proberen";
 "Two free hours a day instead of one" = "Twee gratis uur per dag in plaats van één";

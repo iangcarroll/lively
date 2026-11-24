@@ -25,8 +25,15 @@ def apple_strings(path):
 
 
 def android_strings(path):
-    return {node.attrib["name"]: node.text for node in ET.parse(path).getroot()
-            if node.get("translatable") != "false"}
+    entries = {}
+    for node in ET.parse(path).getroot():
+        if node.get("translatable") != "false":
+            value = node.text
+            # Android treats enclosing double quotes as delimiters that preserve spaces.
+            if value.startswith('"') and value.endswith('"'):
+                value = value[1:-1]
+            entries[node.attrib["name"]] = value
+    return entries
 
 
 def arguments(text):
@@ -44,6 +51,9 @@ class AppLocalizations(unittest.TestCase):
             with self.subTest(key=key):
                 value = translated[key]
                 self.assertTrue(value.strip())
+                # Sentence separators belong between the localized messages.
+                self.assertEqual(source, source.strip())
+                self.assertEqual(value, value.strip())
                 if len(source.split()) >= 7:
                     self.assertNotEqual(value, source)
                 self.assertEqual(arguments(source), arguments(value))

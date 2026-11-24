@@ -129,11 +129,10 @@
     <string name="localized_address_footer">تعتمد الأسماء وتفاصيل العنوان على بيانات الخرائط المتاحة. قد تحتفظ بعض الأماكن بتهجيتها المحلية.</string>
     <string name="localized_address_unavailable">لم يكن عنوان بهذه اللغة متاحاً لهذا المكان. جرّب لغة أخرى أو عنواناً أكثر تحديداً.</string>
     <string name="location">الموقع</string>
-    <string name="location_country_lookup">تستخدم Lively موقعك التقريبي فقط للبحث عن البلد.</string>
     <string name="location_not_found">تعذّر العثور على موقعك. سيحاول Lively مرة أخرى عند فتحه في المرة القادمة.</string>
     <string name="location_offer_body">يمكن لـ Lively اختيار لغتك واللغة المحلية للبلد الذي تتواجد فيه، ويمكنه ذلك أيضاً عند السفر. يمكنك تغيير هذا في الإعدادات.</string>
     <string name="location_permission_denied">لا يملك Lively صلاحية الوصول للموقع. امنحها من إعدادات النظام، ثم فعّل هذا الخيار مرة أخرى.</string>
-    <string name="location_travel_summary">"يحدد لغتك واللغة المحلية عند وصولك إلى بلد آخر. "</string>
+    <string name="location_travel_summary">يحدد لغتك واللغة المحلية عند وصولك إلى بلد آخر. تستخدم Lively موقعك التقريبي فقط للبحث عن البلد.</string>
     <string name="manage_play_subscription_help">إدارته في مدفوعات Google Play والاشتراكات.</string>
     <string name="manage_subscription">إدارة الاشتراك</string>
     <string name="microphone">الميكروفون</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">نطق الترجمات بصوت عالٍ</string>
     <string name="speech_engine">محرك الكلام</string>
     <string name="speech_failed">فشل التعرف على الكلام.</string>
-    <string name="speech_playback_listening_footer">"لا يستمع Lively أثناء التحدث، لذا لن يترجم كلامه الذاتي، إلا إذا كنت تستخدم سماعات رأس. "</string>
+    <string name="speech_playback_listening_footer">لا يستمع Lively أثناء التحدث، لذا لن يترجم كلامه الذاتي، إلا إذا كنت تستخدم سماعات رأس.</string>
     <string name="speech_playback_requires_key">يتطلب نطق الترجمات بصوت عالٍ مفتاح واجهة برمجة تطبيقات Soniox.</string>
     <string name="speech_to_speech">كلام إلى كلام</string>
     <string name="speed">السرعة</string>

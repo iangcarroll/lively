@@ -104,7 +104,7 @@
 "Download the shared voice pack before using offline voices." = "Téléchargez le pack vocal partagé avant d’utiliser les voix hors ligne.";
 "Download voice pack" = "Télécharger le pack vocal";
 "Download voices in Settings → Offline Voice Library." = "Téléchargez des voix dans Paramètres → Bibliothèque vocale hors ligne.";
-"Downloaded voices speak on this device after installation. Previews pause listening. " = "Les voix téléchargées s’activent sur cet appareil après installation. Les aperçus interrompent l’écoute. ";
+"Downloaded voices speak on this device after installation. Previews pause listening." = "Les voix téléchargées s’activent sur cet appareil après installation. Les aperçus interrompent l’écoute.";
 "Downloaded voices · offline" = "Voix téléchargées · hors ligne";
 "Downloading %@ speech…" = "Téléchargement de %@ en cours…";
 "Downloading…" = "Téléchargement…";
@@ -137,8 +137,7 @@
 "Identifying language" = "Identification de la langue";
 "Included" = "Inclus";
 "Included free with your account" = "Inclus gratuitement avec votre compte";
-"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. " = "%1$@ entrant joué via les écouteurs ; %2$@ sortant diffusé par le haut-parleur de l'appareil. ";
-"Incoming audio stays silent without a compatible headset with a microphone. " = "L'audio entrant reste muet sans un casque compatible avec microphone. ";
+"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "%1$@ entrant joué via les écouteurs ; %2$@ sortant diffusé par le haut-parleur de l'appareil. L'audio entrant reste muet sans un casque compatible avec microphone. L'écoute est suspendue pendant la lecture du haut-parleur.";
 "Input language" = "Langue d'entrée";
 "It's included free with your account." = "Il est inclus gratuitement avec votre compte.";
 "Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "Parlez simplement. Lively détecte l'autre langue et traduit dans les deux sens. Votre côté reste en %@.";
@@ -151,7 +150,6 @@
 "Lay it flat between you" = "Posez le téléphone entre vous";
 "Listening" = "En écoute";
 "Listening for another language" = "Écoute d'une autre langue";
-"Listening pauses during speaker playback." = "L'écoute est suspendue pendant la lecture du haut-parleur.";
 "Lively Pro isn't available from the App Store on this device yet." = "Lively Pro n'est pas encore disponible sur l'App Store pour cet appareil.";
 "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings." = "Lively peut choisir votre langue et celle du pays où vous vous trouvez, ainsi que lors de vos déplacements. Vous pouvez modifier cela dans les paramètres.";
 "Lively couldn't find any text in that photo." = "Lively n'a trouvé aucun texte dans cette photo.";
@@ -164,7 +162,6 @@
 "Lively listens for this pair and translates both ways." = "Lively écoute cette paire de langues et traduit dans les deux sens.";
 "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine." = "Lively écoute cette paire de langues et traduit dans les deux sens. La détection automatique de l’autre langue nécessite Soniox comme moteur.";
 "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone." = "Lively a besoin de l’accès au microphone. Vous pouvez l’activer dans Réglages › Confidentialité et sécurité › Microphone.";
-"Lively uses your approximate location only to look up the country." = "Lively utilise uniquement votre position approximative pour identifier le pays.";
 "Lively's key service turned down the request." = "Le service de clés de Lively a refusé la demande.";
 "Location" = "Emplacement";
 "Locations" = "Emplacements";
@@ -265,7 +262,7 @@
 "Set from location" = "Définir depuis la localisation";
 "Set languages from your location?" = "Définir les langues selon votre emplacement ?";
 "Sets the languages for the country you're in" = "Définit les langues du pays où vous vous trouvez.";
-"Sets your language and the local language when you arrive in another country. " = "Définit votre langue et la langue locale lors de votre arrivée dans un autre pays. ";
+"Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country." = "Définit votre langue et la langue locale lors de votre arrivée dans un autre pays. Lively utilise uniquement votre position approximative pour identifier le pays.";
 "Settings" = "Paramètres";
 "Sign Out" = "Se déconnecter";
 "Sign in for another free hour" = "Connectez-vous pour une heure gratuite supplémentaire";
@@ -317,7 +314,7 @@
 "The offline voice %@ is not installed." = "La voix %@ n’est pas installée.";
 "The offline voice files could not be loaded: %@" = "Impossible de charger les fichiers vocaux hors ligne : %@";
 "The offline voice model is not loaded." = "Le modèle vocal hors ligne n’est pas chargé.";
-"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "La voix originale envoie le texte traduit à Soniox et nécessite internet. Le texte hors ligne reste visible lorsque la sortie vocale est en pause. ";
+"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses." = "La voix originale envoie le texte traduit à Soniox et nécessite internet. Le texte hors ligne reste visible lorsque la sortie vocale est en pause.";
 "The other language will appear when they speak." = "L’autre langue apparaîtra lorsqu’ils parleront.";
 "The voice download details aren't valid. Update Lively and try again." = "Les détails du téléchargement de la voix ne sont pas valides. Mettez Lively à jour et réessayez.";
 "The voice download failed (HTTP %lld). Try again." = "Le téléchargement de la voix a échoué (HTTP %lld). Réessayez.";
@@ -344,7 +341,7 @@
 "Translation failed" = "Échec de la traduction";
 "Translation interrupted. Tap to retry." = "Traduction interrompue. Appuyez pour réessayer.";
 "Translations into %@ play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "Les traductions en %@ sont diffusées par les écouteurs ; les traductions vers l’autre langue détectée utilisent le haut-parleur de l’appareil. L’audio entrant reste muet sans un casque compatible avec microphone. L’écoute est mise en pause pendant la diffusion par le haut-parleur.";
-"Translations into %@ play through your current audio output. " = "Les traductions en %@ sont diffusées via votre sortie audio actuelle. ";
+"Translations into %@ play through your current audio output. Listening pauses during speaker playback." = "Les traductions en %@ sont diffusées via votre sortie audio actuelle. L'écoute est suspendue pendant la lecture du haut-parleur.";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "Les traductions sont diffusées via votre sortie audio actuelle. L’écoute est mise en pause pendant la diffusion par le haut-parleur.";
 "Try again" = "Réessayer";
 "Two free hours a day instead of one" = "Deux heures gratuites par jour au lieu d’une";

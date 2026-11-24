@@ -129,11 +129,10 @@
     <string name="localized_address_footer">Имена и адреса зависят от доступных данных карт. Некоторые места могут сохранять местное написание.</string>
     <string name="localized_address_unavailable">Для этого места не был доступен адрес на этом языке. Попробуйте другой язык или более точный адрес.</string>
     <string name="location">Местоположение</string>
-    <string name="location_country_lookup">Lively использует ваше примерное местоположение только для определения страны.</string>
     <string name="location_not_found">Не удалось определить ваше местоположение. Lively попробует снова при следующем запуске.</string>
     <string name="location_offer_body">Lively может выбрать ваш язык и местный для страны, где вы находитесь, а также при путешествиях. Это можно изменить в настройках.</string>
     <string name="location_permission_denied">У Lively нет доступа к геолокации. Разрешите его в настройках системы, затем включите эту функцию снова.</string>
-    <string name="location_travel_summary">"Устанавливает ваш язык и местный язык при прибытии в другую страну. "</string>
+    <string name="location_travel_summary">Устанавливает ваш язык и местный язык при прибытии в другую страну. Lively использует ваше примерное местоположение только для определения страны.</string>
     <string name="manage_play_subscription_help">Управляйте в разделе «Платежи и подписки» Google Play.</string>
     <string name="manage_subscription">Управление подпиской</string>
     <string name="microphone">Микрофон</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">Озвучивать перевод вслух</string>
     <string name="speech_engine">Речевой движок</string>
     <string name="speech_failed">Ошибка распознавания речи.</string>
-    <string name="speech_playback_listening_footer">"Lively не слушает во время воспроизведения речи, поэтому не будет переводить сам себя, если вы не используете наушники. "</string>
+    <string name="speech_playback_listening_footer">Lively не слушает во время воспроизведения речи, поэтому не будет переводить сам себя, если вы не используете наушники.</string>
     <string name="speech_playback_requires_key">Для озвучивания перевода вслух требуется ключ API Soniox.</string>
     <string name="speech_to_speech">Речь-в-речь</string>
     <string name="speed">Скорость</string>

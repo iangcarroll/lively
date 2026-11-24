@@ -129,11 +129,10 @@
     <string name="localized_address_footer">Namen und Adressdetails hängen von den verfügbaren Kartendaten ab. Einige Orte behalten ihre lokale Schreibweise bei.</string>
     <string name="localized_address_unavailable">Eine Adresse in dieser Sprache war für diesen Ort nicht verfügbar. Wählen Sie eine andere Sprache oder eine genauere Adresse.</string>
     <string name="location">Standort</string>
-    <string name="location_country_lookup">Lively verwendet Ihren ungefähren Standort nur zur Ermittlung des Landes.</string>
     <string name="location_not_found">Ihr Standort konnte nicht ermittelt werden. Lively versucht es beim nächsten Start erneut.</string>
     <string name="location_offer_body">Lively kann Ihre Sprache und die lokale Sprache des Landes, in dem Sie sich befinden, auswählen, und erneut, wenn Sie reisen. Dies können Sie in den Einstellungen ändern.</string>
     <string name="location_permission_denied">Lively hat keinen Standortzugriff. Erlauben Sie dies in den Systemeinstellungen und schalten Sie dies erneut ein.</string>
-    <string name="location_travel_summary">"Legt Ihre Sprache und die lokale Sprache fest, wenn Sie ein anderes Land erreichen. "</string>
+    <string name="location_travel_summary">Legt Ihre Sprache und die lokale Sprache fest, wenn Sie ein anderes Land erreichen. Lively verwendet Ihren ungefähren Standort nur zur Ermittlung des Landes.</string>
     <string name="manage_play_subscription_help">Verwalten Sie es in Google Play unter Zahlungen &amp; Abonnements.</string>
     <string name="manage_subscription">Abonnement verwalten</string>
     <string name="microphone">Mikrofon</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">Übersetzungen laut vorlesen</string>
     <string name="speech_engine">Sprachengine</string>
     <string name="speech_failed">Spracherkennung fehlgeschlagen.</string>
-    <string name="speech_playback_listening_footer">"Lively hört nicht zu, während es spricht, also übersetzt es sich selbst nicht, es sei denn, Sie verwenden Kopfhörer. "</string>
+    <string name="speech_playback_listening_footer">Lively hört nicht zu, während es spricht, also übersetzt es sich selbst nicht, es sei denn, Sie verwenden Kopfhörer.</string>
     <string name="speech_playback_requires_key">Das laute Vorlesen von Übersetzungen erfordert einen Soniox-API-Schlüssel.</string>
     <string name="speech_to_speech">Sprache-zu-Sprache</string>
     <string name="speed">Geschwindigkeit</string>

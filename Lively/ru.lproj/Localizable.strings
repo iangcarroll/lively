@@ -104,7 +104,7 @@
 "Download the shared voice pack before using offline voices." = "Скачайте общий голосовой пакет перед использованием офлайн-голосов.";
 "Download voice pack" = "Скачать голосовой пакет";
 "Download voices in Settings → Offline Voice Library." = "Скачайте голоса в Настройки → Офлайн-библиотека голосов.";
-"Downloaded voices speak on this device after installation. Previews pause listening. " = "Скачанные голоса воспроизводятся на этом устройстве после установки. Предпрослушивание приостанавливает прослушивание. ";
+"Downloaded voices speak on this device after installation. Previews pause listening." = "Скачанные голоса воспроизводятся на этом устройстве после установки. Предпрослушивание приостанавливает прослушивание.";
 "Downloaded voices · offline" = "Скачанные голоса · офлайн";
 "Downloading %@ speech…" = "Загрузка речи %@…";
 "Downloading…" = "Загрузка…";
@@ -137,8 +137,7 @@
 "Identifying language" = "Определение языка";
 "Included" = "Включено";
 "Included free with your account" = "Бесплатно входит в ваш аккаунт";
-"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. " = "Входящий %1$@ воспроизводится через наушники; исходящий %2$@ — через динамик устройства. ";
-"Incoming audio stays silent without a compatible headset with a microphone. " = "Входящий звук не воспроизводится без совместимой гарнитуры с микрофоном. ";
+"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "Входящий %1$@ воспроизводится через наушники; исходящий %2$@ — через динамик устройства. Входящий звук не воспроизводится без совместимой гарнитуры с микрофоном. Прослушивание приостанавливается во время воспроизведения речи.";
 "Input language" = "Язык ввода";
 "It's included free with your account." = "Бесплатно входит в ваш аккаунт.";
 "Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "Просто говорите. Lively определяет другой язык и переводит в обе стороны. Ваша речь остаётся на %@.";
@@ -151,7 +150,6 @@
 "Lay it flat between you" = "Положите телефон между вами";
 "Listening" = "Слушает";
 "Listening for another language" = "Слушает другой язык";
-"Listening pauses during speaker playback." = "Прослушивание приостанавливается во время воспроизведения речи.";
 "Lively Pro isn't available from the App Store on this device yet." = "Lively Pro пока недоступен в App Store на этом устройстве.";
 "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings." = "Lively может выбрать ваш язык и местный для страны, где вы находитесь, а также при путешествиях. Это можно изменить в настройках.";
 "Lively couldn't find any text in that photo." = "Lively не нашёл текста на этом фото.";
@@ -164,7 +162,6 @@
 "Lively listens for this pair and translates both ways." = "Lively слушает эту пару языков и переводит в обе стороны.";
 "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine." = "Lively слушает эту пару языков и переводит в обе стороны. Автоматическое обнаружение второго языка требует Soniox в качестве движка.";
 "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone." = "Lively нужен доступ к микрофону. Вы можете включить его в Настройки › Конфиденциальность и безопасность › Микрофон.";
-"Lively uses your approximate location only to look up the country." = "Lively использует ваше примерное местоположение только для определения страны.";
 "Lively's key service turned down the request." = "Сервис ключей Lively отклонил запрос.";
 "Location" = "Местоположение";
 "Locations" = "Местоположения";
@@ -265,7 +262,7 @@
 "Set from location" = "Установить по геолокации";
 "Set languages from your location?" = "Выбрать языки по вашему местоположению?";
 "Sets the languages for the country you're in" = "Устанавливает языки для страны, в которой вы находитесь";
-"Sets your language and the local language when you arrive in another country. " = "Устанавливает ваш язык и местный язык при прибытии в другую страну. ";
+"Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country." = "Устанавливает ваш язык и местный язык при прибытии в другую страну. Lively использует ваше примерное местоположение только для определения страны.";
 "Settings" = "Настройки";
 "Sign Out" = "Выйти";
 "Sign in for another free hour" = "Войдите, чтобы получить ещё час бесплатно";
@@ -317,7 +314,7 @@
 "The offline voice %@ is not installed." = "Оффлайн-голос %@ не установлен.";
 "The offline voice files could not be loaded: %@" = "Не удалось загрузить оффлайн-файлы голоса: %@";
 "The offline voice model is not loaded." = "Оффлайн-голосовой модель не загружена.";
-"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "Оригинальный голос отправляет переведённый текст в Soniox и требует интернета. Офлайн-текст остаётся видимым, когда озвучка приостанавливается. ";
+"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses." = "Оригинальный голос отправляет переведённый текст в Soniox и требует интернета. Офлайн-текст остаётся видимым, когда озвучка приостанавливается.";
 "The other language will appear when they speak." = "Другой язык появится, когда собеседник заговорит.";
 "The voice download details aren't valid. Update Lively and try again." = "Сведения о загрузке голоса недействительны. Обновите Lively и попробуйте снова.";
 "The voice download failed (HTTP %lld). Try again." = "Загрузка голоса не удалась (HTTP %lld). Попробуйте снова.";
@@ -344,7 +341,7 @@
 "Translation failed" = "Ошибка перевода";
 "Translation interrupted. Tap to retry." = "Перевод прерван. Нажмите, чтобы повторить.";
 "Translations into %@ play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "Переводы на %@ воспроизводятся через наушники; переводы на обнаруженный другой язык — через динамик устройства. Входящий звук остаётся беззвучным без совместимой гарнитуры с микрофоном. Прослушивание приостанавливается во время воспроизведения через динамик.";
-"Translations into %@ play through your current audio output. " = "Переводы на %@ воспроизводятся через текущее аудиоустройство вывода. ";
+"Translations into %@ play through your current audio output. Listening pauses during speaker playback." = "Переводы на %@ воспроизводятся через текущее аудиоустройство вывода. Прослушивание приостанавливается во время воспроизведения речи.";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "Переводы воспроизводятся через текущее аудиоустройство вывода. Прослушивание приостанавливается во время воспроизведения через динамик.";
 "Try again" = "Попробовать снова";
 "Two free hours a day instead of one" = "Два бесплатных часа в день вместо одного";

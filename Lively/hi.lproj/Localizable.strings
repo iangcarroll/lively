@@ -104,7 +104,7 @@
 "Download the shared voice pack before using offline voices." = "ऑफ़लाइन वॉइस का उपयोग करने से पहले साझित वॉइस पैक डाउनलोड करें।";
 "Download voice pack" = "वॉइस पैक डाउनलोड करें";
 "Download voices in Settings → Offline Voice Library." = "सेटिंग्स → ऑफ़लाइन वॉइस लाइब्रेरी में वॉइस डाउनलोड करें।";
-"Downloaded voices speak on this device after installation. Previews pause listening. " = "स्थापना के बाद डाउनलोड की गई वॉइस इस डिवाइस पर बोलेंगी। पूर्वावलोकन सुनने को रोक देता है। ";
+"Downloaded voices speak on this device after installation. Previews pause listening." = "स्थापना के बाद डाउनलोड की गई वॉइस इस डिवाइस पर बोलेंगी। पूर्वावलोकन सुनने को रोक देता है।";
 "Downloaded voices · offline" = "डाउनलोड की गई वॉइस · ऑफ़लाइन";
 "Downloading %@ speech…" = "%@ स्पीच डाउनलोड हो रही है…";
 "Downloading…" = "डाउनलोड हो रहा है…";
@@ -137,8 +137,7 @@
 "Identifying language" = "भाषा की पहचान कर रहा है";
 "Included" = "शामिल";
 "Included free with your account" = "आपके खाते के साथ मुफ्त में शामिल";
-"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. " = "इनकमिंग %1$@ हेडफ़ोन के माध्यम से बजेगा; आउटगोइंग %2$@ डिवाइस के स्पीकर का उपयोग करेगा। ";
-"Incoming audio stays silent without a compatible headset with a microphone. " = "अनुकूल हेडसेट (माइक्रोफ़ोन सहित) के बिना इनकमिंग ऑडियो मौन रहेगा। ";
+"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "इनकमिंग %1$@ हेडफ़ोन के माध्यम से बजेगा; आउटगोइंग %2$@ डिवाइस के स्पीकर का उपयोग करेगा। अनुकूल हेडसेट (माइक्रोफ़ोन सहित) के बिना इनकमिंग ऑडियो मौन रहेगा। स्पीकर प्लेबैक के दौरान सुनना रुक जाता है।";
 "Input language" = "इनपुट भाषा";
 "It's included free with your account." = "यह आपके खाते के साथ मुफ्त में शामिल है।";
 "Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "बस बात करें। Lively दूसरी भाषा का पता लगाता है और दोनों तरफ अनुवाद करता है। आपकी ओर की आवाज़ %@ में रहेगी।";
@@ -151,7 +150,6 @@
 "Lay it flat between you" = "फ़ोन को आप दोनों के बीच रखें";
 "Listening" = "सुन रहे हैं";
 "Listening for another language" = "दूसरी भाषा सुन रहे हैं";
-"Listening pauses during speaker playback." = "स्पीकर प्लेबैक के दौरान सुनना रुक जाता है।";
 "Lively Pro isn't available from the App Store on this device yet." = "Lively Pro अभी इस डिवाइस पर App Store से उपलब्ध नहीं है।";
 "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings." = "Lively आपकी भाषा और आपके देश की स्थानीय भाषा चुन सकता है, और फिर जब आप यात्रा करेंगे तब भी। आप सेटिंग्स में इसे बदल सकते हैं।";
 "Lively couldn't find any text in that photo." = "Lively उस फ़ोटो में कोई टेक्स्ट नहीं ढूंढ सका।";
@@ -164,7 +162,6 @@
 "Lively listens for this pair and translates both ways." = "Lively इस जोड़ी के लिए सुनता है और दोनों दिशाओं में अनुवाद करता है।";
 "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine." = "Lively इस जोड़ी के लिए सुनता है और दोनों दिशाओं में अनुवाद करता है। दूसरी भाषा का स्वचालित पता लगाने के लिए इंजन के रूप में Soniox की आवश्यकता होती है।";
 "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone." = "Lively को माइक्रोफ़ोन तक पहुंच की आवश्यकता है। आप इसे सेटिंग्स › गोपनीयता और सुरक्षा › माइक्रोफ़ोन में चालू कर सकते हैं।";
-"Lively uses your approximate location only to look up the country." = "Lively केवल देश की जानकारी पाने के लिए आपका अनुमानित स्थान का उपयोग करता है।";
 "Lively's key service turned down the request." = "Lively की सर्विस ने अनुरोध को अस्वीकार कर दिया।";
 "Location" = "स्थान";
 "Locations" = "स्थान";
@@ -265,7 +262,7 @@
 "Set from location" = "स्थान से सेट करें";
 "Set languages from your location?" = "आपके स्थान से भाषाएं सेट करें?";
 "Sets the languages for the country you're in" = "आप जिस देश में हैं, उसकी भाषाओं को सेट करता है";
-"Sets your language and the local language when you arrive in another country. " = "जब आप किसी अन्य देश में पहुंचते हैं, तो आपकी भाषा और स्थानीय भाषा सेट करता है। ";
+"Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country." = "जब आप किसी अन्य देश में पहुंचते हैं, तो आपकी भाषा और स्थानीय भाषा सेट करता है। Lively केवल देश की जानकारी पाने के लिए आपका अनुमानित स्थान का उपयोग करता है।";
 "Settings" = "सेटिंग्स";
 "Sign Out" = "साइन आउट करें";
 "Sign in for another free hour" = "एक मुफ्त घंटे के लिए साइन इन करें";
@@ -317,7 +314,7 @@
 "The offline voice %@ is not installed." = "ऑफ़लाइन वॉइस %@ इंस्टॉल नहीं है।";
 "The offline voice files could not be loaded: %@" = "ऑफ़लाइन वॉइस फ़ाइलें लोड नहीं की जा सकीं: %@";
 "The offline voice model is not loaded." = "ऑफ़लाइन वॉइस मॉडल लोड नहीं हुआ है।";
-"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "मूल आवाज़ अनुवादित पाठ को Soniox पर भेजती है और इंटरनेट की आवश्यकता होती है। ऑफ़लाइन पाठ बोले जाने पर भी दिखाई देता रहता है जबकि ऑडियो रुक जाता है। ";
+"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses." = "मूल आवाज़ अनुवादित पाठ को Soniox पर भेजती है और इंटरनेट की आवश्यकता होती है। ऑफ़लाइन पाठ बोले जाने पर भी दिखाई देता रहता है जबकि ऑडियो रुक जाता है।";
 "The other language will appear when they speak." = "दूसरी भाषा तब दिखाई देगी जब वे बोलेंगे।";
 "The voice download details aren't valid. Update Lively and try again." = "आवाज़ डाउनलोड विवरण अमान्य हैं। Lively अपडेट करें और पुनः प्रयास करें।";
 "The voice download failed (HTTP %lld). Try again." = "आवाज़ डाउनलोड विफल रहा (HTTP %lld)। पुनः प्रयास करें।";
@@ -344,7 +341,7 @@
 "Translation failed" = "अनुवाद विफल";
 "Translation interrupted. Tap to retry." = "अनुवाद बाधित हुआ। पुनः प्रयास करने के लिए टैप करें।";
 "Translations into %@ play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "%@ में अनुवाद हेडफ़ोन के माध्यम से बजेंगे; पता चली दूसरी भाषा में अनुवाद डिवाइस स्पीकर का उपयोग करेंगे। संगत हेडसेट (माइक्रोफ़ोन सहित) के बिना आने वाला ऑडियो मूक रहेगा। स्पीकर प्लेबैक के दौरान सुनना रुक जाएगा।";
-"Translations into %@ play through your current audio output. " = "%@ में अनुवाद आपके वर्तमान ऑडियो आउटपुट के माध्यम से बजेंगे। ";
+"Translations into %@ play through your current audio output. Listening pauses during speaker playback." = "%@ में अनुवाद आपके वर्तमान ऑडियो आउटपुट के माध्यम से बजेंगे। स्पीकर प्लेबैक के दौरान सुनना रुक जाता है।";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "अनुवाद आपके वर्तमान ऑडियो आउटपुट के माध्यम से बजेंगे। स्पीकर प्लेबैक के दौरान सुनना रुक जाएगा।";
 "Try again" = "पुनः प्रयास करें";
 "Two free hours a day instead of one" = "एक घंटे की जगह प्रतिदिन दो मुफ़्त घंटे";

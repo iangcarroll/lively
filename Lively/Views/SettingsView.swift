@@ -313,23 +313,24 @@ struct SettingsView: View {
 
     private var speechFooter: String {
         let voice = settings.speechSource == .original
-            ? String(localized: "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. ")
-            : String(localized: "Downloaded voices speak on this device after installation. Previews pause listening. ")
+            ? String(localized: "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses.")
+            : String(localized: "Downloaded voices speak on this device after installation. Previews pause listening.")
+        return [voice, speechRoutingFooter].joined(separator: " ")
+    }
+
+    private var speechRoutingFooter: String {
         if settings.usesAutomaticLanguageDetection {
             if SpeechPlayer.supportsDirectionalOutput {
-                return voice + String(localized: "Translations into \(settings.speechListenerLanguage.displayName) play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback.")
+                return String(localized: "Translations into \(settings.speechListenerLanguage.displayName) play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback.")
             }
-            return voice + String(localized: "Translations play through your current audio output. Listening pauses during speaker playback.")
+            return String(localized: "Translations play through your current audio output. Listening pauses during speaker playback.")
         }
         if SpeechPlayer.supportsDirectionalOutput {
             let incoming = settings.speechListenerLanguage.displayName
             let outgoing = settings.languages.other(than: settings.speechListenerLanguage).displayName
-            return voice + String(localized: "Incoming \(incoming) plays through headphones; outgoing \(outgoing) uses the device speaker. ")
-                + String(localized: "Incoming audio stays silent without a compatible headset with a microphone. ")
-                + String(localized: "Listening pauses during speaker playback.")
+            return String(localized: "Incoming \(incoming) plays through headphones; outgoing \(outgoing) uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback.")
         }
-        return voice + String(localized: "Translations into \(settings.languages.second.displayName) play through your current audio output. ")
-            + String(localized: "Listening pauses during speaker playback.")
+        return String(localized: "Translations into \(settings.languages.second.displayName) play through your current audio output. Listening pauses during speaker playback.")
     }
 
     private func previewVoice(_ voice: NeuralVoice) async throws {

@@ -35,8 +35,7 @@ final class LocationLanguages {
         }
     }
 
-    static let summary = String(localized: "Sets your language and the local language when you arrive in another country. ")
-        + String(localized: "Lively uses your approximate location only to look up the country.")
+    static let summary = String(localized: "Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country.")
 
     private(set) var status: Status = .idle
     /// Waiting on the permission prompt, so the switch can stay on meanwhile.

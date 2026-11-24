@@ -104,7 +104,7 @@
 "Download the shared voice pack before using offline voices." = "オフライン音声を使用する前に、共有音声パックをダウンロードしてください。";
 "Download voice pack" = "音声パックをダウンロード";
 "Download voices in Settings → Offline Voice Library." = "設定 → オフライン音声ライブラリで音声をダウンロードします。";
-"Downloaded voices speak on this device after installation. Previews pause listening. " = "インストール後、ダウンロードした音声がデバイス上で読み上げられます。プレビュー中はリスニングが一時停止します。 ";
+"Downloaded voices speak on this device after installation. Previews pause listening." = "インストール後、ダウンロードした音声がデバイス上で読み上げられます。プレビュー中はリスニングが一時停止します。";
 "Downloaded voices · offline" = "ダウンロード済み音声 · オフライン";
 "Downloading %@ speech…" = "%@ の音声をダウンロードしています…";
 "Downloading…" = "ダウンロード中…";
@@ -137,8 +137,7 @@
 "Identifying language" = "言語を識別中";
 "Included" = "含まれています";
 "Included free with your account" = "アカウントに無料で含まれています";
-"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. " = "受信%1$@はイヤホンから出力され、送信%2$@はデバイスのスピーカーから出力されます。 ";
-"Incoming audio stays silent without a compatible headset with a microphone. " = "マイク付きの対応ヘッドセットがない場合、受信音声はミュートされます。 ";
+"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "受信%1$@はイヤホンから出力され、送信%2$@はデバイスのスピーカーから出力されます。 マイク付きの対応ヘッドセットがない場合、受信音声はミュートされます。 スピーカー再生中は聴取が一時停止します。";
 "Input language" = "入力言語";
 "It's included free with your account." = "アカウントに無料で含まれています。";
 "Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "そのまま話してください。Lively が相手の言語を判別して双方向に翻訳します。手元の画面は%@で表示されます。";
@@ -151,7 +150,6 @@
 "Lay it flat between you" = "スマホを二人の間に置く";
 "Listening" = "聴取中";
 "Listening for another language" = "別の言語を聴取中";
-"Listening pauses during speaker playback." = "スピーカー再生中は聴取が一時停止します。";
 "Lively Pro isn't available from the App Store on this device yet." = "Lively ProはこのデバイスではまだApp Storeから利用できません。";
 "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings." = "Livelyは現在の国で使われている言語とあなたの言語を自動選択し、旅行先でも再設定できます。これは[設定]で変更可能です。";
 "Lively couldn't find any text in that photo." = "Livelyはその写真からテキストを検出できませんでした。";
@@ -164,7 +162,6 @@
 "Lively listens for this pair and translates both ways." = "Livelyはこのペアの言語を聞き取り、双方向に翻訳します。";
 "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine." = "Livelyはこのペアの言語を聞き取り、双方向に翻訳します。もう一方の言語を自動検出するには、エンジンとしてSonioxが必要です。";
 "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone." = "Livelyにはマイクへのアクセスが必要です。設定 › プライバシーとセキュリティ › マイク で有効にできます。";
-"Lively uses your approximate location only to look up the country." = "Livelyは国を特定するために大まかな位置情報のみを使用します。";
 "Lively's key service turned down the request." = "Livelyのキーサービスがリクエストを拒否しました。";
 "Location" = "場所";
 "Locations" = "場所一覧";
@@ -265,7 +262,7 @@
 "Set from location" = "現在地から設定";
 "Set languages from your location?" = "現在地の言語を設定しますか？";
 "Sets the languages for the country you're in" = "現在の国に対応する言語に設定されます";
-"Sets your language and the local language when you arrive in another country. " = "他の国に到着した際、あなたの言語と現地の言語が自動的に設定されます。 ";
+"Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country." = "他の国に到着した際、あなたの言語と現地の言語が自動的に設定されます。 Livelyは国を特定するために大まかな位置情報のみを使用します。";
 "Settings" = "設定";
 "Sign Out" = "サインアウト";
 "Sign in for another free hour" = "サインインして無料の1時間を取得";
@@ -317,7 +314,7 @@
 "The offline voice %@ is not installed." = "オフライン音声 %@ がインストールされていません。";
 "The offline voice files could not be loaded: %@" = "オフライン音声ファイルを読み込めませんでした：%@";
 "The offline voice model is not loaded." = "オフライン音声モデルが読み込まれていません。";
-"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "元の音声は翻訳テキストをSonioxに送信し、インターネット接続が必要です。オフライン時のテキストは表示されたままですが、音声出力は一時停止します。 ";
+"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses." = "元の音声は翻訳テキストをSonioxに送信し、インターネット接続が必要です。オフライン時のテキストは表示されたままですが、音声出力は一時停止します。";
 "The other language will appear when they speak." = "相手が話すと、その言語が表示されます。";
 "The voice download details aren't valid. Update Lively and try again." = "音声ダウンロードの詳細が無効です。Livelyを更新して再試行してください。";
 "The voice download failed (HTTP %lld). Try again." = "音声のダウンロードに失敗しました（HTTP %lld）。再試行してください。";
@@ -344,7 +341,7 @@
 "Translation failed" = "翻訳に失敗しました";
 "Translation interrupted. Tap to retry." = "翻訳が中断されました。タップして再試行してください。";
 "Translations into %@ play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "%@ への翻訳はヘッドホンから再生され、検出された相手の言語への翻訳はデバイススピーカーから再生されます。マイク付きの互換性のあるヘッドセットがない場合、受信オーディオは静音になります。スピーカー再生中は録音が一時停止します。";
-"Translations into %@ play through your current audio output. " = "%@ への翻訳は現在のオーディオ出力先から再生されます。 ";
+"Translations into %@ play through your current audio output. Listening pauses during speaker playback." = "%@ への翻訳は現在のオーディオ出力先から再生されます。 スピーカー再生中は聴取が一時停止します。";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "翻訳は現在のオーディオ出力先から再生されます。スピーカー再生中は録音が一時停止します。";
 "Try again" = "再試行";
 "Two free hours a day instead of one" = "無料の翻訳時間が1日1時間から2時間に";

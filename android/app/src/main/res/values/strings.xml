@@ -130,11 +130,10 @@
     <string name="localized_address_footer">Names and address details depend on available map data. Some places may keep their local spelling.</string>
     <string name="localized_address_unavailable">An address in this language wasn’t available for this place. Try another language or a more specific address.</string>
     <string name="location">Location</string>
-    <string name="location_country_lookup">Lively uses your approximate location only to look up the country.</string>
     <string name="location_not_found">Couldn\'t find where you are. Lively will try again the next time it opens.</string>
     <string name="location_offer_body">Lively can choose your language and the local one for the country you\'re in, and again when you travel. You can change this in Settings.</string>
     <string name="location_permission_denied">Lively doesn\'t have location access. Allow it in the system settings, then turn this on again.</string>
-    <string name="location_travel_summary">"Sets your language and the local language when you arrive in another country. "</string>
+    <string name="location_travel_summary">Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country.</string>
     <string name="manage_play_subscription_help">Manage it in Google Play\'s Payments &amp; subscriptions.</string>
     <string name="manage_subscription">Manage subscription</string>
     <string name="microphone">Microphone</string>
@@ -240,7 +239,7 @@
     <string name="speak_translations_aloud">Speak translations aloud</string>
     <string name="speech_engine">Speech engine</string>
     <string name="speech_failed">Speech failed.</string>
-    <string name="speech_playback_listening_footer">"Lively doesn\'t listen while it speaks, so it won\'t translate itself, unless you\'re using headphones. "</string>
+    <string name="speech_playback_listening_footer">Lively doesn\'t listen while it speaks, so it won\'t translate itself, unless you\'re using headphones.</string>
     <string name="speech_playback_requires_key">Speaking translations aloud needs a Soniox API key.</string>
     <string name="speech_to_speech">Speech-to-speech</string>
     <string name="speed">Speed</string>

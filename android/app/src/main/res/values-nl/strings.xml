@@ -129,11 +129,10 @@
     <string name="localized_address_footer">Namen en adresgegevens zijn afhankelijk van beschikbare kaartgegevens. Sommige plaatsen behouden hun lokale spelling.</string>
     <string name="localized_address_unavailable">Er was geen adres in deze taal beschikbaar voor deze locatie. Probeer een andere taal of een specifieker adres.</string>
     <string name="location">Locatie</string>
-    <string name="location_country_lookup">Lively gebruikt je geschatte locatie alleen om het land op te zoeken.</string>
     <string name="location_not_found">Kon je locatie niet vinden. Lively probeert dit de volgende keer opnieuw.</string>
     <string name="location_offer_body">Lively kan je taal en de lokale taal van het land waarin je bent kiezen, en opnieuw wanneer je reist. Je kunt dit wijzigen in Instellingen.</string>
     <string name="location_permission_denied">Lively heeft geen toegang tot de locatie. Sta dit toe in de systeeminstellingen, en zet dit dan weer aan.</string>
-    <string name="location_travel_summary">"Stelt je taal en de lokale taal in wanneer je een ander land binnenkomt. "</string>
+    <string name="location_travel_summary">Stelt je taal en de lokale taal in wanneer je een ander land binnenkomt. Lively gebruikt je geschatte locatie alleen om het land op te zoeken.</string>
     <string name="manage_play_subscription_help">Beheer dit in Betalingen en abonnementen van Google Play.</string>
     <string name="manage_subscription">Abonnement beheren</string>
     <string name="microphone">Microfoon</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">Vertalingen hardop uitspreken</string>
     <string name="speech_engine">Spraakengine</string>
     <string name="speech_failed">Spraak mislukt.</string>
-    <string name="speech_playback_listening_footer">"Lively luistert niet terwijl hij spreekt, dus zal hij zichzelf niet vertalen, tenzij je een headset gebruikt. "</string>
+    <string name="speech_playback_listening_footer">Lively luistert niet terwijl hij spreekt, dus zal hij zichzelf niet vertalen, tenzij je een headset gebruikt.</string>
     <string name="speech_playback_requires_key">Hardop vertalingen uitspreken vereist een Soniox API-sleutel.</string>
     <string name="speech_to_speech">Spraak-naar-spraak</string>
     <string name="speed">Snelheid</string>

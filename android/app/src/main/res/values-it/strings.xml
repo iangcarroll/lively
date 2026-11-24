@@ -129,11 +129,10 @@
     <string name="localized_address_footer">Nomi e dettagli dell\'indirizzo dipendono dai dati delle mappe disponibili. Alcuni luoghi potrebbero mantenere la grafia locale.</string>
     <string name="localized_address_unavailable">Un indirizzo in questa lingua non era disponibile per questo luogo. Prova un\'altra lingua o un indirizzo più specifico.</string>
     <string name="location">Posizione</string>
-    <string name="location_country_lookup">Lively utilizza la tua posizione approssimativa solo per rilevare il paese.</string>
     <string name="location_not_found">Impossibile trovare la tua posizione. Lively proverà di nuovo alla prossima apertura.</string>
     <string name="location_offer_body">Lively può scegliere la tua lingua e quella locale del paese in cui ti trovi, e di nuovo quando viaggi. Puoi modificare questa impostazione nelle Impostazioni.</string>
     <string name="location_permission_denied">Lively non ha accesso alla posizione. Consentilo nelle impostazioni di sistema, quindi riattiva questa funzione.</string>
-    <string name="location_travel_summary">"Imposta la tua lingua e la lingua locale quando arrivi in un altro paese. "</string>
+    <string name="location_travel_summary">Imposta la tua lingua e la lingua locale quando arrivi in un altro paese. Lively utilizza la tua posizione approssimativa solo per rilevare il paese.</string>
     <string name="manage_play_subscription_help">Gestiscilo nelle Pagamenti e abbonamenti di Google Play.</string>
     <string name="manage_subscription">Gestisci abbonamento</string>
     <string name="microphone">Microfono</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">Leggi le traduzioni ad alta voce</string>
     <string name="speech_engine">Motore vocale</string>
     <string name="speech_failed">Errore vocale.</string>
-    <string name="speech_playback_listening_footer">"Lively non ascolta mentre parla, quindi non si tradurrà da solo, a meno che tu non stia utilizzando cuffie. "</string>
+    <string name="speech_playback_listening_footer">Lively non ascolta mentre parla, quindi non si tradurrà da solo, a meno che tu non stia utilizzando cuffie.</string>
     <string name="speech_playback_requires_key">La lettura ad alta voce delle traduzioni richiede una chiave API Soniox.</string>
     <string name="speech_to_speech">Da voce a voce</string>
     <string name="speed">Velocità</string>

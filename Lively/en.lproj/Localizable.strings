@@ -104,7 +104,7 @@
 "Download the shared voice pack before using offline voices." = "Download the shared voice pack before using offline voices.";
 "Download voice pack" = "Download voice pack";
 "Download voices in Settings → Offline Voice Library." = "Download voices in Settings → Offline Voice Library.";
-"Downloaded voices speak on this device after installation. Previews pause listening. " = "Downloaded voices speak on this device after installation. Previews pause listening. ";
+"Downloaded voices speak on this device after installation. Previews pause listening." = "Downloaded voices speak on this device after installation. Previews pause listening.";
 "Downloaded voices · offline" = "Downloaded voices · offline";
 "Downloading %@ speech…" = "Downloading %@ speech…";
 "Downloading…" = "Downloading…";
@@ -137,8 +137,7 @@
 "Identifying language" = "Identifying language";
 "Included" = "Included";
 "Included free with your account" = "Included free with your account";
-"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. " = "Incoming %@ plays through headphones; outgoing %@ uses the device speaker. ";
-"Incoming audio stays silent without a compatible headset with a microphone. " = "Incoming audio stays silent without a compatible headset with a microphone. ";
+"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "Incoming %@ plays through headphones; outgoing %@ uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback.";
 "Input language" = "Input language";
 "It's included free with your account." = "It's included free with your account.";
 "Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "Just talk. Lively detects the other language and translates both ways. Your side stays in %@.";
@@ -151,7 +150,6 @@
 "Lay it flat between you" = "Lay it flat between you";
 "Listening" = "Listening";
 "Listening for another language" = "Listening for another language";
-"Listening pauses during speaker playback." = "Listening pauses during speaker playback.";
 "Lively Pro isn't available from the App Store on this device yet." = "Lively Pro isn't available from the App Store on this device yet.";
 "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings." = "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings.";
 "Lively couldn't find any text in that photo." = "Lively couldn't find any text in that photo.";
@@ -164,7 +162,6 @@
 "Lively listens for this pair and translates both ways." = "Lively listens for this pair and translates both ways.";
 "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine." = "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine.";
 "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone." = "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone.";
-"Lively uses your approximate location only to look up the country." = "Lively uses your approximate location only to look up the country.";
 "Lively's key service turned down the request." = "Lively's key service turned down the request.";
 "Location" = "Location";
 "Locations" = "Locations";
@@ -265,7 +262,7 @@
 "Set from location" = "Set from location";
 "Set languages from your location?" = "Set languages from your location?";
 "Sets the languages for the country you're in" = "Sets the languages for the country you're in";
-"Sets your language and the local language when you arrive in another country. " = "Sets your language and the local language when you arrive in another country. ";
+"Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country." = "Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country.";
 "Settings" = "Settings";
 "Sign Out" = "Sign Out";
 "Sign in for another free hour" = "Sign in for another free hour";
@@ -317,7 +314,7 @@
 "The offline voice %@ is not installed." = "The offline voice %@ is not installed.";
 "The offline voice files could not be loaded: %@" = "The offline voice files could not be loaded: %@";
 "The offline voice model is not loaded." = "The offline voice model is not loaded.";
-"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. ";
+"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses." = "The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses.";
 "The other language will appear when they speak." = "The other language will appear when they speak.";
 "The voice download details aren't valid. Update Lively and try again." = "The voice download details aren't valid. Update Lively and try again.";
 "The voice download failed (HTTP %lld). Try again." = "The voice download failed (HTTP %lld). Try again.";
@@ -344,7 +341,7 @@
 "Translation failed" = "Translation failed";
 "Translation interrupted. Tap to retry." = "Translation interrupted. Tap to retry.";
 "Translations into %@ play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "Translations into %@ play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback.";
-"Translations into %@ play through your current audio output. " = "Translations into %@ play through your current audio output. ";
+"Translations into %@ play through your current audio output. Listening pauses during speaker playback." = "Translations into %@ play through your current audio output. Listening pauses during speaker playback.";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "Translations play through your current audio output. Listening pauses during speaker playback.";
 "Try again" = "Try again";
 "Two free hours a day instead of one" = "Two free hours a day instead of one";

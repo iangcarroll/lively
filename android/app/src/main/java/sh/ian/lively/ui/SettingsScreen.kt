@@ -418,9 +418,11 @@ private fun speechFooter(settings: AppSettings, canSpeak: Boolean): String {
     if (!canSpeak) return stringResource(R.string.speech_playback_requires_key)
     // Android speaks only the outgoing direction: away from the listener's language in Automatic.
     val spoken = if (settings.usesAutomaticLanguageDetection) stringResource(R.string.playback_detected_language) else stringResource(R.string.playback_named_language, settings.languages.second.displayName)
-    return spoken + " " +
-        stringResource(R.string.speech_playback_listening_footer) +
-        stringResource(R.string.face_to_face_playback_menu_hint)
+    return listOf(
+        spoken,
+        stringResource(R.string.speech_playback_listening_footer),
+        stringResource(R.string.face_to_face_playback_menu_hint),
+    ).joinToString(" ")
 }
 
 @Composable

@@ -129,11 +129,10 @@
     <string name="localized_address_footer">Nomes e detalhes do endereço dependem dos dados de mapa disponíveis. Alguns locais podem manter a grafia local.</string>
     <string name="localized_address_unavailable">Um endereço neste idioma não estava disponível para este local. Tente outro idioma ou um endereço mais específico.</string>
     <string name="location">Localização</string>
-    <string name="location_country_lookup">O Lively usa apenas sua localização aproximada para identificar o país.</string>
     <string name="location_not_found">Não foi possível encontrar sua localização. O Lively tentará novamente na próxima vez que for aberto.</string>
     <string name="location_offer_body">O Lively pode escolher seu idioma e o local do país em que você está, e novamente quando viajar. Você pode alterar isso nas Configurações.</string>
     <string name="location_permission_denied">O Lively não tem acesso à localização. Permita-o nas configurações do sistema e ative esta opção novamente.</string>
-    <string name="location_travel_summary">"Define seu idioma e o idioma local quando você chega a outro país. "</string>
+    <string name="location_travel_summary">Define seu idioma e o idioma local quando você chega a outro país. O Lively usa apenas sua localização aproximada para identificar o país.</string>
     <string name="manage_play_subscription_help">Gerencie no Google Play em Pagamentos e assinaturas.</string>
     <string name="manage_subscription">Gerenciar assinatura</string>
     <string name="microphone">Microfone</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">Falar traduções em voz alta</string>
     <string name="speech_engine">Motor de fala</string>
     <string name="speech_failed">Falha na fala.</string>
-    <string name="speech_playback_listening_footer">"O Lively não ouve enquanto fala, então não se traduzirá, a menos que você esteja usando fones de ouvido. "</string>
+    <string name="speech_playback_listening_footer">O Lively não ouve enquanto fala, então não se traduzirá, a menos que você esteja usando fones de ouvido.</string>
     <string name="speech_playback_requires_key">Falar traduções em voz alta requer uma chave de API Soniox.</string>
     <string name="speech_to_speech">Fala para fala</string>
     <string name="speed">Velocidade</string>

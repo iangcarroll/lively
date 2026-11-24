@@ -129,11 +129,10 @@
     <string name="localized_address_footer">名称和地址信息取决于可用的地图数据。部分地点可能保留其本地拼写。</string>
     <string name="localized_address_unavailable">该地点未提供此语言的地址信息。请尝试其他语言或更具体的地址。</string>
     <string name="location">位置</string>
-    <string name="location_country_lookup">Lively 仅使用您的大致位置来查询所在国家/地区。</string>
     <string name="location_not_found">无法获取您的位置信息。Lively 将在下次启动时再次尝试。</string>
     <string name="location_offer_body">Lively 可自动选择您的语言及所在国家的本地语言，并在您旅行时再次更新。您可前往设置更改。</string>
     <string name="location_permission_denied">Lively 未获取位置权限。请在系统设置中允许，然后再次开启此功能。</string>
-    <string name="location_travel_summary">"抵达其他国家时，自动设置您的语言和当地语言。 "</string>
+    <string name="location_travel_summary">抵达其他国家时，自动设置您的语言和当地语言。 Lively 仅使用您的大致位置来查询所在国家/地区。</string>
     <string name="manage_play_subscription_help">请在 Google Play 的“付款与订阅”中管理。</string>
     <string name="manage_subscription">管理订阅</string>
     <string name="microphone">麦克风</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">大声朗读译文</string>
     <string name="speech_engine">语音引擎</string>
     <string name="speech_failed">语音识别失败。</string>
-    <string name="speech_playback_listening_footer">"Lively 在说话时不会监听，因此不会翻译自身内容，除非您使用耳机。 "</string>
+    <string name="speech_playback_listening_footer">Lively 在说话时不会监听，因此不会翻译自身内容，除非您使用耳机。</string>
     <string name="speech_playback_requires_key">大声朗读译文需要 Soniox API 密钥。</string>
     <string name="speech_to_speech">语音到语音</string>
     <string name="speed">速度</string>

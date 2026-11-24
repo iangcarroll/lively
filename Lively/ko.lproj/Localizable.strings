@@ -104,7 +104,7 @@
 "Download the shared voice pack before using offline voices." = "오프라인 음성을 사용하기 전에 공유 음성 팩을 다운로드하세요.";
 "Download voice pack" = "음성 팩 다운로드";
 "Download voices in Settings → Offline Voice Library." = "설정 → 오프라인 음성 라이브러리에서 음성을 다운로드하세요.";
-"Downloaded voices speak on this device after installation. Previews pause listening. " = "설치된 음성은 이 기기에서 재생됩니다. 미리듣기 시 청취가 일시 중지됩니다. ";
+"Downloaded voices speak on this device after installation. Previews pause listening." = "설치된 음성은 이 기기에서 재생됩니다. 미리듣기 시 청취가 일시 중지됩니다.";
 "Downloaded voices · offline" = "다운로드된 음성 · 오프라인";
 "Downloading %@ speech…" = "%@ 음성 다운로드 중…";
 "Downloading…" = "다운로드 중…";
@@ -137,8 +137,7 @@
 "Identifying language" = "언어 식별 중";
 "Included" = "포함됨";
 "Included free with your account" = "계정에 무료로 포함됨";
-"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. " = "수신 %1$@은 이어폰으로 재생되고, 송신 %2$@는 기기 스피커를 사용합니다. ";
-"Incoming audio stays silent without a compatible headset with a microphone. " = "호환되는 마이크 달린 헤드셋이 없으면 수신 오디오는 무음입니다. ";
+"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "수신 %1$@은 이어폰으로 재생되고, 송신 %2$@는 기기 스피커를 사용합니다. 호환되는 마이크 달린 헤드셋이 없으면 수신 오디오는 무음입니다. 화자 재생 중 듣기가 일시 중지됩니다.";
 "Input language" = "입력 언어";
 "It's included free with your account." = "계정에 무료로 포함되어 있습니다.";
 "Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "말하기만 하면 됩니다. Lively가 다른 언어를 감지하고 양방향으로 번역합니다. 내 말은 %@로 유지됩니다.";
@@ -151,7 +150,6 @@
 "Lay it flat between you" = "두 사람 사이에 휴대폰 놓기";
 "Listening" = "듣는 중";
 "Listening for another language" = "다른 언어 듣는 중";
-"Listening pauses during speaker playback." = "화자 재생 중 듣기가 일시 중지됩니다.";
 "Lively Pro isn't available from the App Store on this device yet." = "Lively Pro는 아직 이 기기의 App Store에서 제공되지 않습니다.";
 "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings." = "Lively가 현재 국가의 현지 언어와 당신의 언어를 자동으로 선택하며, 여행 시에도 다시 선택합니다. 설정에서 변경할 수 있습니다.";
 "Lively couldn't find any text in that photo." = "Lively가 해당 사진에서 텍스트를 찾지 못했습니다.";
@@ -164,7 +162,6 @@
 "Lively listens for this pair and translates both ways." = "Lively는 이 언어 쌍을 감지하고 양방향으로 번역합니다.";
 "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine." = "Lively는 이 언어 쌍을 감지하고 양방향으로 번역합니다. 다른 언어를 자동으로 감지하려면 Soniox 엔진이 필요합니다.";
 "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone." = "Lively는 마이크 접근 권한이 필요합니다. 설정 › 개인 정보 보호 및 보안 › 마이크에서 활성화할 수 있습니다.";
-"Lively uses your approximate location only to look up the country." = "Lively는 대략적인 위치 정보만 나라 확인에 사용합니다.";
 "Lively's key service turned down the request." = "Lively의 키 서비스에서 요청이 거부되었습니다.";
 "Location" = "위치";
 "Locations" = "위치 목록";
@@ -265,7 +262,7 @@
 "Set from location" = "위치에서 설정";
 "Set languages from your location?" = "현재 위치의 언어를 사용하시겠습니까?";
 "Sets the languages for the country you're in" = "현재 국가의 언어로 설정됩니다.";
-"Sets your language and the local language when you arrive in another country. " = "다른 국가에 도착하면 기본 언어와 현지 언어가 설정됩니다. ";
+"Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country." = "다른 국가에 도착하면 기본 언어와 현지 언어가 설정됩니다. Lively는 대략적인 위치 정보만 나라 확인에 사용합니다.";
 "Settings" = "설정";
 "Sign Out" = "로그아웃";
 "Sign in for another free hour" = "무료 시간 추가를 위해 로그인하세요";
@@ -317,7 +314,7 @@
 "The offline voice %@ is not installed." = "오프라인 음성 %@이(가) 설치되지 않았습니다.";
 "The offline voice files could not be loaded: %@" = "오프라인 음성 파일을 로드할 수 없습니다: %@";
 "The offline voice model is not loaded." = "오프라인 음성 모델이 로드되지 않았습니다.";
-"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "원본 음성은 번역된 텍스트를 Soniox로 전송하며 인터넷 연결이 필요합니다. 오프라인 상태에서는 음성 출력이 일시 중단되어도 텍스트는 계속 표시됩니다. ";
+"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses." = "원본 음성은 번역된 텍스트를 Soniox로 전송하며 인터넷 연결이 필요합니다. 오프라인 상태에서는 음성 출력이 일시 중단되어도 텍스트는 계속 표시됩니다.";
 "The other language will appear when they speak." = "상대가 말하면 다른 언어가 표시됩니다.";
 "The voice download details aren't valid. Update Lively and try again." = "음성 다운로드 정보가 유효하지 않습니다. Lively를 업데이트하고 다시 시도하세요.";
 "The voice download failed (HTTP %lld). Try again." = "음성 다운로드에 실패했습니다 (HTTP %lld). 다시 시도하세요.";
@@ -344,7 +341,7 @@
 "Translation failed" = "번역 실패";
 "Translation interrupted. Tap to retry." = "번역이 중단되었습니다. 탭하여 재시도하세요.";
 "Translations into %@ play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "%@로 번역된 내용은 이어폰을 통해 재생되며, 감지된 상대방 언어로의 번역은 기기 스피커를 사용합니다. 마이크가 있는 호환 헤드셋이 없으면 수신 오디오는 무음 상태입니다. 스피커 재생 중 청취가 일시 중단됩니다.";
-"Translations into %@ play through your current audio output. " = "%@로 번역된 내용은 현재 오디오 출력 장치로 재생됩니다. ";
+"Translations into %@ play through your current audio output. Listening pauses during speaker playback." = "%@로 번역된 내용은 현재 오디오 출력 장치로 재생됩니다. 화자 재생 중 듣기가 일시 중지됩니다.";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "번역된 내용은 현재 오디오 출력 장치로 재생됩니다. 스피커 재생 중 청취가 일시 중단됩니다.";
 "Try again" = "다시 시도";
 "Two free hours a day instead of one" = "하루 1시간 대신 무료 2시간 제공";

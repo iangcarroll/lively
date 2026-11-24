@@ -129,11 +129,10 @@
     <string name="localized_address_footer">Los nombres y los detalles de la dirección dependen de los datos del mapa disponibles. Algunos lugares pueden conservar su ortografía local.</string>
     <string name="localized_address_unavailable">No había una dirección en este idioma disponible para este lugar. Prueba con otro idioma o una dirección más específica.</string>
     <string name="location">Ubicación</string>
-    <string name="location_country_lookup">Lively usa tu ubicación aproximada solo para buscar el país.</string>
     <string name="location_not_found">No pudimos encontrar tu ubicación. Lively lo intentará la próxima vez que se abra.</string>
     <string name="location_offer_body">Lively puede elegir tu idioma y el local del país donde estás, y de nuevo cuando viajes. Puedes cambiar esto en Ajustes.</string>
     <string name="location_permission_denied">Lively no tiene acceso a la ubicación. Permítelo en los ajustes del sistema y activa esto de nuevo.</string>
-    <string name="location_travel_summary">"Configura tu idioma y el local al llegar a otro país. "</string>
+    <string name="location_travel_summary">Configura tu idioma y el local al llegar a otro país. Lively usa tu ubicación aproximada solo para buscar el país.</string>
     <string name="manage_play_subscription_help">Gestiona esto en Pagos y suscripciones de Google Play.</string>
     <string name="manage_subscription">Gestionar suscripción</string>
     <string name="microphone">Micrófono</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">Leer las traducciones en voz alta</string>
     <string name="speech_engine">Motor de voz</string>
     <string name="speech_failed">Error de reconocimiento de voz.</string>
-    <string name="speech_playback_listening_footer">"Lively no escucha mientras habla, por lo que no se traduce a sí mismo, a menos que uses auriculares. "</string>
+    <string name="speech_playback_listening_footer">Lively no escucha mientras habla, por lo que no se traduce a sí mismo, a menos que uses auriculares.</string>
     <string name="speech_playback_requires_key">Para leer las traducciones en voz alta se necesita una clave API de Soniox.</string>
     <string name="speech_to_speech">Voz a voz</string>
     <string name="speed">Velocidad</string>

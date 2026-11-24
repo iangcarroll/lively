@@ -104,7 +104,7 @@
 "Download the shared voice pack before using offline voices." = "使用离线语音前，请先下载共享语音包。";
 "Download voice pack" = "下载语音包";
 "Download voices in Settings → Offline Voice Library." = "前往设置 → 离线语音库下载语音。";
-"Downloaded voices speak on this device after installation. Previews pause listening. " = "安装后，已下载的语音将在本设备上播放。预览时会暂停收听。 ";
+"Downloaded voices speak on this device after installation. Previews pause listening." = "安装后，已下载的语音将在本设备上播放。预览时会暂停收听。";
 "Downloaded voices · offline" = "已下载语音 · 离线";
 "Downloading %@ speech…" = "正在下载 %@ 语音…";
 "Downloading…" = "正在下载…";
@@ -137,8 +137,7 @@
 "Identifying language" = "正在识别语言";
 "Included" = "已包含";
 "Included free with your account" = "随您的账户免费提供";
-"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. " = "传入的 %1$@ 通过耳机播放；输出的 %2$@ 使用设备扬声器。 ";
-"Incoming audio stays silent without a compatible headset with a microphone. " = "若无带麦克风的兼容耳机，传入音频将保持静音。 ";
+"Incoming %@ plays through headphones; outgoing %@ uses the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "传入的 %1$@ 通过耳机播放；输出的 %2$@ 使用设备扬声器。 若无带麦克风的兼容耳机，传入音频将保持静音。 扬声器播放期间暂停监听。";
 "Input language" = "输入语言";
 "It's included free with your account." = "随您的账户免费提供。";
 "Just talk. Lively detects the other language and translates both ways. Your side stays in %@." = "直接开口就好。Lively 会识别对方的语言并双向翻译。您这边的屏幕会一直显示%@。";
@@ -151,7 +150,6 @@
 "Lay it flat between you" = "把手机平放在两人之间";
 "Listening" = "正在聆听";
 "Listening for another language" = "正在监听其他语言";
-"Listening pauses during speaker playback." = "扬声器播放期间暂停监听。";
 "Lively Pro isn't available from the App Store on this device yet." = "此设备尚未在 App Store 上提供 Lively Pro。";
 "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings." = "Lively 可自动选择您的语言及所在国家的本地语言，并在您旅行时再次更新。您可前往设置更改。";
 "Lively couldn't find any text in that photo." = "Lively 未在该照片中识别到任何文本。";
@@ -164,7 +162,6 @@
 "Lively listens for this pair and translates both ways." = "Lively 监听该语言对并实现双向翻译。";
 "Lively listens for this pair and translates both ways. Detecting the other language automatically needs Soniox as the engine." = "Lively 监听该语言对并实现双向翻译。自动检测另一种语言需使用 Soniox 作为引擎。";
 "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone." = "Lively 需要麦克风权限。您可以在“设置”>“隐私与安全性”>“麦克风”中开启。";
-"Lively uses your approximate location only to look up the country." = "Lively 仅使用您的大致位置来查询所在国家/地区。";
 "Lively's key service turned down the request." = "Lively 的密钥服务拒绝了请求。";
 "Location" = "位置";
 "Locations" = "地点";
@@ -265,7 +262,7 @@
 "Set from location" = "从当前位置设置";
 "Set languages from your location?" = "根据您的位置设置语言？";
 "Sets the languages for the country you're in" = "自动设置为所在国家的语言";
-"Sets your language and the local language when you arrive in another country. " = "抵达其他国家时，自动设置您的语言和当地语言。 ";
+"Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country." = "抵达其他国家时，自动设置您的语言和当地语言。 Lively 仅使用您的大致位置来查询所在国家/地区。";
 "Settings" = "设置";
 "Sign Out" = "退出登录";
 "Sign in for another free hour" = "登录以再享免费一小时";
@@ -317,7 +314,7 @@
 "The offline voice %@ is not installed." = "未安装离线语音 %@。";
 "The offline voice files could not be loaded: %@" = "无法加载离线语音文件：%@";
 "The offline voice model is not loaded." = "未加载离线语音模型。";
-"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses. " = "原始语音会将翻译文本发送至 Soniox，需要网络连接。当语音输出暂停时，离线文本仍可见。 ";
+"The original voice sends translated text to Soniox and needs internet. Offline text stays visible when spoken output pauses." = "原始语音会将翻译文本发送至 Soniox，需要网络连接。当语音输出暂停时，离线文本仍可见。";
 "The other language will appear when they speak." = "对方说话时将显示其语言。";
 "The voice download details aren't valid. Update Lively and try again." = "语音下载详情无效。请更新 Lively 后重试。";
 "The voice download failed (HTTP %lld). Try again." = "语音下载失败（HTTP %lld）。请重试。";
@@ -344,7 +341,7 @@
 "Translation failed" = "翻译失败";
 "Translation interrupted. Tap to retry." = "翻译中断。点击重试。";
 "Translations into %@ play through headphones; translations into the detected other language use the device speaker. Incoming audio stays silent without a compatible headset with a microphone. Listening pauses during speaker playback." = "翻译为 %@ 的内容通过耳机播放；翻译至检测到的对方语言的内容使用设备扬声器。若无带麦克风的兼容耳机，传入音频将保持静音。扬声器播放期间聆听将暂停。";
-"Translations into %@ play through your current audio output. " = "翻译为 %@ 的内容将通过您当前的音频输出播放。 ";
+"Translations into %@ play through your current audio output. Listening pauses during speaker playback." = "翻译为 %@ 的内容将通过您当前的音频输出播放。 扬声器播放期间暂停监听。";
 "Translations play through your current audio output. Listening pauses during speaker playback." = "翻译内容将通过您当前的音频输出播放。扬声器播放期间聆听将暂停。";
 "Try again" = "重试";
 "Two free hours a day instead of one" = "每日免费时长从一小时增至两小时";

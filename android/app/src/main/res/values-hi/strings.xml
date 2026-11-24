@@ -129,11 +129,10 @@
     <string name="localized_address_footer">नाम और पता विवरण उपलब्ध मैप डेटा पर निर्भर करते हैं। कुछ स्थान अपने स्थानीय वर्तनी को बनाए रख सकते हैं।</string>
     <string name="localized_address_unavailable">इस स्थान के लिए इस भाषा में पता उपलब्ध नहीं था। किसी अन्य भाषा या अधिक विशिष्ट पते का प्रयास करें।</string>
     <string name="location">स्थान</string>
-    <string name="location_country_lookup">Lively केवल देश की जानकारी पाने के लिए आपका अनुमानित स्थान का उपयोग करता है।</string>
     <string name="location_not_found">आपकी स्थान नहीं मिल पाई। Lively अगली बार खुलने पर फिर से कोशिश करेगा।</string>
     <string name="location_offer_body">Lively आपकी भाषा और आपके देश की स्थानीय भाषा चुन सकता है, और फिर जब आप यात्रा करेंगे तब भी। आप सेटिंग्स में इसे बदल सकते हैं।</string>
     <string name="location_permission_denied">Lively के पास लोकेशन एक्सेस नहीं है। सिस्टम सेटिंग्स में इसे अनुमति दें, फिर इसे फिर से चालू करें।</string>
-    <string name="location_travel_summary">"जब आप किसी अन्य देश में पहुंचते हैं, तो आपकी भाषा और स्थानीय भाषा सेट करता है। "</string>
+    <string name="location_travel_summary">जब आप किसी अन्य देश में पहुंचते हैं, तो आपकी भाषा और स्थानीय भाषा सेट करता है। Lively केवल देश की जानकारी पाने के लिए आपका अनुमानित स्थान का उपयोग करता है।</string>
     <string name="manage_play_subscription_help">इसे Google Play के भुगतान और सदस्यता में प्रबंधित करें।</string>
     <string name="manage_subscription">सदस्यता प्रबंधित करें</string>
     <string name="microphone">माइक्रोफ़ोन</string>
@@ -239,7 +238,7 @@
     <string name="speak_translations_aloud">अनुवाद ज़ोर से पढ़ें</string>
     <string name="speech_engine">स्पीच इंजन</string>
     <string name="speech_failed">स्पीच विफल हो गई।</string>
-    <string name="speech_playback_listening_footer">"Lively बोलते समय सुनता नहीं है, इसलिए यह स्वयं का अनुवाद नहीं करेगा, जब तक कि आप हेडफ़ोन का उपयोग न कर रहे हों। "</string>
+    <string name="speech_playback_listening_footer">Lively बोलते समय सुनता नहीं है, इसलिए यह स्वयं का अनुवाद नहीं करेगा, जब तक कि आप हेडफ़ोन का उपयोग न कर रहे हों।</string>
     <string name="speech_playback_requires_key">ज़ोर से अनुवाद पढ़ने के लिए Soniox API कुंजी की आवश्यकता है।</string>
     <string name="speech_to_speech">स्पीच-टू-स्पीच</string>
     <string name="speed">गति</string>
