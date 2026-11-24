@@ -1,5 +1,8 @@
 package sh.ian.lively.model
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelResources
+import sh.ian.lively.support.modelString
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -281,8 +284,10 @@ class ConversationStore(
         }
         val provider = settings.provider
         if (!settings.hasCredentials) {
-            val names = provider.credentials.joinToString(" and ") { it.name }
-            alert = "Add your $names in Settings to start."
+            val labels = provider.credentials.map { credential -> modelString(credential.nameRes) { credential.id } }
+            val names = modelResources?.let { android.icu.text.ListFormatter.getInstance(it.configuration.locales[0]).format(labels) }
+                ?: labels.joinToString(" and ")
+            alert = modelString(R.string.add_your_value_in_settings_to_start, names) { "Add your $names in Settings to start." }
             return
         }
         // Lazy, so a start that finishes at once still finds itself here.
@@ -290,7 +295,7 @@ class ConversationStore(
             val permitted = host.requestMicPermission()
             listeningStart = null
             if (!permitted) {
-                alert = "Lively needs microphone access. You can turn it on in Settings › Apps › Lively › Permissions."
+                alert = modelString(R.string.microphone_permission_denied) { "Lively needs microphone access. You can turn it on in Settings › Apps › Lively › Permissions." }
                 return@launch
             }
             if (isListening) return@launch
@@ -307,13 +312,13 @@ class ConversationStore(
                     onChunk = { chunk, decibels -> chunks.trySend(chunk to decibels) },
                     onInterrupted = {
                         stopListening()
-                        alert = "The microphone stopped. Tap the mic to start again."
+                        alert = modelString(R.string.microphone_stopped) { "The microphone stopped. Tap the mic to start again." }
                     },
                 )
             } catch (e: IOException) {
                 stopListening()
                 releaseEngine()
-                alert = e.message ?: "No microphone is available."
+                alert = e.message ?: modelString(R.string.no_microphone_is_available) { "No microphone is available." }
             }
         }
         listeningStart = start
@@ -983,7 +988,7 @@ class ConversationStore(
         if (utterance.translation.isEmpty()) {
             utterance.translatedSource = null
             utterance.translatedLanguage = null
-            utterance.translationState = TranslationState.Failed("Translation did not finish. Tap to retry.")
+            utterance.translationState = TranslationState.Failed(modelString(R.string.translation_did_not_finish_tap_to_retry) { "Translation did not finish. Tap to retry." })
         } else {
             utterance.translationState = TranslationState.Current
         }
@@ -1203,7 +1208,7 @@ class ConversationStore(
                         (e as? BrokerTranslationException)?.isPermanent == true ||
                         (e as? TranslationException)?.isPermanent == true
                     if (permanent || attempt >= 4) {
-                        utterance.translationState = TranslationState.Failed(e.message ?: "Translation failed")
+                        utterance.translationState = TranslationState.Failed(e.message ?: modelString(R.string.translation_failed) { "Translation failed" })
                         translations.remove(utterance.id)
                         return@launch
                     }
@@ -1391,7 +1396,7 @@ class ConversationStore(
         /** How many waiting turns are translated once the partner's language is known. */
         const val BACKFILLED_TURNS = 3
 
-        private const val INTERRUPTED = "Translation interrupted. Tap to retry."
+        private val INTERRUPTED get() = modelString(R.string.translation_interrupted_tap_to_retry) { "Translation interrupted. Tap to retry." }
     }
 }
 

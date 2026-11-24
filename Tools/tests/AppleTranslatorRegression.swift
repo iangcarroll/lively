@@ -2,7 +2,7 @@ import Foundation
 
 struct Language: Equatable, Sendable {
     let rawValue: String
-    var englishName: String { rawValue }
+    var displayName: String { rawValue }
     static let english = Self(rawValue: "en")
     static let chinese = Self(rawValue: "zh")
 }

@@ -1,5 +1,8 @@
 package sh.ian.lively.model
 
+import androidx.annotation.StringRes
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import java.util.Locale
 
 /** The lookup language is independent of the conversation and speech provider. */
@@ -12,6 +15,8 @@ data class AddressLanguage(val code: String) {
             "zh-Hant" -> "Chinese (Traditional)"
             else -> locale.getDisplayLanguage(Locale.ENGLISH).ifEmpty { code }
         }
+
+    val displayName: String get() = locale.getDisplayName(Locale.getDefault()).ifEmpty { englishName }
 
     val nativeName: String
         get() = when (code) {
@@ -32,7 +37,7 @@ data class AddressLanguage(val code: String) {
                 // The platform may also list a language under an old code ("iw") and its new one.
                 .filter { it.englishName != it.code }
                 .distinctBy { it.englishName }
-                .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.englishName })
+                .sortedWith(compareBy(java.text.Collator.getInstance()) { it.displayName })
         }
 
         fun matching(code: String): AddressLanguage {
@@ -65,11 +70,13 @@ data class AddressPlace(
  * Why a lookup failed, with the line shown for it. Swift also has
  * `rateLimited`, which MapKit reports and Android's Geocoder doesn't.
  */
-enum class AddressLookupError(val message: String) {
-    UNAVAILABLE("Address lookup is unavailable right now. Try again."),
-    NETWORK("Connect to the internet to look up an address."),
-    MISSING_ADDRESS("An address in this language wasn’t available for this place. Try another language or a more specific address."),
-    EXPIRED_SELECTION("Search again to choose this place."),
+enum class AddressLookupError(@param:StringRes private val messageRes: Int, private val english: String) {
+    UNAVAILABLE(R.string.address_lookup_unavailable, "Address lookup is unavailable right now. Try again."),
+    NETWORK(R.string.address_lookup_requires_internet, "Connect to the internet to look up an address."),
+    MISSING_ADDRESS(R.string.localized_address_unavailable, "An address in this language wasn’t available for this place. Try another language or a more specific address."),
+    EXPIRED_SELECTION(R.string.search_again_to_choose_this_place, "Search again to choose this place.");
+
+    val message: String get() = modelString(messageRes) { english }
 }
 
 class AddressLookupException(val error: AddressLookupError) : Exception(error.message)

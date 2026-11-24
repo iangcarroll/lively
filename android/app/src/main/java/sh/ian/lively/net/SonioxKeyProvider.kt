@@ -1,5 +1,8 @@
 package sh.ian.lively.net
 
+import sh.ian.lively.support.localizedBrokerMessage
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -153,7 +156,7 @@ class SonioxKeyProvider(
             // Another caller can take the key this fill brings, so check again.
             fillSpare()
         }
-        throw IOException("Couldn't get a key")
+        throw IOException(modelString(R.string.couldnt_get_a_key) { "Couldn't get a key" })
     }
 
     /**
@@ -205,18 +208,18 @@ class SonioxKeyProvider(
 
         val body = runCatching { Json.parseToJsonElement(response.body) as? JsonObject }.getOrNull()
         if (response.code != 200) {
-            val message = body?.string("message")
+            val message = body?.string("message")?.localizedBrokerMessage()
             val retryAfter = response.header("Retry-After")?.toDoubleOrNull() ?: 0.0
             throw when {
                 // A per-minute limit clears quickly; reconnecting with backoff gets past it.
-                response.code == 429 && retryAfter <= 60 -> IOException("Rate limited")
+                response.code == 429 && retryAfter <= 60 -> IOException(modelString(R.string.rate_limited) { "Rate limited" })
                 response.code == 429 && body?.string("plan") == "free" -> {
                     identity.freeLimitReached()
-                    SocketSetupException(message ?: "Today's free translation time is used up.")
+                    SocketSetupException(message ?: modelString(R.string.todays_free_translation_time_is_used_up) { "Today's free translation time is used up." })
                 }
                 response.code in setOf(400, 403, 429, 503) ->
-                    SocketSetupException(message ?: "Lively's key service turned down the request.")
-                else -> IOException("Key service error ${response.code}")
+                    SocketSetupException(message ?: modelString(R.string.livelys_key_service_turned_down_the_request) { "Lively's key service turned down the request." })
+                else -> IOException(modelString(R.string.key_service_error_value, response.code) { "Key service error ${response.code}" })
             }
         }
 

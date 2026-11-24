@@ -1,5 +1,6 @@
 package sh.ian.lively
 
+import java.text.Collator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -16,7 +17,8 @@ class AddressLocationTest {
         assertTrue("ja" in codes && "en" in codes)
         // Far more than any speech engine offers.
         assertTrue(codes.size > 100)
-        assertEquals(AddressLanguage.all.map { it.englishName }, AddressLanguage.all.map { it.englishName }.sortedWith(String.CASE_INSENSITIVE_ORDER))
+        val names = AddressLanguage.all.map { it.displayName }
+        assertEquals(names.sortedWith(Collator.getInstance()), names)
     }
 
     @Test fun bothChineseScriptsHaveExplicitSelections() {

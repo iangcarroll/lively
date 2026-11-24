@@ -126,8 +126,8 @@ struct ConversationScreen: View {
                     }
                     if !automaticOffline && missingDownloadedVoice {
                         Text(NeuralVoicePacks.shared.status == .checking
-                             ? "Checking downloaded voices…"
-                             : "Download voices in Settings → Offline Voice Library.")
+                             ? String(localized: "Checking downloaded voices…")
+                             : String(localized: "Download voices in Settings → Offline Voice Library."))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -284,7 +284,7 @@ struct ConversationScreen: View {
             #if DEBUG
             if showsDemoLimit {
                 Pro.shared.freeLimitReached = true
-                store.alert = "Today's free translation time is used up."
+                store.alert = String(localized: "Today's free translation time is used up.")
             }
             if isDemo {
                 if isDemoAutoPlay && !didStartDemoAutomatically {
@@ -417,7 +417,7 @@ struct ConversationScreen: View {
                 ) { showLanguages = true }
             }
             topBarRow(wide: wide, column: column) {
-                GlassIconButton(systemImage: "globe", label: "Change languages") { showLanguages = true }
+                GlassIconButton(systemImage: "globe", label: String(localized: "Change languages")) { showLanguages = true }
             }
         }
     }
@@ -441,7 +441,7 @@ struct ConversationScreen: View {
         // on, so it can be stopped from here.
         if settings.speaksTranslations { SpeakAloudButton(store: store, settings: settings) }
         if !wide {
-            GlassIconButton(systemImage: "rectangle.split.1x2", label: "Face-to-face mode") {
+            GlassIconButton(systemImage: "rectangle.split.1x2", label: String(localized: "Face-to-face mode")) {
                 withAnimation(.snappy) { phoneShowsTranscript = false }
             }
         }
@@ -449,6 +449,7 @@ struct ConversationScreen: View {
             Button("Address", systemImage: "mappin.and.ellipse", action: openAddress)
             Divider()
             Button("Settings", systemImage: "gearshape") { showSettings = true }
+                .accessibilityIdentifier("conversationSettings")
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 17, weight: .semibold))
@@ -459,6 +460,7 @@ struct ConversationScreen: View {
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .circle)
         .accessibilityLabel("More")
+        .accessibilityIdentifier("conversationMenu")
     }
 
     @ViewBuilder
@@ -501,13 +503,13 @@ struct ConversationScreen: View {
     private func controlRow(column: StatusColumn?) -> some View {
         ZStack(alignment: .top) {
             HStack {
-                GlassIconButton(systemImage: "trash", label: "Clear conversation") {
+                GlassIconButton(systemImage: "trash", label: String(localized: "Clear conversation")) {
                     withAnimation(.snappy) { store.clear() }
                 }
                 .disabled(store.utterances.isEmpty)
                 .opacity(store.utterances.isEmpty ? 0.4 : 1)
                 Spacer()
-                GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: "Type to translate") {
+                GlassIconButton(systemImage: showsTextInput ? "keyboard.chevron.compact.down" : "keyboard", label: String(localized: "Type to translate")) {
                     setTextInput(!showsTextInput)
                 }
                 .anchorPreference(key: KeyboardButtonBounds.self, value: .bounds) { $0 }
@@ -524,7 +526,7 @@ struct ConversationScreen: View {
                 } onHoldEnd: {
                     store.stopListening()
                 }
-                Text(store.isListening ? "Stop" : "Start")
+                Text(store.isListening ? String(localized: "Stop") : String(localized: "Start"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -648,9 +650,8 @@ struct LocationOfferCard: View {
             Text("Set languages from your location?")
                 .font(.system(.title3, design: .rounded, weight: .bold))
                 .multilineTextAlignment(.center)
-            Text(asked ? location.status.message ?? "Finding where you are…"
-                 : "Lively can choose your language and the local one for the country you're in, "
-                 + "and again when you travel. You can change this in Settings.")
+            Text(asked ? location.status.message ?? String(localized: "Finding where you are…")
+                 : String(localized: "Lively can choose your language and the local one for the country you're in, and again when you travel. You can change this in Settings."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

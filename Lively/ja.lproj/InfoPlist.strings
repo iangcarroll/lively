@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "Livelyは撮影した写真内のテキストを読み取り、翻訳します。";
+"NSLocationWhenInUseUsageDescription" = "Livelyは現在地に基づいて国を特定し、現地の言語を選択します。";
+"NSMicrophoneUsageDescription" = "Livelyは会話内容をリアルタイムで文字起こし・翻訳するために会話を聞き取ります。";
+"NSMotionUsageDescription" = "Livelyは電話を回転または手渡した際に、マイクが録音中であることを一時的に表示します。";
+"NSSpeechRecognitionUsageDescription" = "Livelyは音声サービスに接続できない場合、デバイス上で文字起こしを行います。";

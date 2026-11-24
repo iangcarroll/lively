@@ -20,6 +20,8 @@ enum SpeechSource { case original, downloaded }
 enum NWInterface { enum InterfaceType { case wifi, cellular } }
 enum ConversationMode { case automatic, pair }
 final class AppSettings {
+    // These online flows start after the user has enabled online translation.
+    var onlineProcessing: Bool? = true
     var provider = SpeechProvider(id: "soniox")
     var providerID: String {
         get { provider.id }

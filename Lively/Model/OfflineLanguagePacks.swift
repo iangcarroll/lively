@@ -7,12 +7,18 @@ import Translation
 /// Apple shares these models with other apps and can remove unused assets.
 @Observable
 final class OfflineLanguagePacks {
-    enum State: String {
-        case checking = "Checking…"
-        case missing = "Download needed"
-        case downloading = "Downloading…"
-        case ready = "Ready"
-        case unsupported = "Unavailable on this device"
+    enum State {
+        case checking, missing, downloading, ready, unsupported
+
+        var label: String {
+            switch self {
+            case .checking: String(localized: "Checking…")
+            case .missing: String(localized: "Download needed")
+            case .downloading: String(localized: "Downloading…")
+            case .ready: String(localized: "Ready")
+            case .unsupported: String(localized: "Unavailable on this device")
+            }
+        }
     }
 
     struct Component: Identifiable {
@@ -64,7 +70,7 @@ final class OfflineLanguagePacks {
             } else {
                 state = .unsupported
             }
-            rows.append(Component(id: "speech-\(language.rawValue)", title: "\(language.englishName) speech recognition", state: state))
+            rows.append(Component(id: "speech-\(language.rawValue)", title: String(localized: "\(language.displayName) speech recognition"), state: state))
         }
         for (source, target) in directions {
             let state: State
@@ -73,7 +79,7 @@ final class OfflineLanguagePacks {
             case .supported: state = .missing
             default: state = .unsupported
             }
-            rows.append(Component(id: "text-\(source.rawValue)", title: "\(source.englishName) → \(target.englishName)", state: state))
+            rows.append(Component(id: "text-\(source.rawValue)", title: "\(source.displayName) → \(target.displayName)", state: state))
         }
         let reserved = await AssetInventory.reservedLocales
         guard !Task.isCancelled, refreshID == token else { return }
@@ -92,9 +98,9 @@ final class OfflineLanguagePacks {
             do {
                 for language in languages.all {
                     try check(token)
-                    downloadLabel = "Downloading \(language.englishName) speech…"
+                    downloadLabel = String(localized: "Downloading \(language.displayName) speech…")
                     guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: OfflineSpeechEngine.locale(for: language, script: script)) else {
-                        throw PackError.unavailable(language.englishName)
+                        throw PackError.unavailable(language.displayName)
                     }
                     try check(token)
                     // false means this app already reserved the locale; quota
@@ -169,7 +175,7 @@ final class OfflineLanguagePacks {
 
     private func prepareDirection() {
         let (source, target) = directions[direction]
-        downloadLabel = "Preparing \(source.englishName) → \(target.englishName)…"
+        downloadLabel = String(localized: "Preparing \(source.displayName) → \(target.displayName)…")
         translationRequestID = UUID()
         translationConfiguration = Self.configuration(source: source, target: target, script: script)
     }
@@ -222,8 +228,8 @@ private enum PackError: LocalizedError {
     case unavailable(String), incomplete
     var errorDescription: String? {
         switch self {
-        case .unavailable(let language): "Offline speech isn't supported for \(language) on this device."
-        case .incomplete: "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download."
+        case .unavailable(let language): String(localized: "Offline speech isn't supported for \(language) on this device.")
+        case .incomplete: String(localized: "The languages aren't fully installed yet. Keep an internet connection, then check again or retry the download.")
         }
     }
 }

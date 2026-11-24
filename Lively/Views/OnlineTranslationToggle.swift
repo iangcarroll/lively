@@ -11,9 +11,12 @@ struct OnlineTranslationToggle: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Toggle("Online translation", isOn: $isOn)
-                .font(.headline)
-                .accessibilityIdentifier("onlineTranslationToggle")
+            Toggle(isOn: $isOn) {
+                Text("Online translation")
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityIdentifier("onlineTranslationToggle")
             Text(detail)
                 .font(.footnote)
                 .foregroundStyle(.secondary)

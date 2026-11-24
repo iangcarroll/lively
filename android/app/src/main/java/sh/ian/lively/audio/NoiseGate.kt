@@ -1,5 +1,7 @@
 package sh.ian.lively.audio
 
+import sh.ian.lively.R
+import androidx.annotation.StringRes
 import kotlin.math.max
 import kotlin.math.min
 
@@ -7,11 +9,11 @@ import kotlin.math.min
  * How far away Lively listens. Sound quieter than the range's threshold is
  * sent as silence, so a conversation across the room isn't translated.
  */
-enum class PickupRange(val id: String, val label: String, val summary: String) {
-    AUTO("auto", "Auto", "Follows how loud the room is, and only hears people noticeably louder than the background."),
-    CLOSE("close", "Close", "Only the people right by the phone. For loud places like restaurants and stations."),
-    NEARBY("nearby", "Nearby", "People around the table. Conversations across the room are ignored."),
-    ROOM("room", "Whole room", "Everything the mic can hear, even far away.");
+enum class PickupRange(val id: String, @get:StringRes val labelRes: Int, @get:StringRes val summaryRes: Int) {
+    AUTO("auto", R.string.auto, R.string.pickup_auto_description),
+    CLOSE("close", R.string.pickup_close, R.string.pickup_close_description),
+    NEARBY("nearby", R.string.nearby, R.string.pickup_nearby_description),
+    ROOM("room", R.string.whole_room, R.string.everything_the_mic_can_hear_even_far_away);
 
     companion object {
         val DEFAULT = NEARBY

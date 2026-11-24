@@ -1,5 +1,7 @@
 package sh.ian.lively.net
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -490,7 +492,9 @@ class ResilientSocket(
                 is WsMessage.Binary -> socket.send(message.bytes.toByteString())
             }
             if (!queued) scope.launch {
-                if (this@Connection.socket === socket) connectionFailed(this@Connection, SocketSignal.Retry("Send failed"))
+                if (this@Connection.socket === socket) {
+                    connectionFailed(this@Connection, SocketSignal.Retry(modelString(R.string.send_failed) { "Send failed" }))
+                }
             }
         }
 
@@ -557,12 +561,12 @@ class ResilientSocket(
                 }
                 dialect.makeRequest(connection.stream)
             } catch (e: SocketSetupException) {
-                if (!connection.isClosed) connectionFailed(connection, SocketSignal.Fail(e.message ?: "Couldn't connect"))
+                if (!connection.isClosed) connectionFailed(connection, SocketSignal.Fail(e.message ?: modelString(R.string.couldnt_connect) { "Couldn't connect" }))
                 return@launch
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (!connection.isClosed) connectionFailed(connection, SocketSignal.Retry("Couldn't connect"))
+                if (!connection.isClosed) connectionFailed(connection, SocketSignal.Retry(modelString(R.string.couldnt_connect) { "Couldn't connect" }))
                 return@launch
             }
             if (connection.isClosed) return@launch
@@ -599,7 +603,7 @@ class ResilientSocket(
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 scope.launch {
-                    if (connection.socket === webSocket) connectionFailed(connection, SocketSignal.Retry("Closed by server ($code)"))
+                    if (connection.socket === webSocket) connectionFailed(connection, SocketSignal.Retry(modelString(R.string.closed_by_server_value, code) { "Closed by server ($code)" }))
                 }
             }
 
@@ -607,7 +611,7 @@ class ResilientSocket(
                 scope.launch {
                     if (connection.socket !== webSocket) return@launch
                     connection.response = response
-                    connectionFailed(connection, SocketSignal.Retry(t.message ?: "Connection failed"))
+                    connectionFailed(connection, SocketSignal.Retry(t.message ?: modelString(R.string.connection_failed) { "Connection failed" }))
                 }
             }
         }
@@ -628,7 +632,7 @@ class ResilientSocket(
             connection.jobs += scope.launch {
                 delay(HANDSHAKE_TIMEOUT_MS)
                 if (connection.socket === socket && (!connection.isReady || connection.isSuspended)) {
-                    connectionFailed(connection, SocketSignal.Retry("Handshake timed out"))
+                    connectionFailed(connection, SocketSignal.Retry(modelString(R.string.handshake_timed_out) { "Handshake timed out" }))
                 }
             }
         }
@@ -640,7 +644,7 @@ class ResilientSocket(
                     if (connection.isClosed) return@launch
                     val since = connection.awaitingReplySince
                     if (!connection.isSuspended && since != null && now() - since > timeout) {
-                        connectionFailed(connection, SocketSignal.Retry("No reply from the server"))
+                        connectionFailed(connection, SocketSignal.Retry(modelString(R.string.no_reply_from_the_server) { "No reply from the server" }))
                         return@launch
                     }
                 }

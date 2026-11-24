@@ -67,11 +67,11 @@ struct AccountContent: View {
             .shadow(color: Color(.firstLanguageInk).opacity(0.3), radius: 14, y: 6)
 
             VStack(spacing: 6) {
-                Text(account.isSignedIn ? "You're signed in" : "Sign in to Lively")
+                Text(account.isSignedIn ? String(localized: "You're signed in") : String(localized: "Sign in to Lively"))
                     .font(.system(.title, design: .rounded, weight: .bold))
                 Text(account.isSignedIn
-                    ? "Your translation time follows you to every device you sign in on."
-                    : "Optional, and it takes a few seconds. Signing in doubles your free translation time to two hours a day.")
+                    ? String(localized: "Your translation time follows you to every device you sign in on.")
+                    : String(localized: "Optional, and it takes a few seconds. Signing in doubles your free translation time to two hours a day."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -82,12 +82,12 @@ struct AccountContent: View {
 
     private var benefits: some View {
         VStack(alignment: .leading, spacing: 18) {
-            BenefitRow(systemImage: "timer", color: .orange, title: "Two hours a day, free",
-                       detail: "Double the hour you get without an account.")
-            BenefitRow(systemImage: "iphone.gen3", color: .blue, title: "On all your devices",
-                       detail: "Sign in on each one; your allowance comes along.")
-            BenefitRow(systemImage: "key.fill", color: .green, title: "No password to remember",
-                       detail: "Use Sign in with Apple, or a 6-digit code we email you.")
+            BenefitRow(systemImage: "timer", color: .orange, title: String(localized: "Two hours a day, free"),
+                       detail: String(localized: "Double the hour you get without an account."))
+            BenefitRow(systemImage: "iphone.gen3", color: .blue, title: String(localized: "On all your devices"),
+                       detail: String(localized: "Sign in on each one; your allowance comes along."))
+            BenefitRow(systemImage: "key.fill", color: .green, title: String(localized: "No password to remember"),
+                       detail: String(localized: "Use Sign in with Apple, or a 6-digit code we email you."))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
@@ -104,7 +104,7 @@ private struct BenefitRow: View {
         HStack(alignment: .top, spacing: 14) {
             SettingsIcon(systemImage: systemImage, color: color)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold))
+                Text(title).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
                 Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -136,7 +136,7 @@ private struct SignedInCard: View {
             HStack(spacing: 12) {
                 SettingsIcon(systemImage: "envelope.fill", color: .blue)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(Account.hidesEmail(email) ? "Email hidden" : "Email").font(.caption).foregroundStyle(.secondary)
+                    Text(Account.hidesEmail(email) ? String(localized: "Email hidden") : String(localized: "Email")).font(.caption).foregroundStyle(.secondary)
                     Text(Account.displayName(for: email)).font(.body).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer(minLength: 0)
@@ -225,8 +225,8 @@ private struct SignedInCard: View {
             Button("Delete Account", role: .destructive, action: delete)
         } message: {
             Text(account.hasFreePro
-                ? "This erases your email and account from Lively's servers, including the free Lively Pro that came with it. It can't be undone."
-                : "This erases your email and account from Lively's servers and can't be undone. It doesn't cancel a Lively Pro subscription.")
+                ? String(localized: "This erases your email and account from Lively's servers, including the free Lively Pro that came with it. It can't be undone.")
+                : String(localized: "This erases your email and account from Lively's servers and can't be undone. It doesn't cancel a Lively Pro subscription."))
         }
     }
 
@@ -301,7 +301,7 @@ private struct SignInForm: View {
             case .success(let authorization):
                 guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
                       let token = credential.identityToken.flatMap({ String(data: $0, encoding: .utf8) }) else {
-                    errorMessage = "Couldn't sign in with Apple. Try again."
+                    errorMessage = String(localized: "Couldn't sign in with Apple. Try again.")
                     return
                 }
                 let code = credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
@@ -310,7 +310,7 @@ private struct SignInForm: View {
             case .failure(let error):
                 // Closing the sheet isn't an error.
                 if (error as? ASAuthorizationError)?.code != .canceled {
-                    errorMessage = "Couldn't sign in with Apple. Try again, or use your email."
+                    errorMessage = String(localized: "Couldn't sign in with Apple. Try again, or use your email.")
                 }
             }
         }
@@ -364,7 +364,8 @@ private struct SignInForm: View {
             }
             .font(.body)
             .padding(.horizontal, 18)
-            .frame(height: 56)
+            .padding(.vertical, 8)
+            .frame(minHeight: 56)
             .background(Color(.card), in: .rect(cornerRadius: 18, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -374,7 +375,12 @@ private struct SignInForm: View {
 
             Button(action: sendCode) {
                 ZStack {
-                    Text("Email Me a Code").opacity(working ? 0 : 1)
+                    Text("Email Me a Code")
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                        .opacity(working ? 0 : 1)
                     if working { ProgressView().tint(.white) }
                 }
                 .font(.body.weight(.semibold))
@@ -431,7 +437,7 @@ private struct SignInForm: View {
                 Divider().frame(height: 18)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     let wait = Int(resendAvailableAt.timeIntervalSince(context.date).rounded(.up))
-                    Button(wait > 0 ? "Resend in \(wait)s" : "Resend Code", systemImage: "arrow.clockwise") {
+                    Button(wait > 0 ? String(localized: "Resend in \(wait)s") : String(localized: "Resend Code"), systemImage: "arrow.clockwise") {
                         send(to: sentTo)
                     }
                     .disabled(wait > 0)

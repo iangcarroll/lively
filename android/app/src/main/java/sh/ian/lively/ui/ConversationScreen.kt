@@ -1,5 +1,8 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -111,6 +114,7 @@ fun ConversationScreen(
     /** Opens Lively Pro saying today's free time has run out. */
     onShowLimit: () -> Unit,
 ) {
+    val resources = LocalResources.current
     val pair = settings.languages
     // The near side's language, kept within the current pair.
     val near = when {
@@ -172,7 +176,7 @@ fun ConversationScreen(
         if (automaticOffline) {
             Text(
                 // iOS goes on to offer on-device translation with a pair, which Android doesn't have.
-                "Automatic detection needs internet.",
+                stringResource(R.string.automatic_detection_needs_internet),
                 Modifier
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
@@ -242,7 +246,7 @@ fun ConversationScreen(
         if (DebugFlags.limit) {
             DebugFlags.limit = false
             pro.freeLimitReached = true
-            store.alert = "Today's free translation time is used up."
+            store.alert = resources.getString(R.string.todays_free_translation_time_is_used_up)
         }
     }
 
@@ -270,9 +274,9 @@ fun ConversationScreen(
             confirmButton = {
                 Row {
                     if (!settings.hasCredentials) {
-                        TextButton(onClick = { dismiss(); onShowSettings() }) { Text("Open Settings") }
+                        TextButton(onClick = { dismiss(); onShowSettings() }) { Text(stringResource(R.string.open_settings)) }
                     }
-                    TextButton(onClick = dismiss) { Text("OK") }
+                    TextButton(onClick = dismiss) { Text(stringResource(R.string.ok)) }
                 }
             },
         )
@@ -330,19 +334,19 @@ private fun TranscriptLayout(
             // Turned on from the menu in face-to-face or Settings; shown while
             // on, so it can be stopped from here.
             if (store.speaksTranslations) SpeakAloudButton(store)
-            if (!wide) TonalIconButton(Icons.Rounded.Splitscreen, "Face-to-face mode", onFaceToFace)
+            if (!wide) TonalIconButton(Icons.Rounded.Splitscreen, stringResource(R.string.face_to_face_mode), onFaceToFace)
             Box {
                 var menu by remember { mutableStateOf(false) }
-                TonalIconButton(Icons.Rounded.MoreVert, "More", onClick = { menu = true })
+                TonalIconButton(Icons.Rounded.MoreVert, stringResource(R.string.more), onClick = { menu = true })
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
                     DropdownMenuItem(
-                        text = { Text("Address") },
+                        text = { Text(stringResource(R.string.address)) },
                         leadingIcon = { Icon(Icons.Rounded.Place, null) },
                         onClick = { menu = false; onShowAddress() },
                     )
                     HorizontalDivider()
                     DropdownMenuItem(
-                        text = { Text("Settings") },
+                        text = { Text(stringResource(R.string.settings)) },
                         leadingIcon = { Icon(Icons.Rounded.Settings, null) },
                         onClick = { menu = false; onShowSettings() },
                     )
@@ -379,7 +383,7 @@ private fun TranscriptLayout(
                 Modifier.padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TonalIconButton(Icons.Rounded.DeleteOutline, "Clear conversation", store::clear, enabled = store.utterances.isNotEmpty())
+                TonalIconButton(Icons.Rounded.DeleteOutline, stringResource(R.string.clear_conversation), store::clear, enabled = store.utterances.isNotEmpty())
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     MicButton(
                         store.isListening, store.level, onClick = store::toggleListening, isHearing = store.isHearing,
@@ -390,7 +394,7 @@ private fun TranscriptLayout(
             }
             // The mic's own label is read by TalkBack; this one is for the eye.
             Text(
-                if (store.isListening) "Stop" else "Start",
+                if (store.isListening) stringResource(R.string.stop) else stringResource(R.string.start),
                 Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics {},
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -423,7 +427,7 @@ fun LanguagesSheet(settings: AppSettings, onDismiss: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Text("Languages", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.languages), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             // Automatic detection is the online engine's; other engines only take a pair.
             if (settings.providerID == SpeechProviders.SONIOX_ID) {
                 ConversationModePicker(settings, Modifier.widthIn(max = 420.dp))
@@ -435,7 +439,7 @@ fun LanguagesSheet(settings: AppSettings, onDismiss: () -> Unit) {
                 LanguagePairPicker(settings, Modifier.widthIn(max = 420.dp))
             }
             Text(
-                "Changing a language starts a new conversation.",
+                stringResource(R.string.changing_language_notice),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -447,13 +451,14 @@ fun LanguagesSheet(settings: AppSettings, onDismiss: () -> Unit) {
 /** Automatic or a chosen pair, as a segmented control. */
 @Composable
 fun ConversationModePicker(settings: AppSettings, modifier: Modifier = Modifier) {
-    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth().semantics { contentDescription = "Conversation" }) {
+    val resources = LocalResources.current
+    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth().semantics { contentDescription = resources.getString(R.string.conversation) }) {
         ConversationMode.entries.forEachIndexed { index, mode ->
             SegmentedButton(
                 selected = settings.conversationMode == mode,
                 onClick = { settings.conversationMode = mode },
                 shape = SegmentedButtonDefaults.itemShape(index, ConversationMode.entries.size),
-                label = { Text(mode.label, maxLines = 1) },
+                label = { Text(stringResource(mode.labelRes), textAlign = TextAlign.Center) },
             )
         }
     }
@@ -464,7 +469,7 @@ fun ConversationModePicker(settings: AppSettings, modifier: Modifier = Modifier)
 fun TextInputToggle(showsTextInput: Boolean, onChange: (Boolean) -> Unit, size: Dp = 48.dp) {
     TonalIconButton(
         if (showsTextInput) Icons.Rounded.KeyboardHide else Icons.Rounded.Keyboard,
-        "Type to translate",
+        stringResource(R.string.type_to_translate),
         onClick = { onChange(!showsTextInput) },
         size = size,
     )
@@ -499,32 +504,31 @@ fun LocationOfferCard(location: LocationLanguages, onDone: (changed: Boolean) ->
             ) {
                 SettingsIcon(Icons.Rounded.LocationOn, MaterialTheme.colorScheme.primary, size = 56.dp)
                 Text(
-                    "Set languages from your location?",
+                    stringResource(R.string.set_languages_from_your_location),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    if (asked) status.message ?: "Finding where you are…"
-                    else "Lively can choose your language and the local one for the country you're in, " +
-                        "and again when you travel. You can change this in Settings.",
+                    if (asked) status.message ?: stringResource(R.string.finding_where_you_are)
+                    else stringResource(R.string.location_offer_body),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
                 when {
                     !asked -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        PillButton("Use my location", onClick = {
+                        PillButton(stringResource(R.string.use_my_location), onClick = {
                             asked = true
                             setUsesLocation(true)
                         })
                         TextButton(onClick = { onDone(false) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                            Text("Not now", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.not_now), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     isWorking -> CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.5.dp)
                     else -> TextButton(onClick = { onDone(false) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text("OK", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.ok), style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }

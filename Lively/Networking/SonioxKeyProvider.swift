@@ -176,16 +176,16 @@ final class SonioxKeyProvider {
 
         guard http.statusCode == 200 else {
             let brokerError = try? JSONDecoder().decode(BrokerError.self, from: data)
-            let message = brokerError?.message
+            let message = brokerError.map { NSLocalizedString($0.message, tableName: "BrokerErrors", comment: "Broker error") }
             let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 0
             switch http.statusCode {
             // A per-minute limit clears quickly; reconnecting with backoff gets past it.
             case 429 where retryAfter <= 60: throw URLError(.resourceUnavailable)
             case 429 where brokerError?.plan == "free":
                 Pro.shared.freeLimitReached = true
-                throw SocketSetupError.fail(message ?? "Today's free translation time is used up.")
+                throw SocketSetupError.fail(message ?? String(localized: "Today's free translation time is used up."))
             case 400, 403, 429, 503:
-                throw SocketSetupError.fail(message ?? "Lively's key service turned down the request.")
+                throw SocketSetupError.fail(message ?? String(localized: "Lively's key service turned down the request."))
             default: throw URLError(.badServerResponse)
             }
         }

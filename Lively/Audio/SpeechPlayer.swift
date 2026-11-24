@@ -382,7 +382,7 @@ final class SpeechPlayer {
 
     private enum PlaybackError: LocalizedError {
         case routingUnavailable
-        var errorDescription: String? { "Lively couldn't route speech to the selected audio device. Reconnect your headphones and try again." }
+        var errorDescription: String? { String(localized: "Lively couldn't route speech to the selected audio device. Reconnect your headphones and try again.") }
     }
 
     /// Audio goes to headphones or a headset rather than a loudspeaker.

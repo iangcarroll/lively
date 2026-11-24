@@ -14,15 +14,15 @@ public enum NeuralVoiceError: Error, LocalizedError, Sendable, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .unloaded: "The offline voice model is not loaded."
-        case .missingAssets(let files): "Offline voice files are missing: \(files.joined(separator: ", "))."
-        case .corruptAssets(let detail): "The offline voice files could not be loaded: \(detail)"
-        case .unsupportedLanguage(let language): "Offline speech is not supported for \(language)."
-        case .unavailableVoice(let voice): "The offline voice \(voice) is not installed."
-        case let .voiceLanguageMismatch(voice, language): "Voice \(voice) does not support \(language)."
-        case .emptyText: "There is no text to speak."
-        case .textTooLong(let maximum): "Split this text into pieces of at most \(maximum) characters."
-        case .inferenceFailed(let detail): "Offline speech could not be generated: \(detail)"
+        case .unloaded: String(localized: "The offline voice model is not loaded.")
+        case .missingAssets(let files): String(localized: "Offline voice files are missing: \(files.joined(separator: ", ")).")
+        case .corruptAssets(let detail): String(localized: "The offline voice files could not be loaded: \(detail)")
+        case .unsupportedLanguage(let language): String(localized: "Offline speech is not supported for \(language).")
+        case .unavailableVoice(let voice): String(localized: "The offline voice \(voice) is not installed.")
+        case let .voiceLanguageMismatch(voice, language): String(localized: "Voice \(voice) does not support \(language).")
+        case .emptyText: String(localized: "There is no text to speak.")
+        case .textTooLong(let maximum): String(localized: "Split this text into pieces of at most \(maximum) characters.")
+        case .inferenceFailed(let detail): String(localized: "Offline speech could not be generated: \(detail)")
         }
     }
 }

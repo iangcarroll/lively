@@ -1,5 +1,8 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -99,7 +102,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -196,13 +198,13 @@ fun OnboardingScreen(settings: AppSettings, account: Account?, location: Locatio
                 PageDots(steps.size, pager.currentPage, light = welcome)
                 if (step == Step.ACCOUNT) {
                     TextButton(onClick = onFinish, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                        Text("Not now", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.not_now), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     val title = when {
-                        step == Step.WELCOME -> "Get started"
-                        step == Step.LANGUAGES && Step.ACCOUNT !in steps -> "Start talking"
-                        else -> "Continue"
+                        step == Step.WELCOME -> stringResource(R.string.get_started)
+                        step == Step.LANGUAGES && Step.ACCOUNT !in steps -> stringResource(R.string.start_talking)
+                        else -> stringResource(R.string.action_continue)
                     }
                     PillButton(
                         title,
@@ -229,7 +231,7 @@ fun OnboardingScreen(settings: AppSettings, account: Account?, location: Locatio
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            TonalIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = {
+            TonalIconButton(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), onClick = {
                 scope.launch { pager.animateScrollToPage((pager.currentPage - 1).coerceAtLeast(0)) }
             })
         }
@@ -243,7 +245,7 @@ private fun OnboardingPage(title: String, message: String, light: Boolean = fals
         // Tablets and unfolded foldables have room for a bigger picture.
         val grow = if (maxWidth >= 480.dp && maxHeight >= 760.dp) 1.25f else 1f
         // Landscape phones are too short for both; there the page scrolls.
-        val short = maxHeight < 300.dp
+        val short = maxHeight < 340.dp * LocalDensity.current.fontScale
         val compact = maxHeight < 520.dp
         val shortArtHeight = maxHeight * 0.8f
         Column(
@@ -306,14 +308,14 @@ private fun FitInside(grow: Float, content: @Composable () -> Unit) {
 @Composable
 private fun WelcomePage(languageCount: Int) = OnboardingPage(
     title = "Lively",
-    message = "Talk with anyone, face to face. Lively translates both of you as you speak, in $languageCount languages.",
+    message = stringResource(R.string.onboarding_welcome_body, languageCount),
     light = true,
 ) { GreetingBubbles() }
 
 @Composable
 private fun TablePage(active: Boolean) = OnboardingPage(
-    title = "Lay it flat between you",
-    message = "Just talk. Lively hears who's speaking, and each of you reads your own half, in your own language.",
+    title = stringResource(R.string.lay_it_flat_between_you),
+    message = stringResource(R.string.onboarding_table_body),
 ) { TableDemo(active) }
 
 @Composable
@@ -321,11 +323,11 @@ private fun LanguagesPage(settings: AppSettings, location: LocationLanguages) {
     val setUsesLocation = rememberLocationSwitch(location)
     val automatic = settings.usesAutomaticLanguageDetection
     OnboardingPage(
-        title = if (automatic) "Choose your language" else "Pick your languages",
+        title = if (automatic) stringResource(R.string.choose_your_language) else stringResource(R.string.pick_your_languages),
         message = if (automatic) {
-            "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection uses internet."
+            stringResource(R.string.onboarding_automatic_languages_body)
         } else {
-            "Lively listens for both and translates each into the other. You can change them any time."
+            stringResource(R.string.onboarding_pair_languages_body)
         },
     ) {
         if (automatic) {
@@ -352,7 +354,7 @@ private fun LanguagesPage(settings: AppSettings, location: LocationLanguages) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Icon(if (on) Icons.Rounded.LocationOn else Icons.Outlined.LocationOn, null, Modifier.size(18.dp))
-                    Text(if (on) "Using your location" else "Use my location", style = MaterialTheme.typography.labelLarge)
+                    Text(if (on) stringResource(R.string.using_your_location) else stringResource(R.string.use_my_location), style = MaterialTheme.typography.labelLarge)
                 }
             }
             location.status.message?.let { message ->
@@ -379,7 +381,7 @@ fun AutomaticLanguagePicker(settings: AppSettings, modifier: Modifier = Modifier
     var choosingOwn by remember { mutableStateOf(false) }
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
     Column(modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        LanguageCard("Your language", settings.speechListenerLanguage, Lively.colors.firstInk) { choosingOwn = true }
+        LanguageCard(stringResource(R.string.your_language), settings.speechListenerLanguage, Lively.colors.firstInk) { choosingOwn = true }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -391,9 +393,9 @@ fun AutomaticLanguagePicker(settings: AppSettings, modifier: Modifier = Modifier
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Other language", style = MaterialTheme.typography.titleSmall, color = secondary)
-                Text("Automatic", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = secondary)
-                Text("Detected when they speak", style = MaterialTheme.typography.bodyMedium, color = secondary)
+                Text(stringResource(R.string.other_language), style = MaterialTheme.typography.titleSmall, color = secondary)
+                Text(stringResource(R.string.automatic), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = secondary)
+                Text(stringResource(R.string.detected_when_they_speak), style = MaterialTheme.typography.bodyMedium, color = secondary)
             }
             Icon(Icons.Rounded.Language, null, tint = secondary)
         }
@@ -414,13 +416,14 @@ fun AutomaticLanguagePicker(settings: AppSettings, modifier: Modifier = Modifier
  */
 @Composable
 fun LanguagePairPicker(settings: AppSettings, modifier: Modifier = Modifier, extras: @Composable () -> Unit = {}) {
+    val resources = LocalResources.current
     var choosing by remember { mutableStateOf<LanguageSide?>(null) }
     val view = LocalView.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(contentAlignment = Alignment.Center) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                LanguageCard("You speak", settings.languages.first, Lively.colors.firstInk) { choosing = LanguageSide.FIRST }
-                LanguageCard("They speak", settings.languages.second, Lively.colors.secondInk) { choosing = LanguageSide.SECOND }
+                LanguageCard(stringResource(R.string.you_speak), settings.languages.first, Lively.colors.firstInk) { choosing = LanguageSide.FIRST }
+                LanguageCard(stringResource(R.string.they_speak), settings.languages.second, Lively.colors.secondInk) { choosing = LanguageSide.SECOND }
             }
             Surface(
                 onClick = {
@@ -430,7 +433,7 @@ fun LanguagePairPicker(settings: AppSettings, modifier: Modifier = Modifier, ext
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 shadowElevation = 4.dp,
-                modifier = Modifier.size(48.dp).semantics { contentDescription = "Swap languages" },
+                modifier = Modifier.size(48.dp).semantics { contentDescription = resources.getString(R.string.swap_languages) },
             ) {
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.SwapVert, null) }
             }
@@ -446,7 +449,7 @@ fun LanguagePairPicker(settings: AppSettings, modifier: Modifier = Modifier, ext
                 settings,
                 side,
                 onDone = { choosing = null },
-                title = if (side == LanguageSide.FIRST) "You speak" else "They speak",
+                title = if (side == LanguageSide.FIRST) stringResource(R.string.you_speak) else stringResource(R.string.they_speak),
                 closeIcon = true,
             )
         }
@@ -456,6 +459,7 @@ fun LanguagePairPicker(settings: AppSettings, modifier: Modifier = Modifier, ext
 /** One side of the pair: the language's own name, large, in its ink. */
 @Composable
 private fun LanguageCard(caption: String, language: Language, ink: Color, onClick: () -> Unit) {
+    val resources = LocalResources.current
     val shape = RoundedCornerShape(28.dp)
     Row(
         Modifier
@@ -466,8 +470,8 @@ private fun LanguageCard(caption: String, language: Language, ink: Color, onClic
             .background(Lively.colors.card)
             .background(ink.copy(alpha = 0.06f))
             .border(1.dp, ink.copy(alpha = 0.18f), shape)
-            .clickable(onClickLabel = "Choose a language", onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = "$caption: ${language.englishName}" }
+            .clickable(onClickLabel = stringResource(R.string.choose_a_language), onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = resources.getString(R.string.label_value, caption, language.displayName) }
             .padding(horizontal = 22.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -480,11 +484,9 @@ private fun LanguageCard(caption: String, language: Language, ink: Color, onClic
                         style = MaterialTheme.typography.headlineMedium.copy(localeList = shown.localeList()),
                         fontWeight = FontWeight.Bold,
                         color = ink,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
-                    if (shown.englishName != shown.nativeName) {
-                        Text(shown.englishName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (shown.hasDistinctDisplayName) {
+                        Text(shown.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -508,9 +510,10 @@ private fun AccountPage(account: Account, onSignedIn: () -> Unit) {
 
 @Composable
 private fun PageDots(count: Int, current: Int, light: Boolean) {
+    val resources = LocalResources.current
     val color = if (light) Color.White else MaterialTheme.colorScheme.onBackground
     Row(
-        Modifier.semantics(mergeDescendants = true) { contentDescription = "Page ${current + 1} of $count" },
+        Modifier.semantics(mergeDescendants = true) { contentDescription = resources.getString(R.string.page_value_of_value, current + 1, count) },
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         repeat(count) { index ->
@@ -620,6 +623,7 @@ private fun bubbleShape(tailLeading: Boolean) = GenericShape { size, _ ->
  */
 @Composable
 private fun TableDemo(active: Boolean) {
+    val resources = LocalResources.current
     val script = remember { DemoConversation.SCRIPT.take(3) }
     val tilt = remember { Animatable(0f) }
     var lineCount by remember { mutableIntStateOf(0) }
@@ -662,7 +666,7 @@ private fun TableDemo(active: Boolean) {
     Box(
         Modifier
             .size(260.dp, 390.dp)
-            .semantics { contentDescription = "A phone lying flat between two people. Each half shows the conversation in one person's language." },
+            .semantics { contentDescription = resources.getString(R.string.table_demo_description) },
         contentAlignment = Alignment.Center,
     ) {
         Box(

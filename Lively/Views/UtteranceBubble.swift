@@ -38,12 +38,12 @@ struct UtteranceBubble: View {
             .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
             .contextMenu {
                 if !utterance.trimmedSource.isEmpty {
-                    Button(spoken.map { "Copy \($0.nativeName)" } ?? "Copy original", systemImage: "doc.on.doc") {
+                    Button(spoken.map { String(localized: "Copy \($0.nativeName)") } ?? String(localized: "Copy original"), systemImage: "doc.on.doc") {
                         Clipboard.copy(utterance.trimmedSource)
                     }
                 }
                 if !utterance.translation.isEmpty {
-                    Button(utterance.target.map { "Copy \($0.nativeName)" } ?? "Copy translation", systemImage: "doc.on.doc") {
+                    Button(utterance.target.map { String(localized: "Copy \($0.nativeName)") } ?? String(localized: "Copy translation"), systemImage: "doc.on.doc") {
                         Clipboard.copy(utterance.translation)
                     }
                 }
@@ -64,14 +64,14 @@ struct UtteranceBubble: View {
     private func block(_ language: Language?, text: String, spoken: Bool) -> some View {
         let missingSource = spoken && text.isEmpty && utterance.isFinal
         return VStack(alignment: .leading, spacing: 4) {
-            OptionalLanguageTag(language: language, spoken: spoken, unknownTitle: spoken ? utterance.unidentifiedLanguageTitle : "Automatic")
+            OptionalLanguageTag(language: language, spoken: spoken, unknownTitle: spoken ? utterance.unidentifiedLanguageTitle : String(localized: "Automatic"))
             HStack(alignment: .lastTextBaseline, spacing: 6) {
                 Text(missingSource ? "—" : text)
                     .font(.transcript(language ?? utterance.listenerLanguage, emphasized: !spoken))
                     .foregroundStyle(spoken ? AnyShapeStyle(.primary) : AnyShapeStyle(language?.ink ?? .secondary))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityLabel(missingSource ? "Original transcript unavailable" : text)
+                    .accessibilityLabel(missingSource ? String(localized: "Original transcript unavailable") : text)
                 if spoken && !utterance.isFinal {
                     TypingDots(color: language?.ink ?? .secondary)
                 }

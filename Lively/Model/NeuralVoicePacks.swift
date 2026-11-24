@@ -206,12 +206,12 @@ final class NeuralVoicePacks {
     var updateBytes: Int64 { offered?.totalBytes ?? 0 }
     var statusText: String {
         switch status {
-        case .notInstalled: "Download needed"
-        case .checking: "Checking downloaded files…"
-        case .downloading: "Downloading…"
-        case .ready: isUpdateAvailable ? "Update available" : "All 54 voices available offline"
-        case .deleting: "Deleting voice files…"
-        case .failed: "Download needs attention"
+        case .notInstalled: String(localized: "Download needed")
+        case .checking: String(localized: "Checking downloaded files…")
+        case .downloading: String(localized: "Downloading…")
+        case .ready: isUpdateAvailable ? String(localized: "Update available") : String(localized: "All 54 voices available offline")
+        case .deleting: String(localized: "Deleting voice files…")
+        case .failed: String(localized: "Download needs attention")
         }
     }
 
@@ -567,11 +567,11 @@ nonisolated enum NeuralVoicePackError: LocalizedError {
     case notConfigured, manifest, integrity, notInstalled, server(Int)
     var errorDescription: String? {
         switch self {
-        case .notConfigured: "Offline voice downloads aren't configured in this build."
-        case .manifest: "The voice download details aren't valid. Update Lively and try again."
-        case .integrity: "The voice files couldn't be verified. Retry the download."
-        case .notInstalled: "Download the shared voice pack before using offline voices."
-        case .server(let status): "The voice download failed (HTTP \(status)). Try again."
+        case .notConfigured: String(localized: "Offline voice downloads aren't configured in this build.")
+        case .manifest: String(localized: "The voice download details aren't valid. Update Lively and try again.")
+        case .integrity: String(localized: "The voice files couldn't be verified. Retry the download.")
+        case .notInstalled: String(localized: "Download the shared voice pack before using offline voices.")
+        case .server(let status): String(localized: "The voice download failed (HTTP \(status)). Try again.")
         }
     }
 }

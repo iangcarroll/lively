@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "O Lively lê o texto nas fotos que você tira para traduzi-lo.";
+"NSLocationWhenInUseUsageDescription" = "O Lively identifica o país em que você está para escolher o idioma local adequado.";
+"NSMicrophoneUsageDescription" = "O Lively ouve sua conversa para transcrever e traduzir em tempo real.";
+"NSMotionUsageDescription" = "O Lively detecta quando você vira ou entrega o telefone para indicar brevemente que o microfone está ativo.";
+"NSSpeechRecognitionUsageDescription" = "O Lively transcreve no dispositivo quando não consegue acessar um serviço de fala.";

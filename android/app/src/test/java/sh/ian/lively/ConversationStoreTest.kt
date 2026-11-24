@@ -91,7 +91,7 @@ class ConversationStoreTest {
     private var clock = 0L
 
     private fun provider(id: String = SpeechProviders.SONIOX_ID) = SpeechProvider(
-        id = id, name = "Fake", summary = "", credentials = emptyList(), options = emptySet(),
+        id = id, name = "Fake", summaryRes = R.string.engine, credentials = emptyList(), options = emptySet(),
         languages = Language.SONIOX, makePipeline = { error("unused") },
     )
 

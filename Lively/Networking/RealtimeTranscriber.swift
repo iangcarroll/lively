@@ -78,7 +78,7 @@ final class RealtimeTranscriber: SpeechEngine, SocketDialect {
 
     var endOfAudioMessage: URLSessionWebSocketTask.Message? { .json(["type": "input_audio.end"]) }
     var readyWhenOpen: Bool { false }
-    var rejectedKeyMessage: String { "Your Mistral API key was rejected. Check it in Settings." }
+    var rejectedKeyMessage: String { String(localized: "Your Mistral API key was rejected. Check it in Settings.") }
 
     func sessionDidReset(_ stream: SocketStream) {
         onEvent(.sessionReset)
@@ -102,10 +102,10 @@ final class RealtimeTranscriber: SpeechEngine, SocketDialect {
             onEvent(.turnEnded)
         case "transcription.done":
             // The server finished this session (e.g. a duration limit). Start a fresh one.
-            return .retry("Session ended")
+            return .retry(String(localized: "Session ended"))
         case "error":
             let error = json["error"] as? [String: Any]
-            let message = error?["message"] as? String ?? "Transcription error"
+            let message = error?["message"] as? String ?? String(localized: "Transcription error")
             let code = "\(error?["code"] ?? "")"
             if code.contains("401") || message.localizedCaseInsensitiveContains("api key")
                 || message.localizedCaseInsensitiveContains("unauthorized") {
@@ -122,8 +122,8 @@ final class RealtimeTranscriber: SpeechEngine, SocketDialect {
 extension ProviderCredential {
     static let mistral = ProviderCredential(
         id: "mistral-api-key",
-        name: "Mistral API key",
-        help: "Create a key at console.mistral.ai."
+        name: String(localized: "Mistral API key"),
+        help: String(localized: "Create a key at console.mistral.ai.")
     )
 }
 
@@ -131,7 +131,7 @@ extension SpeechProvider {
     static let voxtralMistral = SpeechProvider(
         id: "voxtral-mistral",
         name: "Voxtral + Mistral",
-        summary: "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn.",
+        summary: String(localized: "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn."),
         credentials: [.mistral],
         options: [.speed, .translationModel],
         languages: Language.voxtral,

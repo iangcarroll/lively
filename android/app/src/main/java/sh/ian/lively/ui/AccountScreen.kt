@@ -1,5 +1,7 @@
 package sh.ian.lively.ui
 
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -123,7 +125,7 @@ fun AccountScreen(account: Account, pro: Pro, onBack: () -> Unit, onPro: () -> U
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Account") },
+                title = { Text(stringResource(R.string.account)) },
                 navigationIcon = { BackButton(onBack) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
@@ -167,12 +169,12 @@ fun AccountContent(account: Account, modifier: Modifier = Modifier, pro: Pro? = 
                     Column(verticalArrangement = Arrangement.spacedBy(32.dp)) {
                         SignInForm(account)
                         Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.padding(horizontal = 4.dp)) {
-                            Benefit(Icons.Rounded.Timer, Color(0xFFFF9500), "Two hours a day, free", "Double the hour you get without an account.")
-                            Benefit(Icons.Rounded.Devices, Color(0xFF007AFF), "On all your devices", "Sign in on each one; your allowance comes along.")
+                            Benefit(Icons.Rounded.Timer, Color(0xFFFF9500), stringResource(R.string.two_hours_a_day_free), stringResource(R.string.double_the_hour_you_get_without_an_account))
+                            Benefit(Icons.Rounded.Devices, Color(0xFF007AFF), stringResource(R.string.on_all_your_devices), stringResource(R.string.account_multiple_devices_benefit))
                             Benefit(
-                                Icons.Rounded.Key, Color(0xFF34C759), "No password to remember",
+                                Icons.Rounded.Key, Color(0xFF34C759), stringResource(R.string.no_password_to_remember),
                                 // Without a Google client ID, the build only has email sign-in.
-                                if (account.offersGoogle) "Use Sign in with Google, or a 6-digit code we email you." else "We email you a 6-digit code each time.",
+                                if (account.offersGoogle) stringResource(R.string.use_sign_in_with_google_or_a_6_digit_code_we) else stringResource(R.string.we_email_you_a_6_digit_code_each_time),
                             )
                         }
                     }
@@ -202,16 +204,16 @@ private fun Header(account: Account) {
             }
         }
         Text(
-            if (account.isSignedIn) "You're signed in" else "Sign in to Lively",
+            if (account.isSignedIn) stringResource(R.string.youre_signed_in) else stringResource(R.string.sign_in_to_lively),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
         Text(
             if (account.isSignedIn) {
-                "Your translation time follows you to every device you sign in on."
+                stringResource(R.string.signed_in_allowance_summary)
             } else {
-                "Optional, and it takes a few seconds. Signing in doubles your free translation time to two hours a day."
+                stringResource(R.string.onboarding_sign_in_body)
             },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -252,10 +254,10 @@ private fun SignedInCard(account: Account, email: String, pro: Pro?, onPro: () -
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 SettingsIcon(Icons.Rounded.Email, Color(0xFF007AFF))
                 Column(Modifier.weight(1f)) {
-                    Text(if (Account.hidesEmail(email)) "Email hidden" else "Email", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (Account.hidesEmail(email)) stringResource(R.string.email_hidden) else stringResource(R.string.email), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(Account.displayName(email), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                 }
-                Icon(Icons.Rounded.Verified, "Verified", tint = Lively.colors.live)
+                Icon(Icons.Rounded.Verified, stringResource(R.string.verified), tint = Lively.colors.live)
             }
             if (account.hasFreePro) {
                 HorizontalDivider(Modifier.padding(start = 66.dp), color = MaterialTheme.colorScheme.outlineVariant)
@@ -267,7 +269,7 @@ private fun SignedInCard(account: Account, email: String, pro: Pro?, onPro: () -
                     SettingsIcon(Icons.Rounded.Star, Color(0xFFFF9500))
                     Column {
                         Text("Lively Pro", style = MaterialTheme.typography.bodyLarge)
-                        Text("Included free with your account", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.included_free_with_your_account), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -284,7 +286,7 @@ private fun SignedInCard(account: Account, email: String, pro: Pro?, onPro: () -
                 ) {
                     SettingsIcon(Icons.Rounded.Star, Color(0xFFFF9500))
                     Column(Modifier.weight(1f)) {
-                        Text("Get 10 hours a day", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.get_10_hours_a_day), style = MaterialTheme.typography.bodyLarge)
                         Text("Lively Pro", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -296,7 +298,7 @@ private fun SignedInCard(account: Account, email: String, pro: Pro?, onPro: () -
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 shape = RoundedCornerShape(0.dp),
             ) {
-                Text("Sign out", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.sign_out), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMedium)
             }
         }
 
@@ -304,7 +306,7 @@ private fun SignedInCard(account: Account, email: String, pro: Pro?, onPro: () -
             if (deleting) {
                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
-                Text("Delete account", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.delete_account), color = MaterialTheme.colorScheme.error)
             }
         }
         deleteError?.let { ErrorLine(it) }
@@ -313,26 +315,26 @@ private fun SignedInCard(account: Account, email: String, pro: Pro?, onPro: () -
     if (confirmingSignOut) {
         AlertDialog(
             onDismissRequest = { confirmingSignOut = false },
-            title = { Text("Sign out of Lively?") },
-            text = { Text("You'll go back to this device's daily translation time.") },
+            title = { Text(stringResource(R.string.sign_out_of_lively)) },
+            text = { Text(stringResource(R.string.sign_out_allowance_notice)) },
             confirmButton = {
                 TextButton(onClick = { confirmingSignOut = false; account.signOut() }) {
-                    Text("Sign out", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.sign_out), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmingSignOut = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmingSignOut = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text("Delete your Lively account?") },
+            title = { Text(stringResource(R.string.delete_your_lively_account)) },
             text = {
                 Text(
                     if (account.hasFreePro) {
-                        "This erases your email and account from Lively's servers, including the free Lively Pro that came with it. It can't be undone."
+                        stringResource(R.string.delete_account_free_pro_notice)
                     } else {
-                        "This erases your email and account from Lively's servers and can't be undone. It doesn't cancel a Lively Pro subscription."
+                        stringResource(R.string.delete_account_subscription_notice)
                     },
                 )
             },
@@ -350,9 +352,9 @@ private fun SignedInCard(account: Account, email: String, pro: Pro?, onPro: () -
                             deleting = false
                         }
                     }
-                }) { Text("Delete account", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.delete_account), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmingDelete = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmingDelete = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -372,6 +374,7 @@ private fun ErrorLine(message: String) {
  */
 @Composable
 private fun SignInForm(account: Account) {
+    val resources = LocalResources.current
     var email by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     /** The address a code was sent to, while waiting for it. */
@@ -418,7 +421,7 @@ private fun SignInForm(account: Account) {
                 val result = GoogleSignIn.request(context, clientID) ?: return@run
                 account.signInWithGoogle(result.idToken, result.nonce)
             } catch (e: GoogleSignIn.Failed) {
-                throw Account.AccountException(e.message ?: "Couldn't sign in with Google. Try again.")
+                throw Account.AccountException(e.message ?: resources.getString(R.string.couldnt_sign_in_with_google_try_again))
             }
         }
     }
@@ -495,6 +498,7 @@ private fun EmailStep(
     /** Null when the build has no Google client ID. */
     onGoogle: (() -> Unit)?,
 ) {
+    val resources = LocalResources.current
     var focused by remember { mutableStateOf(false) }
     val border by animateColorAsState(
         if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
@@ -534,7 +538,7 @@ private fun EmailStep(
                     .onFocusChanged { focused = it.isFocused }
                     .semantics {
                         contentType = ContentType.EmailAddress
-                        contentDescription = "Email"
+                        contentDescription = resources.getString(R.string.email)
                     },
                 decorationBox = { inner ->
                     Box {
@@ -546,7 +550,7 @@ private fun EmailStep(
                 },
             )
         }
-        PillButton("Email me a code", onClick = onSubmit, enabled = plausible, working = working)
+        PillButton(stringResource(R.string.email_me_a_code), onClick = onSubmit, enabled = plausible, working = working)
     }
 }
 
@@ -569,7 +573,7 @@ private fun GoogleButton(onClick: () -> Unit, enabled: Boolean) {
         Image(painterResource(R.drawable.ic_google), null, Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Text(
-            "Continue with Google",
+            stringResource(R.string.continue_with_google),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = if (dark) Color(0xFFE3E3E3) else Color(0xFF1F1F1F),
@@ -581,7 +585,7 @@ private fun GoogleButton(onClick: () -> Unit, enabled: Boolean) {
 private fun OrDivider() {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
-        Text("or", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.or), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
@@ -598,6 +602,7 @@ private fun CodeStep(
     onChangeEmail: () -> Unit,
     onResend: () -> Unit,
 ) {
+    val resources = LocalResources.current
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     var focused by remember { mutableStateOf(false) }
@@ -618,7 +623,7 @@ private fun CodeStep(
 
     Column(verticalArrangement = Arrangement.spacedBy(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Enter the code we emailed to", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.enter_the_code_we_emailed_to), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(sentTo, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
         }
 
@@ -647,7 +652,7 @@ private fun CodeStep(
                     .onFocusChanged { focused = it.isFocused }
                     .semantics {
                         contentType = ContentType.SmsOtpCode
-                        contentDescription = "6-digit code"
+                        contentDescription = resources.getString(R.string.six_digit_code)
                     },
             )
             Row(
@@ -664,10 +669,10 @@ private fun CodeStep(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onChangeEmail, enabled = !working, modifier = Modifier.weight(1f)) { Text("Change email") }
+            TextButton(onClick = onChangeEmail, enabled = !working, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.change_email)) }
             VerticalDivider(Modifier.height(18.dp))
             TextButton(onClick = onResend, enabled = !working && wait == 0L, modifier = Modifier.weight(1f)) {
-                Text(if (wait > 0) "Resend in ${wait}s" else "Resend code")
+                Text(if (wait > 0) stringResource(R.string.resend_in_values, wait) else stringResource(R.string.resend_code))
             }
         }
     }

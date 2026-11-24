@@ -1,5 +1,7 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -155,18 +157,18 @@ fun ProScreen(
                     ) {
                         when {
                             pro.isSubscribed -> {
-                                ProHeader("You have Lively Pro", "It renews through Google Play until you cancel.")
-                                PillButton("Manage subscription", onClick = { uri.openUri(pro.manageURL) })
+                                ProHeader(stringResource(R.string.you_have_lively_pro), stringResource(R.string.play_renewal_status))
+                                PillButton(stringResource(R.string.manage_subscription), onClick = { uri.openUri(pro.manageURL) })
                             }
-                            account?.hasFreePro == true -> ProHeader("You have Lively Pro", "It's included free with your account.")
+                            account?.hasFreePro == true -> ProHeader(stringResource(R.string.you_have_lively_pro), stringResource(R.string.its_included_free_with_your_account))
                             // The subtitle says what Pro adds, so the list of
                             // benefits is left out and the plans stay close.
                             limitReached -> ProHeader(
-                                "That's today's free time",
+                                stringResource(R.string.thats_todays_free_time),
                                 if (offersSignIn) {
-                                    "Free translation is back tomorrow. Sign in for another hour today, or get 10 hours a day with Pro."
+                                    stringResource(R.string.free_limit_signed_out)
                                 } else {
-                                    "Free translation is back tomorrow. Lively Pro gives you 10 hours a day."
+                                    stringResource(R.string.free_limit_signed_in)
                                 },
                                 showsBenefits = false,
                             )
@@ -189,8 +191,8 @@ fun ProScreen(
 private fun Links() {
     val uri = LocalUriHandler.current
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        QuietButton("Terms of Use") { uri.openUri(TERMS) }
-        QuietButton("Privacy Policy") { uri.openUri(PRIVACY) }
+        QuietButton(stringResource(R.string.terms_of_use)) { uri.openUri(TERMS) }
+        QuietButton(stringResource(R.string.privacy_policy)) { uri.openUri(PRIVACY) }
     }
 }
 
@@ -225,12 +227,12 @@ private fun Store(pro: Pro, onSignIn: (() -> Unit)?) {
                         PlanCard(offer, offer.productID == selected) { selected = offer.productID }
                     }
                 }
-                PillButton("Subscribe", onClick = {
+                PillButton(stringResource(R.string.subscribe), onClick = {
                     val offer = offers.firstOrNull { it.productID == selected } ?: return@PillButton
                     activity?.let { pro.buy(it, offer) }
                 })
                 Text(
-                    "Renews automatically until you cancel in Google Play. Cancel anytime.",
+                    stringResource(R.string.play_subscription_terms),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -239,10 +241,10 @@ private fun Store(pro: Pro, onSignIn: (() -> Unit)?) {
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (onSignIn != null) {
-                QuietButton("Sign in for another free hour", MaterialTheme.colorScheme.primary, onSignIn)
+                QuietButton(stringResource(R.string.sign_in_for_another_free_hour), MaterialTheme.colorScheme.primary, onSignIn)
             }
             // Play may only have been slow, so this is offered whatever the store said.
-            QuietButton("Restore purchases") { pro.start() }
+            QuietButton(stringResource(R.string.restore_purchases)) { pro.start() }
         }
     }
 }
@@ -283,13 +285,13 @@ private fun PlanCard(offer: Pro.Offer, selected: Boolean, onClick: () -> Unit) {
                     )
                 }
             }
-            Text("${offer.price} per ${offer.period}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.price_per_period, offer.price, if (offer.period == "year") stringResource(R.string.year) else stringResource(R.string.month)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun ProHeader(title: String = "Lively Pro", subtitle: String = "Translate for hours, every day.", showsBenefits: Boolean = true) {
+private fun ProHeader(title: String = "Lively Pro", subtitle: String = stringResource(R.string.translate_for_hours_every_day), showsBenefits: Boolean = true) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(
@@ -306,9 +308,9 @@ private fun ProHeader(title: String = "Lively Pro", subtitle: String = "Translat
             Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
         if (showsBenefits) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Benefit(Icons.Rounded.Timer, Color(0xFFFF9500), "10 hours a day", "Free gives you an hour a day, or two when you're signed in.")
-            Benefit(Icons.Rounded.Devices, Color(0xFF007AFF), "On all your devices", "Pro comes with your Google account. No sign-in needed.")
-            Benefit(Icons.AutoMirrored.Rounded.Undo, Color(0xFF34C759), "Cancel anytime", "Manage it in Google Play's Payments & subscriptions.")
+            Benefit(Icons.Rounded.Timer, Color(0xFFFF9500), stringResource(R.string.ten_hours_a_day), stringResource(R.string.free_plan_allowance))
+            Benefit(Icons.Rounded.Devices, Color(0xFF007AFF), stringResource(R.string.on_all_your_devices), stringResource(R.string.pro_google_account_benefit))
+            Benefit(Icons.AutoMirrored.Rounded.Undo, Color(0xFF34C759), stringResource(R.string.cancel_anytime), stringResource(R.string.manage_play_subscription_help))
         }
     }
 }

@@ -26,11 +26,11 @@ struct OfflineLanguagesView: View {
 
             Section {
                 ForEach(packs.components) { component in
-                    LabeledContent(component.title, value: component.state.rawValue)
+                    LabeledContent(component.title, value: component.state.label)
                 }
                 if packs.components.isEmpty { ProgressView("Checking this device…") }
             } header: {
-                Text("\(packs.languages.first.englishName) ↔ \(packs.languages.second.englishName)")
+                Text("\(packs.languages.first.displayName) ↔ \(packs.languages.second.displayName)")
             } footer: {
                 Text("Prepare both languages before going offline. These downloads also cover typed text and text read from photos.")
             }
@@ -40,7 +40,7 @@ struct OfflineLanguagesView: View {
                     ProgressView(packs.downloadLabel)
                     Button("Stop preparing", role: .cancel) { packs.cancel() }
                 } else {
-                    Button(packs.ready ? "Check downloads again" : "Download languages") {
+                    Button(packs.ready ? String(localized: "Check downloads again") : String(localized: "Download languages")) {
                         if packs.ready { Task { await packs.refresh() } } else { packs.download() }
                     }
                     .disabled(!packs.canDownload)

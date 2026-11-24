@@ -123,7 +123,7 @@ final class NeuralSpeaker: TranslationSpeaker {
             while !Task.isCancelled, let line = self?.nextLine(token) {
                 guard let player = self?.player, let renderer = self?.renderer else { return }
                 do {
-                    self?.previewStatus("Preparing audio…", for: line, token: token)
+                    self?.previewStatus(String(localized: "Preparing audio…"), for: line, token: token)
                     let available: Bool
                     if line.isPreview {
                         if !SpeechPlayer.supportsDirectionalOutput {
@@ -145,7 +145,7 @@ final class NeuralSpeaker: TranslationSpeaker {
                         self?.finishLine(line, token: token)
                         continue
                     }
-                    self?.previewStatus("Preparing offline voice…", for: line, token: token)
+                    self?.previewStatus(String(localized: "Preparing offline voice…"), for: line, token: token)
                     try Task.checkCancellation()
                     guard self?.generation == token else { throw CancellationError() }
                     let stream = try await renderer.audio(for: line.text, voice: line.voice)
@@ -161,7 +161,7 @@ final class NeuralSpeaker: TranslationSpeaker {
                         produced = true
                         player.play(pcm)
                         audible = audible || player.isAudible
-                        self?.previewStatus("Playing \(line.voice.name)", for: line, token: token)
+                        self?.previewStatus(String(localized: "Playing \(line.voice.name)"), for: line, token: token)
                     }
                     try Task.checkCancellation()
                     guard self?.generation == token else { throw CancellationError() }
@@ -504,12 +504,12 @@ private enum NeuralSpeechError: LocalizedError {
     case unsupportedLanguage(String), textTooLong, queueFull, noAudio, invalidAudio, outputUnavailable
     var errorDescription: String? {
         switch self {
-        case .unsupportedLanguage(let language): "A downloaded voice is not available for \(language)."
-        case .textTooLong: "This offline speech request is too long. Split it into shorter sentences."
-        case .queueFull: "Too many sentences are waiting for offline speech. Start listening again to clear them."
-        case .noAudio: "The downloaded voice did not produce audio."
-        case .invalidAudio: "The downloaded voice produced invalid audio."
-        case .outputUnavailable: "The voice preview could not play on the selected output."
+        case .unsupportedLanguage(let language): String(localized: "A downloaded voice is not available for \(language).")
+        case .textTooLong: String(localized: "This offline speech request is too long. Split it into shorter sentences.")
+        case .queueFull: String(localized: "Too many sentences are waiting for offline speech. Start listening again to clear them.")
+        case .noAudio: String(localized: "The downloaded voice did not produce audio.")
+        case .invalidAudio: String(localized: "The downloaded voice produced invalid audio.")
+        case .outputUnavailable: String(localized: "The voice preview could not play on the selected output.")
         }
     }
 }

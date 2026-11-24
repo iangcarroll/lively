@@ -168,7 +168,7 @@ final class ConversationStore {
         }
         mic.onInterrupted = { [weak self] in
             self?.stopListening()
-            self?.alert = "The microphone stopped. Tap the mic to start again."
+            self?.alert = String(localized: "The microphone stopped. Tap the mic to start again.")
         }
 
         pathMonitor.pathUpdateHandler = { [weak self] path in
@@ -262,7 +262,7 @@ final class ConversationStore {
         let provider = settings.provider
         guard provider.id == SpeechProvider.onDevice.id || settings.hasCredentials else {
             let names = provider.credentials.map(\.name).formatted(.list(type: .and))
-            alert = "Add your \(names) in Settings to start."
+            alert = String(localized: "Add your \(names) in Settings to start.")
             return
         }
         let generation = UUID()
@@ -274,7 +274,7 @@ final class ConversationStore {
             let permitted = await MicCapture.requestPermission()
             guard !Task.isCancelled, listeningGeneration == generation else { return }
             guard permitted else {
-                alert = "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone."
+                alert = String(localized: "Lively needs microphone access. You can turn it on in Settings › Privacy & Security › Microphone.")
                 return
             }
             guard !isListening else { return }
@@ -701,7 +701,7 @@ final class ConversationStore {
         translations.removeAll()
         for utterance in interruptedBackfill {
             utterance.translationState = utterance.translation.isEmpty ? .idle
-                : .failed("Translation interrupted. Tap to retry.")
+                : .failed(String(localized: "Translation interrupted. Tap to retry."))
         }
         if resume { startListening() }
         // The replacement recognizer starts asynchronously. Accepted text can
@@ -833,7 +833,7 @@ final class ConversationStore {
             speechFlushes.removeValue(forKey: utterance.id)?.cancel()
             if utterance.translationState == .working || utterance.translationState == .waitingForNetwork {
                 utterance.translationState = utterance.translation.isEmpty
-                    ? .failed("Translation interrupted. Tap to retry.") : .current
+                    ? .failed(String(localized: "Translation interrupted. Tap to retry.")) : .current
             }
         }
         automaticSessionID = UUID()
@@ -1122,7 +1122,7 @@ final class ConversationStore {
         if utterance.translation.isEmpty {
             utterance.translatedSource = nil
             utterance.translatedLanguage = nil
-            utterance.translationState = .failed("Translation did not finish. Tap to retry.")
+            utterance.translationState = .failed(String(localized: "Translation did not finish. Tap to retry."))
         } else {
             utterance.translationState = .current
         }
@@ -1187,7 +1187,7 @@ final class ConversationStore {
         utterance.waitsForAutomaticPartner = utterance.sourceLanguage == utterance.listenerLanguage
             && utterance.target == nil && detectedPartnerLanguage == nil
         utterance.translationState = utterance.target == nil ? .awaitingPartner
-            : .failed("Translation interrupted. Tap to retry.")
+            : .failed(String(localized: "Translation interrupted. Tap to retry."))
     }
 
     /// Ends the turn if no text and no turn events have arrived for a while,

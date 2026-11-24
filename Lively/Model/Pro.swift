@@ -94,10 +94,10 @@ final class Pro {
         do {
             let products = try await Product.products(for: Self.productIDs)
             store = products.isEmpty
-                ? .unavailable("Lively Pro isn't available from the App Store on this device yet.")
+                ? .unavailable(String(localized: "Lively Pro isn't available from the App Store on this device yet."))
                 : .ready(Self.offers(products))
         } catch {
-            store = .unavailable("Couldn't reach the App Store. Check your connection and try again.")
+            store = .unavailable(String(localized: "Couldn't reach the App Store. Check your connection and try again."))
         }
     }
 
@@ -128,9 +128,9 @@ final class Pro {
                 let yearly = product.subscription?.subscriptionPeriod.unit == .year
                 return Offer(
                     id: product.id,
-                    title: yearly ? "Yearly" : "Monthly",
+                    title: yearly ? String(localized: "Yearly") : String(localized: "Monthly"),
                     price: product.displayPrice,
-                    period: yearly ? "year" : "month",
+                    period: yearly ? String(localized: "year") : String(localized: "month"),
                     badge: yearly ? monthly.flatMap { savingBadge(yearly: product.price, monthly: $0) } : nil,
                     product: product
                 )
@@ -146,7 +146,7 @@ final class Pro {
         var floored = Decimal()
         NSDecimalRound(&floored, &fraction, 0, .down)
         let saving = NSDecimalNumber(decimal: floored).intValue
-        return saving >= 5 ? "Save \(saving)%" : nil
+        return saving >= 5 ? String(localized: "Save \(saving)%") : nil
     }
 
     private static var isDemo: Bool {
@@ -159,7 +159,7 @@ final class Pro {
 
     /// `Config/Lively.storekit`'s local test prices, for demo mode.
     private static let demoOffers = [
-        Offer(id: "hk.cautela.lively.pro.yearly", title: "Yearly", price: "$39.99", period: "year", badge: "Save 33%", product: nil),
-        Offer(id: "hk.cautela.lively.pro.monthly", title: "Monthly", price: "$4.99", period: "month", badge: nil, product: nil),
+        Offer(id: "hk.cautela.lively.pro.yearly", title: String(localized: "Yearly"), price: "$39.99", period: String(localized: "year"), badge: String(localized: "Save 33%"), product: nil),
+        Offer(id: "hk.cautela.lively.pro.monthly", title: String(localized: "Monthly"), price: "$4.99", period: String(localized: "month"), badge: nil, product: nil),
     ]
 }

@@ -121,7 +121,7 @@ struct BrokerTranslator: TranslationService {
         let stream = chatCompletionStream(request(body: body, token: token), session: Self.session) { status, data in
             if status == 401, let token { return BrokerTranslationError.tokenRejected(token) }
             let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String
-            return message.map { TranslationError.service($0, permanent: status != 502) } ?? TranslationError.http(status)
+            return message.map { TranslationError.service(NSLocalizedString($0, tableName: "BrokerErrors", comment: "Broker error"), permanent: status != 502) } ?? TranslationError.http(status)
         }
         guard token != nil else { return stream }
         // A signed-out or expired session: drop it and ask again anonymously.
@@ -240,7 +240,7 @@ struct AppleTranslator: TranslationService {
                 } catch is CancellationError {
                     continuation.finish(throwing: CancellationError())
                 } catch {
-                    continuation.finish(throwing: TranslationError.onDevice(languageName: target.englishName))
+                    continuation.finish(throwing: TranslationError.onDevice(languageName: target.displayName))
                 }
             }
             continuation.onTermination = { _ in task.cancel() }
@@ -275,11 +275,11 @@ enum TranslationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .onDevice(let name): "Offline translation into \(name) isn't ready. Download both languages in Settings → Offline Languages while connected to the internet."
+        case .onDevice(let name): String(localized: "Offline translation into \(name) isn't ready. Download both languages in Settings → Offline Languages while connected to the internet.")
         case .service(let message, _): message
-        case .http(401), .http(403): "API key rejected"
-        case .http(429): "Rate limited"
-        case .http(let code): "Server error \(code)"
+        case .http(401), .http(403): String(localized: "API key rejected")
+        case .http(429): String(localized: "Rate limited")
+        case .http(let code): String(localized: "Server error \(code)")
         }
     }
 

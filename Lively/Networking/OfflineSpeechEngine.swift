@@ -181,14 +181,14 @@ final class OfflineSpeechEngine: SpeechEngine {
             let language = spokenLanguage
             let locale = Self.locale(for: language, script: script)
             guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
-                throw OfflineSpeechError.unsupported(language.englishName)
+                throw OfflineSpeechError.unsupported(language.displayName)
             }
             guard !Task.isCancelled, runID == self.runID else { return }
             let transcriber = Self.makeTranscriber(locale: supported)
             let status = await AssetInventory.status(forModules: [transcriber])
             guard !Task.isCancelled, runID == self.runID else { return }
-            guard status != .unsupported else { throw OfflineSpeechError.unsupported(language.englishName) }
-            guard status == .installed else { throw OfflineSpeechError.notDownloaded(language.englishName) }
+            guard status != .unsupported else { throw OfflineSpeechError.unsupported(language.displayName) }
+            guard status == .installed else { throw OfflineSpeechError.notDownloaded(language.displayName) }
             let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) ?? Self.sourceFormat
             guard !Task.isCancelled, runID == self.runID else { return }
             guard let converter = AVAudioConverter(from: Self.sourceFormat, to: format) else {
@@ -463,13 +463,13 @@ private enum OfflineSpeechError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            "On-device speech recognition isn't available on this device."
+            String(localized: "On-device speech recognition isn't available on this device.")
         case .unsupported(let language):
-            "On-device speech recognition isn't available for \(language) on this device."
+            String(localized: "On-device speech recognition isn't available for \(language) on this device.")
         case .notDownloaded(let language):
-            "\(language) speech recognition isn't downloaded. Open Settings > Offline Languages while online to download it."
+            String(localized: "\(language) speech recognition isn't downloaded. Open Settings > Offline Languages while online to download it.")
         case .audioFormat:
-            "The microphone audio couldn't be converted for on-device speech recognition."
+            String(localized: "The microphone audio couldn't be converted for on-device speech recognition.")
         }
     }
 }
@@ -477,8 +477,8 @@ private enum OfflineSpeechError: LocalizedError {
 extension SpeechProvider {
     static let onDevice = SpeechProvider(
         id: "on-device",
-        name: "On-device",
-        summary: "Apple's speech recognition and text translation run on this device. Download voices separately for offline spoken translations.",
+        name: String(localized: "On-device"),
+        summary: String(localized: "Apple's speech recognition and text translation run on this device. Download voices separately for offline spoken translations."),
         credentials: [],
         options: [],
         languages: Language.appleOnDevice,

@@ -1,5 +1,7 @@
 package sh.ian.lively.model
 
+import sh.ian.lively.R
+import androidx.annotation.StringRes
 import java.util.Locale
 
 /** A spoken language, by ISO 639-1 code. */
@@ -14,6 +16,8 @@ value class Language(val code: String) {
     val englishName: String
         get() = locale.getDisplayLanguage(Locale.ENGLISH).ifEmpty { code }
 
+    val displayName: String get() = locale.getDisplayLanguage(Locale.getDefault()).ifEmpty { englishName }
+
     /** Name of the language written in that language, e.g. "Español". */
     val nativeName: String
         get() {
@@ -22,9 +26,11 @@ value class Language(val code: String) {
             return name.substring(0, 1).uppercase(locale) + name.substring(1)
         }
 
-    /** "Spanish · Español", or just "English" when the names match. */
+    val hasDistinctDisplayName: Boolean get() = !displayName.equals(nativeName, ignoreCase = true)
+
+    /** The localized and native names, without repeating the same name. */
     val pickerName: String
-        get() = if (englishName == nativeName) englishName else "$englishName · $nativeName"
+        get() = if (hasDistinctDisplayName) "$displayName · $nativeName" else nativeName
 
     /** Written right to left, so a reader's half of the screen mirrors. */
     val isRightToLeft: Boolean get() = code in RTL
@@ -102,8 +108,8 @@ enum class ChineseScript(val id: String) {
     SIMPLIFIED("simplified"),
     TRADITIONAL("traditional");
 
-    /** English first, for whoever is setting Lively up. */
-    val label: String get() = if (this == SIMPLIFIED) "Simplified 简体" else "Traditional 繁體"
+    /** Shown in the interface language. */
+    @get:StringRes val labelRes: Int get() = if (this == SIMPLIFIED) R.string.simplified else R.string.traditional
     val promptName: String get() = if (this == SIMPLIFIED) "Simplified Chinese" else "Traditional Chinese"
 
     /**
@@ -126,10 +132,10 @@ object ScriptConverter {
 }
 
 /** Streaming delay for Voxtral Realtime. Lower is faster, higher is more accurate. */
-enum class Latency(val milliseconds: Int, val label: String) {
-    FASTEST(240, "Fastest"),
-    BALANCED(480, "Balanced"),
-    ACCURATE(960, "Accurate");
+enum class Latency(val milliseconds: Int, @get:StringRes val labelRes: Int) {
+    FASTEST(240, R.string.fastest),
+    BALANCED(480, R.string.balanced),
+    ACCURATE(960, R.string.accurate);
 
     companion object {
         fun from(ms: Int) = entries.firstOrNull { it.milliseconds == ms } ?: FASTEST

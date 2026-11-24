@@ -22,6 +22,7 @@ struct OnboardingView: View {
     /// The iPhone Duo's status column, which the tour spans instead, centered
     /// on the screen.
     @State private var statusColumn: StatusColumn?
+    @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.colorScheme) private var colorScheme
 
     enum Step: Int, CaseIterable {
@@ -56,7 +57,7 @@ struct OnboardingView: View {
         // Swiping back works too, but nothing on the page says so.
         .overlay(alignment: .topLeading) {
             if step != steps.first {
-                GlassIconButton(systemImage: "chevron.left", label: "Back", action: goBack)
+                GlassIconButton(systemImage: "chevron.backward", label: String(localized: "Back"), action: goBack)
                     .padding(.leading, 16)
                     .padding(.top, 8)
                     .transition(.opacity)
@@ -105,19 +106,26 @@ struct OnboardingView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 52)
+                    .accessibilityIdentifier("onboardingSkip")
                     .contentShape(.rect)
             } else {
                 Button(action: advance) {
                     Text(primaryTitle)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(step == .welcome ? Self.welcomeInk : .white)
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .contentShape(.capsule)
                 }
+                .accessibilityIdentifier("onboardingNext")
                 .buttonStyle(PressableCapsule(fill: step == .welcome ? .white : .accentColor))
             }
         }
         .padding(.horizontal, 24)
+        .padding(.top, step == .account ? 12 : 0)
         .padding(.bottom, 12)
     }
 
@@ -126,10 +134,10 @@ struct OnboardingView: View {
 
     private var primaryTitle: String {
         switch step {
-        case .welcome: "Get Started"
-        case .table: onlineSelection ? "Use Online Translation" : "Use On-Device Translation"
-        case .languages where !steps.contains(.account): "Start Talking"
-        default: "Continue"
+        case .welcome: String(localized: "Get Started")
+        case .table: onlineSelection ? String(localized: "Use Online Translation") : String(localized: "Use On-Device Translation")
+        case .languages where !steps.contains(.account): String(localized: "Start Talking")
+        default: String(localized: "Continue")
         }
     }
 
@@ -156,11 +164,12 @@ struct OnboardingView: View {
             .onEnded { drag in
                 guard abs(drag.translation.width) > abs(drag.translation.height) * 1.5 else { return }
                 // A swipe can navigate, but only the labeled button enables online sharing.
-                if drag.translation.width < -60, step != .account,
+                let distance = layoutDirection == .rightToLeft ? -drag.translation.width : drag.translation.width
+                if distance < -60, step != .account,
                    step != .table || !onlineSelection || settings.onlineProcessing == true {
                     advance()
                 }
-                if drag.translation.width > 60 { goBack() }
+                if distance > 60 { goBack() }
             }
     }
 }
@@ -168,28 +177,46 @@ struct OnboardingView: View {
 // MARK: - Pages
 
 /// The page layout every step shares: a picture, then a title and a line or two.
-private struct OnboardingPage<Art: View>: View {
+private struct OnboardingPage<Art: View, Footer: View>: View {
     let title: String
     let message: String
-    var light = false
-    @ViewBuilder var art: Art
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    @Environment(\.statusColumn) private var statusColumn
-    /// The picture's own height, and the height it has room for.
-    @State private var artHeight: CGFloat = 0
-    @State private var room: CGFloat = 0
+    let light: Bool
+    let containsControls: Bool
+    let art: Art
+    let footer: Footer
 
-    /// Scales the picture down to fit the space it's given (or up where
-    /// there's room), so it never runs into the words below. The unfolded
-    /// Duo is wide but short, so a fixed scale there overlapped the title.
-    private var artScale: CGFloat {
-        // iPad and the unfolded Duo have room for a bigger picture.
-        let grow: CGFloat = sizeClass == .regular ? 1.3 : 1
-        guard artHeight > 0, room > 0 else { return 1 }
-        return min(grow, room / artHeight)
+    init(title: String, message: String, light: Bool = false, containsControls: Bool = false,
+         @ViewBuilder footer: () -> Footer = { EmptyView() }, @ViewBuilder art: () -> Art) {
+        self.title = title
+        self.message = message
+        self.light = light
+        self.containsControls = containsControls
+        self.footer = footer()
+        self.art = art()
     }
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.statusColumn) private var statusColumn
+    @State private var artHeight: CGFloat = 0
+    @State private var captionHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
+
     var body: some View {
+        GeometryReader { geometry in
+            // Reserve the caption's natural height first. A ScrollView proposes
+            // unbounded height, so the illustration needs an explicit allocation.
+            let minimum = containsControls ? artHeight : min(80, artHeight)
+            let room = max(minimum, geometry.size.height - captionHeight - footerHeight)
+            let growth: CGFloat = sizeClass == .regular ? 1.3 : 1
+            let scale = containsControls || artHeight == 0 ? 1 : min(growth, room / artHeight)
+            ScrollView {
+                content(room: room, scale: scale)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private func content(room: CGFloat, scale: CGFloat) -> some View {
         VStack(spacing: 0) {
             art
                 // Beside the iPhone Duo's status icons, the picture keeps clear
@@ -197,14 +224,17 @@ private struct OnboardingPage<Art: View>: View {
                 .padding(.horizontal, statusColumn?.width ?? 0)
                 .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { artHeight = $0 }
-                .scaleEffect(artScale)
-                .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { room = $0 }
+                .scaleEffect(scale)
+                .frame(maxWidth: .infinity)
+                .frame(height: room)
             VStack(spacing: 12) {
                 Text(title)
+                    .accessibilityIdentifier("tourTitle")
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(message)
+                    .accessibilityIdentifier("tourBody")
                     .font(.body)
                     .foregroundStyle(light ? AnyShapeStyle(.white.opacity(0.85)) : AnyShapeStyle(.secondary))
                     .multilineTextAlignment(.center)
@@ -214,6 +244,9 @@ private struct OnboardingPage<Art: View>: View {
             .padding(.horizontal, 32)
             .padding(.top, 8)
             .padding(.bottom, 28)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
+            footer
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
         }
     }
 }
@@ -224,7 +257,7 @@ private struct WelcomePage: View {
     var body: some View {
         OnboardingPage(
             title: "Lively",
-            message: "Talk with anyone, face to face. Lively translates both of you as you speak, in \(languageCount) languages.",
+            message: String(localized: "Talk with anyone, face to face. Lively translates both of you as you speak, in \(languageCount) languages."),
             light: true
         ) {
             GreetingBubbles()
@@ -236,22 +269,22 @@ private struct TablePage: View {
     @Binding var onlineSelection: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            OnboardingPage(
-                title: "Lay it flat between you",
-                message: "Just talk. Lively hears who's speaking, and each of you reads your own half, in your own language."
-            ) {
-                TableDemo()
+        OnboardingPage(
+            title: String(localized: "Lay it flat between you"),
+            message: String(localized: "Just talk. Lively hears who's speaking, and each of you reads your own half, in your own language."),
+            footer: {
+                VStack(spacing: 8) {
+                    OnlineTranslationToggle(isOn: $onlineSelection)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .background(Color(.card), in: .rect(cornerRadius: 22))
+                    if !onlineSelection { OfflineTranslationNotice() }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 14)
             }
-            VStack(spacing: 8) {
-                OnlineTranslationToggle(isOn: $onlineSelection)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
-                    .background(Color(.card), in: .rect(cornerRadius: 22))
-                if !onlineSelection { OfflineTranslationNotice() }
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 14)
+        ) {
+            TableDemo()
         }
     }
 }
@@ -263,10 +296,11 @@ private struct LanguagesPage: View {
 
     var body: some View {
         OnboardingPage(
-            title: settings.usesAutomaticLanguageDetection ? "Choose your language" : "Pick your languages",
+            title: settings.usesAutomaticLanguageDetection ? String(localized: "Choose your language") : String(localized: "Pick your languages"),
             message: settings.usesAutomaticLanguageDetection
-                ? "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection uses internet."
-                : "Lively listens for both and translates each into the other. You can change them any time."
+                ? String(localized: "Choose the language you read and hear. Lively detects the other language when someone speaks. Automatic detection uses internet.")
+                : String(localized: "Lively listens for both and translates each into the other. You can change them any time."),
+            containsControls: true
         ) {
             VStack(spacing: 16) {
                 if settings.usesAutomaticLanguageDetection {
@@ -276,24 +310,21 @@ private struct LanguagesPage: View {
                     // Location chooses a pair, which automatic detection doesn't use.
                     locationButton
                 }
-            }
-            .padding(.horizontal, 24)
-            .overlay(alignment: .bottom) {
                 if !settings.usesAutomaticLanguageDetection && settings.languages.contains(.chinese) {
                     Picker("Chinese script", selection: $settings.chineseScript) {
                         ForEach(ChineseScript.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 280)
-                    .offset(y: 52)
+                    .frame(maxWidth: 340)
                     .transition(.opacity)
                 }
             }
+            .padding(.horizontal, 24)
             .animation(.snappy, value: settings.languages)
         }
         .sheet(item: $choosing) { side in
             NavigationStack {
-                LanguageList(settings: settings, side: side, title: side == .first ? "You Speak" : "They Speak")
+                LanguageList(settings: settings, side: side, title: side == .first ? String(localized: "You Speak") : String(localized: "They Speak"))
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel", systemImage: "xmark") { choosing = nil }
@@ -323,7 +354,7 @@ private struct LanguagesPage: View {
             Button {
                 if on { location.disable() } else { Task { await location.enable() } }
             } label: {
-                Label(on ? "Using your location" : "Use my location", systemImage: on ? "location.fill" : "location")
+                Label(on ? String(localized: "Using your location") : String(localized: "Use my location"), systemImage: on ? "location.fill" : "location")
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 16)
                     .frame(minHeight: 44)
@@ -355,7 +386,7 @@ struct AutomaticLanguagePicker: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            LanguageCard(caption: "Your language", language: settings.speechListenerLanguage, ink: Color(.firstLanguageInk), action: onChooseOwn)
+            LanguageCard(caption: String(localized: "Your language"), language: settings.speechListenerLanguage, ink: Color(.firstLanguageInk), action: onChooseOwn)
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Other language").font(.subheadline.weight(.medium))
@@ -383,11 +414,11 @@ struct LanguagePairPicker: View {
 
     var body: some View {
         VStack(spacing: -14) {
-            LanguageCard(caption: "You speak", language: settings.languages.first, ink: Color(.firstLanguageInk)) {
+            LanguageCard(caption: String(localized: "You speak"), language: settings.languages.first, ink: Color(.firstLanguageInk)) {
                 onChoose(.first)
             }
             swapButton.zIndex(1)
-            LanguageCard(caption: "They speak", language: settings.languages.second, ink: Color(.secondLanguageInk)) {
+            LanguageCard(caption: String(localized: "They speak"), language: settings.languages.second, ink: Color(.secondLanguageInk)) {
                 onChoose(.second)
             }
         }
@@ -472,7 +503,7 @@ struct LanguagesSheet: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
             .navigationDestination(item: $choosing) { side in
-                LanguageList(settings: settings, side: side, title: side == .first ? "You Speak" : "They Speak")
+                LanguageList(settings: settings, side: side, title: side == .first ? String(localized: "You Speak") : String(localized: "They Speak"))
             }
             .navigationDestination(isPresented: $choosingOwn) {
                 OwnLanguageList(settings: settings)
@@ -509,8 +540,8 @@ private struct LanguageCard: View {
                         .font(.system(.title, design: .rounded, weight: .bold))
                         .foregroundStyle(ink)
                         .contentTransition(.opacity)
-                    if language.englishName != language.nativeName {
-                        Text(language.englishName)
+                    if language.hasDistinctDisplayName {
+                        Text(language.displayName)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -532,7 +563,7 @@ private struct LanguageCard: View {
             .contentShape(.rect(cornerRadius: 28))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(caption): \(language.englishName)")
+        .accessibilityLabel("\(caption): \(language.displayName)")
         .accessibilityHint("Choose a language")
     }
 }

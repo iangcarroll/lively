@@ -111,7 +111,7 @@ struct LivelyWidgetView: View {
                 Image(systemName: languages.isAutomatic ? "globe" : "arrow.left.arrow.right")
                     .imageScale(.small)
                     .foregroundStyle(.secondary)
-                Text(languages.secondName)
+                Text(secondName)
                     .foregroundStyle(languages.isAutomatic ? Color.secondary : Color(.secondLanguageInk))
             }
         }
@@ -147,7 +147,7 @@ struct LivelyWidgetView: View {
             Label("Lively", systemImage: "mic.fill")
                 .font(.headline)
                 .widgetAccentable()
-            Text("\(languages.firstName) \(languages.isAutomatic ? "·" : "⇄") \(languages.secondName)")
+            Text("\(languages.firstName) \(languages.isAutomatic ? "·" : "⇄") \(secondName)")
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text("Tap to translate")
@@ -160,14 +160,16 @@ struct LivelyWidgetView: View {
         Label(shortDescription, systemImage: "mic.fill")
     }
 
+    private var secondName: String { languages.isAutomatic ? String(localized: "Automatic") : languages.secondName }
+
     private var shortDescription: String {
-        "\(languages.firstTag) \(languages.isAutomatic ? "·" : "⇄") \(languages.secondTag)"
+        "\(languages.firstTag) \(languages.isAutomatic ? "·" : "⇄") \((languages.isAutomatic ? String(localized: "Auto") : languages.secondTag))"
     }
 
     private var languageDescription: String {
         languages.isAutomatic
-            ? "Automatic language detection. Your language: \(languages.firstName)"
-            : "Translate \(languages.firstName) and \(languages.secondName)"
+            ? String(localized: "Automatic language detection. Your language: \(languages.firstName)")
+            : String(localized: "Translate \(languages.firstName) and \(secondName)")
     }
 }
 

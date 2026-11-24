@@ -53,11 +53,11 @@ final class AddressLookupStore {
         reset()
         guard !input.isEmpty else { return }
         guard input.count <= 1_000 else {
-            errorMessage = "Use a shorter address or place name."
+            errorMessage = String(localized: "Use a shorter address or place name.")
             return
         }
         guard !input.lowercased().hasPrefix("https://"), !input.lowercased().hasPrefix("http://") else {
-            errorMessage = "Paste an address or place name instead of a map link."
+            errorMessage = String(localized: "Paste an address or place name instead of a map link.")
             return
         }
         phase = .searching
@@ -69,7 +69,7 @@ final class AddressLookupStore {
                 guard isCurrent(token) else { return }
                 matches = Array(places.filter(\.hasValidCoordinate).prefix(8))
                 phase = matches.isEmpty ? .idle : .choosing
-                if matches.isEmpty { errorMessage = "No places found. Add a city or country and try again." }
+                if matches.isEmpty { errorMessage = String(localized: "No places found. Add a city or country and try again.") }
             } catch {
                 guard isCurrent(token) else { return }
                 phase = .idle
@@ -134,6 +134,6 @@ final class AddressLookupStore {
     }
 
     private func message(for error: Error) -> String {
-        (error as? AddressLookupError)?.errorDescription ?? "Couldn’t look up this place. Try again."
+        (error as? AddressLookupError)?.errorDescription ?? String(localized: "Couldn’t look up this place. Try again.")
     }
 }

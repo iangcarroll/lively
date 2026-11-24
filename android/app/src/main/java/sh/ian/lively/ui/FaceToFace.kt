@@ -1,5 +1,8 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -203,26 +206,26 @@ private fun ControlStrip(
                 )
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(if (narrow) 6.dp else 10.dp, Alignment.End)) {
                     TonalIconButton(
-                        Icons.Rounded.DeleteOutline, "Clear conversation", store::clear,
+                        Icons.Rounded.DeleteOutline, stringResource(R.string.clear_conversation), store::clear,
                         enabled = store.utterances.isNotEmpty(), size = buttonSize,
                     )
                     Box {
                         var menu by remember { mutableStateOf(false) }
-                        TonalIconButton(Icons.Rounded.MoreVert, "More", size = buttonSize, onClick = { menu = true })
+                        TonalIconButton(Icons.Rounded.MoreVert, stringResource(R.string.more), size = buttonSize, onClick = { menu = true })
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
                             DropdownMenuItem(
-                                text = { Text("Address") },
+                                text = { Text(stringResource(R.string.address)) },
                                 leadingIcon = { Icon(Icons.Rounded.Place, null) },
                                 onClick = { menu = false; onShowAddress() },
                             )
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Transcript view") },
+                                text = { Text(stringResource(R.string.transcript_view)) },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ViewList, null) },
                                 onClick = { menu = false; onShowTranscript() },
                             )
                             DropdownMenuItem(
-                                text = { Text("Swap sides") },
+                                text = { Text(stringResource(R.string.swap_sides)) },
                                 leadingIcon = { Icon(Icons.Rounded.SwapVert, null) },
                                 onClick = {
                                     menu = false
@@ -233,7 +236,7 @@ private fun ControlStrip(
                             SpeakAloudMenuItem(store, onDone = { menu = false })
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Settings") },
+                                text = { Text(stringResource(R.string.settings)) },
                                 leadingIcon = { Icon(Icons.Rounded.Settings, null) },
                                 onClick = { menu = false; onShowSettings() },
                             )
@@ -303,8 +306,8 @@ private fun FaceToFaceHalf(
                 ) {
                     AnimatedContent(
                         targetState = when {
-                            automaticOffline -> "Automatic detection needs internet"
-                            phrases == null -> if (store.isListening) "Listening for another language" else "Automatic"
+                            automaticOffline -> stringResource(R.string.automatic_detection_needs_internet)
+                            phrases == null -> if (store.isListening) stringResource(R.string.listening_for_another_language) else stringResource(R.string.automatic)
                             store.isListening && store.status == ConnectionStatus.Offline -> phrases.waitingForConnection
                             store.isConnecting -> phrases.connecting
                             store.isListening -> phrases.listening
@@ -323,7 +326,7 @@ private fun FaceToFaceHalf(
                     }
                     Text(
                         // Offline, iOS points at its on-device translation here; Android has none to offer.
-                        phrases?.speakHint ?: "The other language will appear when they speak.",
+                        phrases?.speakHint ?: stringResource(R.string.waiting_for_partner_language),
                         style = MaterialTheme.typography.bodyMedium.inLanguage(language),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -354,20 +357,21 @@ private fun FaceToFaceHalf(
  */
 @Composable
 private fun RoleHeader(language: Language?, role: TranscriptRole?, pair: LanguagePair, onChangeLanguages: () -> Unit, modifier: Modifier) {
+    val resources = LocalResources.current
     Column(
         modifier
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onChangeLanguages, role = Role.Button)
             .clearAndSetSemantics {
-                contentDescription = "Change languages"
-                stateDescription = language?.nativeName ?: "Automatic"
+                contentDescription = resources.getString(R.string.change_languages)
+                stateDescription = language?.nativeName ?: resources.getString(R.string.automatic)
             }
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (role != null) {
             Text(
-                if (role == TranscriptRole.LISTENER) "Your language" else "Other language",
+                if (role == TranscriptRole.LISTENER) stringResource(R.string.your_language) else stringResource(R.string.other_language),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -390,6 +394,7 @@ private fun Line(
     onEdit: ((Utterance) -> Unit)?,
     modifier: Modifier,
 ) {
+    val resources = LocalResources.current
     val rowLanguage = if (role != null) role.language(utterance) else language
     val neutral = utterance.isAutomatic && utterance.sourceLanguage == null && utterance.target == null
     val text = role?.text(utterance) ?: language?.let(utterance::text).orEmpty()
@@ -426,7 +431,7 @@ private fun Line(
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 menu = true
                             },
-                            onLongClickLabel = "Edit",
+                            onLongClickLabel = stringResource(R.string.edit),
                         )
                     } else {
                         Modifier
@@ -438,7 +443,7 @@ private fun Line(
                 OptionalLanguageTag(
                     if (neutral) null else rowLanguage, pair,
                     spoken = ownWords,
-                    unknownTitle = if (neutral) utterance.unidentifiedLanguageTitle else "Automatic",
+                    unknownTitle = if (neutral) utterance.unidentifiedLanguageTitle else stringResource(R.string.automatic),
                 )
             }
             if (text.isEmpty()) {
@@ -452,7 +457,7 @@ private fun Line(
                         style = style,
                         fontWeight = weight,
                         color = secondary.copy(alpha = 0.5f),
-                        modifier = Modifier.semantics { contentDescription = "Original transcript unavailable" },
+                        modifier = Modifier.semantics { contentDescription = resources.getString(R.string.original_transcript_unavailable) },
                     )
                 } else {
                     TypingDots(ink, Modifier.padding(vertical = 8.dp), dotSize = 8.dp)
@@ -476,7 +481,7 @@ private fun Line(
         if (editable) {
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(16.dp)) {
                 DropdownMenuItem(
-                    text = { Text("Edit") },
+                    text = { Text(stringResource(R.string.edit)) },
                     leadingIcon = { Icon(Icons.Rounded.Edit, null) },
                     onClick = { menu = false; onEdit(utterance) },
                 )
@@ -491,8 +496,8 @@ private fun StatusLine(utterance: Utterance, language: Language?, script: Chines
     val phrases = language?.phrases(script)
     when (utterance.translationState) {
         TranslationState.AwaitingPartner -> PendingLanguageLabel(utterance, onTranslate = onRetry)
-        TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, phrases?.waitingForConnection ?: "Waiting for connection")
-        is TranslationState.Failed -> RetryButton(phrases?.translationFailed ?: "Translation failed", onRetry)
+        TranslationState.WaitingForNetwork -> Caption(Icons.Rounded.WifiOff, phrases?.waitingForConnection ?: stringResource(R.string.waiting_for_connection))
+        is TranslationState.Failed -> RetryButton(phrases?.translationFailed ?: stringResource(R.string.translation_failed), onRetry)
         else -> {}
     }
 }

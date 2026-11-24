@@ -141,7 +141,7 @@ final class AutomaticSonioxTranscriber: SpeechEngine, SocketDialect {
     var endOfAudioMessage: URLSessionWebSocketTask.Message? { .string("") }
     /// Audio can start at handshake, even when the server omits the reconnect offer.
     var readyWhenOpen: Bool { true }
-    var rejectedKeyMessage: String { "Your Soniox API key was rejected. Check it in Settings." }
+    var rejectedKeyMessage: String { String(localized: "Your Soniox API key was rejected. Check it in Settings.") }
     /// Soniox replies about every 0.12 s while audio flows, and within 1.1 s
     /// at worst (Tools/probe/ASIA_LATENCY.md §2).
     var stallTimeout: Duration? { .milliseconds(2500) }
@@ -168,9 +168,9 @@ final class AutomaticSonioxTranscriber: SpeechEngine, SocketDialect {
         guard case .broker = config.credential else { return .fail(rejectedKeyMessage) }
         rejectedTemporaryKeys += 1
         guard rejectedTemporaryKeys < 3 else {
-            return .fail("Soniox is rejecting Lively's temporary keys. Try again in a few minutes.")
+            return .fail(String(localized: "Soniox is rejecting Lively's temporary keys. Try again in a few minutes."))
         }
-        return .retry("Temporary key rejected")
+        return .retry(String(localized: "Temporary key rejected"))
     }
 
     func sessionDidReset(_ stream: SocketStream) {
@@ -191,11 +191,11 @@ final class AutomaticSonioxTranscriber: SpeechEngine, SocketDialect {
         guard let json = message.jsonObject else { return .none }
 
         if let code = json["error_code"] as? Int {
-            let text = json["error_message"] as? String ?? "Soniox error \(code)"
+            let text = json["error_message"] as? String ?? String(localized: "Soniox error \(code)")
             switch code {
             case 401, 403: return keyRejected()
-            case 402: return .fail("Your Soniox balance or budget is used up.")
-            case 400: return .fail("Soniox rejected the request: \(text)")
+            case 402: return .fail(String(localized: "Your Soniox balance or budget is used up."))
+            case 400: return .fail(String(localized: "Soniox rejected the request: \(text)"))
             // Too many sessions or requests: back off for longer.
             case 429: return .retry(text, throttled: true)
             // 408, 413 (session too long), 5xx: start a fresh session.
@@ -219,7 +219,7 @@ final class AutomaticSonioxTranscriber: SpeechEngine, SocketDialect {
         }
 
         // The server closes after `finished`; we only stop on purpose, so reconnect.
-        if json["finished"] as? Bool == true { return .retry("Session finished") }
+        if json["finished"] as? Bool == true { return .retry(String(localized: "Session finished")) }
         return endedUtterance ? .boundary : .none
     }
 

@@ -2,6 +2,11 @@ package sh.ian.lively
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
+import org.junit.Assert.assertFalse
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
@@ -82,18 +87,47 @@ class LivelyUiTest {
         compose.waitUntilAtLeastOneExists(hasText(text, substring = true), timeout)
 
     @Test fun onboardingLeadsToTheConversation() {
+        // Uses the installed app's resources so this same flow can run under any system language.
+        fun checkText(id: Int) {
+            val label = context.getString(id)
+            waitForText(label)
+            val node = compose.onNode(hasText(label) and
+                SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult), useUnmergedTree = true)
+            node.assertIsDisplayed()
+            node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { getLayout ->
+                val results = mutableListOf<TextLayoutResult>()
+                check(getLayout(results) && results.isNotEmpty())
+                results.forEach { layout ->
+                    // Compose may shape the paragraph at the maximum width and then wrap its
+                    // Text node around the glyphs. Measure the painted lines, not that unused width.
+                    val clippedLine = (0 until layout.lineCount).any { line ->
+                        layout.isLineEllipsized(line) ||
+                            layout.getLineRight(line) - layout.getLineLeft(line) > layout.size.width + 1
+                    }
+                    assertFalse("Clipped '$label' at ${layout.size}", clippedLine ||
+                        layout.multiParagraph.didExceedMaxLines || layout.multiParagraph.height > layout.size.height + 1)
+                }
+            }
+        }
+        fun tap(id: Int) {
+            checkText(id)
+            compose.onNodeWithText(context.getString(id)).performClick()
+        }
+
         launch()
-        waitForText("Get started")
-        compose.onNodeWithText("Get started").performClick()
-        waitForText("Lay it flat between you")
-        compose.onNodeWithText("Continue").performClick()
-        waitForText("Pick your languages")
-        compose.onNodeWithContentDescription("Swap languages").performClick()
-        compose.onNodeWithContentDescription("Swap languages").performClick()
-        compose.onNodeWithText("Continue").performClick()
-        waitForText("Sign in to Lively")
-        compose.onNodeWithText("Not now").performClick()
-        compose.waitUntilAtLeastOneExists(hasContentDescription("Start listening"), 10_000)
+        tap(R.string.get_started)
+        checkText(R.string.lay_it_flat_between_you)
+        checkText(R.string.onboarding_table_body)
+        tap(R.string.action_continue)
+        checkText(R.string.pick_your_languages)
+        val swap = compose.onNodeWithContentDescription(context.getString(R.string.swap_languages))
+        swap.performClick()
+        swap.performClick()
+        tap(R.string.action_continue)
+        checkText(R.string.sign_in_to_lively)
+        tap(R.string.not_now)
+        compose.waitUntilAtLeastOneExists(hasContentDescription(context.getString(R.string.start_listening)), 10_000)
+        // The reader's guidance stays in the chosen conversation language.
         compose.onNodeWithText("Tap the mic to start").assertExists()
     }
 
@@ -123,40 +157,41 @@ class LivelyUiTest {
 
     @Test fun addressOpensFromBothLayouts() {
         launch("LivelyDemo")
-        compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 10_000)
-        compose.onNodeWithContentDescription("More").performClick()
-        compose.onNodeWithText("Address").performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription(context.getString(R.string.more)), 10_000)
+        compose.onNodeWithContentDescription(context.getString(R.string.more)).performClick()
+        compose.onNodeWithText(context.getString(R.string.address)).performClick()
         compose.waitUntilAtLeastOneExists(hasTestTag("address-query"), 5_000)
-        compose.onNodeWithContentDescription("Back").performClick()
-        compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 5_000)
-        compose.onNodeWithContentDescription("More").performClick()
-        compose.onNodeWithText("Transcript view").performClick()
-        compose.waitUntilAtLeastOneExists(hasContentDescription("Face-to-face mode"), 5_000)
-        compose.onNodeWithContentDescription("More").performClick()
-        compose.onNodeWithText("Address").performClick()
+        compose.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription(context.getString(R.string.more)), 5_000)
+        compose.onNodeWithContentDescription(context.getString(R.string.more)).performClick()
+        compose.onNodeWithText(context.getString(R.string.transcript_view)).performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription(context.getString(R.string.face_to_face_mode)), 5_000)
+        compose.onNodeWithContentDescription(context.getString(R.string.more)).performClick()
+        compose.onNodeWithText(context.getString(R.string.address)).performClick()
         compose.waitUntilAtLeastOneExists(hasTestTag("address-query"), 5_000)
     }
 
     @Test fun settingsPickALanguage() {
         launch("LivelyDemo")
-        compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 10_000)
-        compose.onNodeWithContentDescription("More").performClick()
-        compose.onNodeWithText("Settings").performClick()
-        waitForText("Second language")
-        compose.onNodeWithText("Second language").performClick()
-        waitForText("Search languages")
-        compose.onNodeWithText("Search languages").performTextInput("japan")
+        compose.waitUntilAtLeastOneExists(hasContentDescription(context.getString(R.string.more)), 10_000)
+        compose.onNodeWithContentDescription(context.getString(R.string.more)).performClick()
+        compose.onNodeWithText(context.getString(R.string.settings)).performClick()
+        waitForText(context.getString(R.string.second_language))
+        compose.onNodeWithText(context.getString(R.string.second_language)).performClick()
+        waitForText(context.getString(R.string.search_languages))
+        compose.onNodeWithText(context.getString(R.string.search_languages)).performTextInput("japan")
         waitForText("日本語")
         compose.onNodeWithText("日本語").performClick()
         // Back in Settings; Chinese script goes away with Chinese.
-        waitForText("First language")
-        compose.onNodeWithText("Chinese script").assertDoesNotExist()
+        waitForText(context.getString(R.string.first_language))
+        compose.onNodeWithText(context.getString(R.string.chinese_script)).assertDoesNotExist()
         compose.onNodeWithText("日本語").assertExists()
         // Swap by picking the other side's language.
-        compose.onNodeWithText("First language").performClick()
-        waitForText("Swap")
-        compose.onNodeWithText("Swap").performClick()
-        waitForText("First language")
+        compose.onNodeWithText(context.getString(R.string.first_language)).performClick()
+        waitForText(context.getString(R.string.swap))
+        // The other language also appears alphabetically below the pinned pair.
+        compose.onAllNodesWithText(context.getString(R.string.swap))[0].performClick()
+        waitForText(context.getString(R.string.first_language))
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
         val prefs = context.getSharedPreferences("lively", Context.MODE_PRIVATE)
         assert(prefs.getString("firstLanguage", null) == "ja") { "first language should now be Japanese" }
@@ -201,20 +236,20 @@ class LivelyUiTest {
 
     @Test fun proScreenOffersYearlyFirst() {
         launch("LivelyDemo")
-        compose.waitUntilAtLeastOneExists(hasContentDescription("More"), 10_000)
-        compose.onNodeWithContentDescription("More").performClick()
-        compose.onNodeWithText("Settings").performClick()
-        waitForText("Upgrade")
-        compose.onNodeWithText("Upgrade").performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription(context.getString(R.string.more)), 10_000)
+        compose.onNodeWithContentDescription(context.getString(R.string.more)).performClick()
+        compose.onNodeWithText(context.getString(R.string.settings)).performClick()
+        waitForText(context.getString(R.string.upgrade))
+        compose.onNodeWithText(context.getString(R.string.upgrade)).performClick()
         // Both plans and Subscribe are on screen without scrolling.
-        waitForText("Yearly")
-        compose.onNodeWithText("Yearly").assertIsDisplayed()
-        compose.onNodeWithText("Monthly").assertIsDisplayed()
-        compose.onNodeWithText("Save 33%").assertIsDisplayed()
-        compose.onNodeWithText("Subscribe").assertIsDisplayed()
+        waitForText(context.getString(R.string.yearly))
+        compose.onNodeWithText(context.getString(R.string.yearly)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.monthly)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.save_value, 33)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.subscribe)).assertIsDisplayed()
         compose.onNodeWithTag("plan-year").assertIsSelected()
         compose.onNodeWithTag("plan-month").assertIsNotSelected()
-        compose.onNodeWithText("Restore purchases").assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.restore_purchases)).assertIsDisplayed()
     }
 
     @Test fun freeLimitOpensLivelyPro() {

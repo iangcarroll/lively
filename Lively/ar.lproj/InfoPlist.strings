@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "تقرأ Lively النص في الصور التي التقطتها لترجمته.";
+"NSLocationWhenInUseUsageDescription" = "تبحث Lively عن البلد الذي تتواجد فيه لاختيار اللغة المحلية لك.";
+"NSMicrophoneUsageDescription" = "تستمع Lively لمحادثتك لتقوم بنسخها وترجمتها مباشرة.";
+"NSMotionUsageDescription" = "تلاحظ Lively عندما تقلب الهاتف أو تمده لشخص آخر لتشير مؤقتاً بأن الميكروفون يستمع.";
+"NSSpeechRecognitionUsageDescription" = "تقوم Lively بالنسخ على الجهاز عندما لا تتمكن من الوصول إلى خدمة الكلام.";

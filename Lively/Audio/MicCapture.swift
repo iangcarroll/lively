@@ -434,7 +434,7 @@ nonisolated final class MicCapture: @unchecked Sendable {
 
     enum CaptureError: LocalizedError {
         case noInput
-        var errorDescription: String? { "No microphone is available." }
+        var errorDescription: String? { String(localized: "No microphone is available.") }
     }
 }
 

@@ -25,18 +25,17 @@ final class LocationLanguages {
         var message: String? {
             switch self {
             case .idle: nil
-            case .locating: "Finding where you are…"
-            case .applied(let region): "Languages set for \(LocationLanguages.name(ofRegion: region))."
+            case .locating: String(localized: "Finding where you are…")
+            case .applied(let region): String(localized: "Languages set for \(LocationLanguages.name(ofRegion: region)).")
             case .unchanged(let region):
-                "No different language to suggest for \(LocationLanguages.name(ofRegion: region)), so your languages stay as they are."
-            case .denied: "Lively doesn't have location access. Allow it in the system settings, then turn this on again."
-            case .failed: "Couldn't find where you are. Lively will try again the next time it opens."
+                String(localized: "No different language to suggest for \(LocationLanguages.name(ofRegion: region)), so your languages stay as they are.")
+            case .denied: String(localized: "Lively doesn't have location access. Allow it in the system settings, then turn this on again.")
+            case .failed: String(localized: "Couldn't find where you are. Lively will try again the next time it opens.")
             }
         }
     }
 
-    static let summary = "Sets your language and the local language when you arrive in another country. "
-        + "Lively uses your approximate location only to look up the country."
+    static let summary = String(localized: "Sets your language and the local language when you arrive in another country. Lively uses your approximate location only to look up the country.")
 
     private(set) var status: Status = .idle
     /// Waiting on the permission prompt, so the switch can stay on meanwhile.
@@ -156,7 +155,7 @@ final class LocationLanguages {
     }
 
     static func name(ofRegion region: String) -> String {
-        Locale(identifier: "en").localizedString(forRegionCode: region) ?? region
+        Locale.current.localizedString(forRegionCode: region) ?? region
     }
 
     private static let traditionalRegions: Set<String> = ["TW", "HK", "MO"]

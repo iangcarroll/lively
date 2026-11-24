@@ -36,7 +36,7 @@ enum TranscriptRole: Equatable {
 
 extension Utterance {
     var unidentifiedLanguageTitle: String {
-        isFinal ? "Language not identified" : "Identifying language"
+        isFinal ? String(localized: "Language not identified") : String(localized: "Identifying language")
     }
 
     var showsLanguagePrompt: Bool {
@@ -59,7 +59,7 @@ struct OptionalLanguageTag: View {
     var showsIcon = true
     /// On for a tag that's a button opening the language choice.
     var showsChevron = false
-    var unknownTitle = "Automatic"
+    var unknownTitle = String(localized: "Automatic")
 
     var body: some View {
         if let language {
@@ -111,7 +111,7 @@ struct PendingLanguageLabel: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else if utterance.target == nil {
-            Label(utterance.isFinal ? "Finishing transcript" : "Listening", systemImage: "waveform")
+            Label(utterance.isFinal ? String(localized: "Finishing transcript") : String(localized: "Listening"), systemImage: "waveform")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else if let onTranslate {
@@ -162,7 +162,7 @@ struct LanguageTag: View {
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
         .background(spoken ? language.ink : language.ink.opacity(0.12), in: .capsule)
-        .accessibilityLabel(!showsIcon ? language.nativeName : spoken ? "Spoken in \(language.nativeName)" : "Translated to \(language.nativeName)")
+        .accessibilityLabel(!showsIcon ? language.nativeName : spoken ? String(localized: "Spoken in \(language.nativeName)") : String(localized: "Translated to \(language.nativeName)"))
     }
 }
 

@@ -7,9 +7,10 @@ nonisolated struct NeuralVoice: Identifiable, Hashable, Sendable {
     let localeIdentifier: String
 
     var embeddingPath: String { "voices/\(id).json" }
-    var languageName: String { NeuralVoiceCatalog.language(with: languageCode)?.name ?? languageCode }
+    var languageName: String { NeuralVoiceCatalog.language(with: languageCode)?.displayName ?? languageCode }
     var nativeLanguageName: String { NeuralVoiceCatalog.language(with: languageCode)?.nativeName ?? languageCode }
-    var accent: String? {
+    var accent: String? { accentLabel.map { String(localized: $0) } }
+    fileprivate var accentLabel: LocalizedStringResource? {
         switch localeIdentifier {
         case "en-US": "American"
         case "en-GB": "British"
@@ -24,7 +25,22 @@ nonisolated struct NeuralVoiceLanguage: Identifiable, Hashable, Sendable {
     let name: String
     let nativeName: String
     let defaultVoiceID: String
+    var displayName: String { Locale.current.localizedString(forLanguageCode: id) ?? name }
+    var pickerName: String {
+        displayName.localizedCaseInsensitiveCompare(nativeName) == .orderedSame ? nativeName : "\(displayName) · \(nativeName)"
+    }
     var voices: [NeuralVoice] { NeuralVoiceCatalog.voices.filter { $0.languageCode == id } }
+
+    func voices(matching search: String) -> [NeuralVoice] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty || [name, displayName, nativeName].contains(where: { $0.localizedStandardContains(query) }) {
+            return voices
+        }
+        return voices.filter { voice in
+            [voice.name, voice.id, voice.accent, voice.accentLabel?.key].compactMap { $0 }
+                .contains { $0.localizedStandardContains(query) }
+        }
+    }
 }
 
 /// Presets actually shipped by Kokoro v1.0. This catalog is independent of

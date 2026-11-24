@@ -18,7 +18,6 @@ enum IsolatedDefaults {
     static let suiteName = ProcessInfo.processInfo.environment["LIVELY_SETTINGS_REGRESSION_SUITE"]!
     static let standard = Foundation.UserDefaults(suiteName: suiteName)!
 }
-typealias UserDefaults = IsolatedDefaults
 struct ProviderCredential {
     let id: String
     var isOptional = false
@@ -57,23 +56,24 @@ struct SettingsRegression {
         defer { defaults.removePersistentDomain(forName: IsolatedDefaults.suiteName) }
         defaults.removePersistentDomain(forName: IsolatedDefaults.suiteName)
         defaults.set(true, forKey: "onboardingDone")
-        let existing = AppSettings()
+        let existing = AppSettings(defaults: defaults)
         expect(existing.conversationMode == .pair, "installation set up before automatic keeps its pair")
         expect(!existing.usesAutomaticLanguageDetection, "existing installation stays on its pair")
         expect(defaults.string(forKey: "conversationMode") == "pair", "kept pair is saved at launch")
         defaults.removePersistentDomain(forName: IsolatedDefaults.suiteName)
-        let fresh = AppSettings()
+        let fresh = AppSettings(defaults: defaults)
         expect(fresh.conversationMode == .automatic, "new installation defaults to automatic")
         defaults.set(true, forKey: "onboardingDone")
-        expect(AppSettings().conversationMode == .automatic, "finishing the tour keeps a new installation automatic")
+        expect(AppSettings(defaults: defaults).conversationMode == .automatic, "finishing the tour keeps a new installation automatic")
         defaults.removeObject(forKey: "onboardingDone")
+        fresh.chooseOnlineProcessing(true)
         expect(fresh.usesAutomaticLanguageDetection, "default Soniox activates automatic")
         expect(fresh.speechListenerLanguage == .english, "fresh listener uses saved leading language")
         let pair = LanguagePair(first: Language("es"), second: Language("de"))
         defaults.set(pair.first.rawValue, forKey: "firstLanguage")
         defaults.set(pair.second.rawValue, forKey: "secondLanguage")
         defaults.set("fr", forKey: "speechListenerLanguage")
-        let migrated = AppSettings()
+        let migrated = AppSettings(defaults: defaults)
         expect(migrated.conversationMode == .automatic, "saved automatic mode survives a changed pair")
         expect(migrated.languages == pair, "migration preserves manual pair")
         expect(migrated.speechListenerLanguage == Language("fr"), "automatic listener is outside manual pair")
@@ -81,7 +81,7 @@ struct SettingsRegression {
         expect(migrated.speechListenerLanguage == Language("ja"), "automatic setter accepts language outside pair")
         expect(migrated.languages == pair, "Your language setter never mutates pair")
         expect(defaults.string(forKey: "speechListenerLanguage") == "ja", "listener written to real persistent suite")
-        let reloaded = AppSettings()
+        let reloaded = AppSettings(defaults: defaults)
         expect(reloaded.speechListenerLanguage == Language("ja"), "listener survives actual settings reinstantiation")
         expect(reloaded.languages == pair, "reload keeps legacy pair independent")
         reloaded.speechListenerLanguage = Language("xx")
@@ -90,14 +90,14 @@ struct SettingsRegression {
         reloaded.conversationMode = .pair
         expect(!reloaded.usesAutomaticLanguageDetection, "manual opt-out deactivates automatic")
         expect(defaults.string(forKey: "conversationMode") == "pair", "mode written to real persistence")
-        let manual = AppSettings()
+        let manual = AppSettings(defaults: defaults)
         expect(manual.conversationMode == .pair, "explicit pair opt-out survives reload")
         expect(manual.speechListenerLanguage == .english, "manual getter stays inside pair")
         manual.speechListenerLanguage = Language("fr")
         expect(manual.speechListenerLanguage == .english, "manual setter rejects outside-pair language")
         manual.conversationMode = .automatic
         expect(manual.speechListenerLanguage == Language("ja"), "manual getter did not destroy independent saved listener")
-        let automaticReload = AppSettings()
+        let automaticReload = AppSettings(defaults: defaults)
         expect(automaticReload.conversationMode == .automatic, "switch back to automatic persists")
         for id in [SpeechProvider.onDevice.id, SpeechProvider.voxtralMistral.id] {
             automaticReload.providerID = id
@@ -107,9 +107,9 @@ struct SettingsRegression {
         automaticReload.providerID = SpeechProvider.soniox.id
         expect(automaticReload.usesAutomaticLanguageDetection && automaticReload.speechListenerLanguage == Language("ja"), "Soniox restores independent automatic listener")
         defaults.set("xx", forKey: "speechListenerLanguage")
-        expect(AppSettings().speechListenerLanguage == .english, "invalid persisted automatic listener has supported fallback")
+        expect(AppSettings(defaults: defaults).speechListenerLanguage == .english, "invalid persisted automatic listener has supported fallback")
         defaults.set("invalid-mode", forKey: "conversationMode")
-        expect(AppSettings().conversationMode == .automatic, "invalid persisted mode uses automatic default")
+        expect(AppSettings(defaults: defaults).conversationMode == .automatic, "invalid persisted mode uses automatic default")
         print("Automatic settings regression: \(checks) checks, \(failures) failures")
         if failures > 0 {
             defaults.removePersistentDomain(forName: IsolatedDefaults.suiteName)
@@ -153,8 +153,6 @@ def main():
     with tempfile.TemporaryDirectory(prefix="lively-automatic-settings-") as directory:
         work = Path(directory)
         for name, actual, positive in variants:
-            # The only visibility change permits recreating the real singleton type.
-            actual = changed(actual, "    private init() {", "    init() {")
             source = work / (name + ".swift")
             source.write_text("import Foundation\n" + BOUNDARIES + language + pickup + actual + HARNESS)
             binary = work / name

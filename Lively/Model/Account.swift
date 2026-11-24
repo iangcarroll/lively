@@ -31,7 +31,7 @@ final class Account {
 
     /// What to call the account: its email, unless Apple hides it.
     static func displayName(for email: String) -> String {
-        hidesEmail(email) ? "Apple Account" : email
+        hidesEmail(email) ? String(localized: "Apple Account") : email
     }
 
     private let brokerURL: URL
@@ -74,7 +74,7 @@ final class Account {
         #if DEBUG
         if isDemo {
             try await Task.sleep(for: .milliseconds(600))
-            guard code == "123456" else { throw AccountError(message: "That code didn't work. Try again.") }
+            guard code == "123456" else { throw AccountError(message: String(localized: "That code didn't work. Try again.")) }
             self.email = email
             return
         }
@@ -155,8 +155,8 @@ final class Account {
             guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
             // 401: the session, and so maybe the account, is already gone.
             guard http.statusCode == 200 || http.statusCode == 401 else {
-                let message = (try? JSONDecoder().decode(BrokerError.self, from: data))?.message
-                throw AccountError(message: message ?? "Couldn't delete your account. Try again.")
+                let message = (try? JSONDecoder().decode(BrokerError.self, from: data)).map { NSLocalizedString($0.message, tableName: "BrokerErrors", comment: "Broker error") }
+                throw AccountError(message: message ?? String(localized: "Couldn't delete your account. Try again."))
             }
         }
         forget()
@@ -201,8 +201,8 @@ final class Account {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         guard http.statusCode == 200 else {
-            let message = (try? JSONDecoder().decode(BrokerError.self, from: data))?.message
-            throw AccountError(message: message ?? "Something went wrong. Try again.")
+            let message = (try? JSONDecoder().decode(BrokerError.self, from: data)).map { NSLocalizedString($0.message, tableName: "BrokerErrors", comment: "Broker error") }
+            throw AccountError(message: message ?? String(localized: "Something went wrong. Try again."))
         }
         return try JSONDecoder().decode(Response.self, from: data)
     }

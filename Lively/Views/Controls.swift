@@ -48,7 +48,7 @@ struct MicButton: View {
         .glassEffect(.regular.tint(.accentColor).interactive(), in: .circle)
         .sensoryFeedback(.impact(weight: .medium), trigger: isListening)
         .keyboardShortcut(.space, modifiers: [])
-        .accessibilityLabel(isListening ? "Stop listening" : "Start listening")
+        .accessibilityLabel(isListening ? String(localized: "Stop listening") : String(localized: "Start listening"))
     }
 
     private func pressChanged(_ pressed: Bool) {
@@ -137,20 +137,20 @@ struct StatusPill: View {
 
     private var label: String {
         switch status {
-        case .idle: "Ready"
-        case .connecting: "Connecting…"
-        case .live: onDevice ? "On-device" : "Listening"
-        case .reconnecting: "Reconnecting…"
-        case .offline: isListening ? "Offline · holding audio" : "Offline"
-        case .failed: "Needs attention"
+        case .idle: String(localized: "Ready")
+        case .connecting: String(localized: "Connecting…")
+        case .live: onDevice ? String(localized: "On-device") : String(localized: "Listening")
+        case .reconnecting: String(localized: "Reconnecting…")
+        case .offline: isListening ? String(localized: "Offline · holding audio") : String(localized: "Offline")
+        case .failed: String(localized: "Needs attention")
         }
     }
 
     private var shortLabel: String {
         switch status {
-        case .offline: "Offline"
-        case .reconnecting: "Reconnecting"
-        case .connecting: "Connecting"
+        case .offline: String(localized: "Offline")
+        case .reconnecting: String(localized: "Reconnecting")
+        case .connecting: String(localized: "Connecting")
         default: label
         }
     }
@@ -187,7 +187,7 @@ struct TranscriptListeningStatus: View {
                     } else if let partner = store.detectedPartnerLanguage {
                         Text(prompt(in: partner)).foregroundStyle(partner.ink)
                     } else {
-                        Text(isListening ? "Listening for another language" : "Other language · Automatic")
+                        Text(isListening ? String(localized: "Listening for another language") : String(localized: "Other language · Automatic"))
                             .foregroundStyle(.secondary)
                     }
                 } else {
@@ -264,7 +264,7 @@ struct SpeakAloudToggle: View {
     var body: some View {
         if store.canSpeakTranslations {
             Toggle(
-                "Speak Translations",
+                String(localized: "Speak Translations"),
                 systemImage: "speaker.wave.2",
                 isOn: Binding(get: { settings.speaksTranslations }, set: { store.setSpeaksTranslations($0) })
             )
@@ -282,7 +282,7 @@ struct SpeakAloudButton: View {
             let on = settings.speaksTranslations
             GlassIconButton(
                 systemImage: on ? "speaker.wave.2.fill" : "speaker.slash",
-                label: on ? "Stop speaking translations aloud" : "Speak translations aloud",
+                label: on ? String(localized: "Stop speaking translations aloud") : String(localized: "Speak translations aloud"),
                 isOn: on
             ) {
                 store.setSpeaksTranslations(!on)
@@ -337,7 +337,7 @@ struct TypeToTranslateBar: View {
             } else {
                 photoButton
             }
-            TextField(editing == nil ? "Type to translate" : "Fix what was heard", text: $text)
+            TextField(editing == nil ? String(localized: "Type to translate") : String(localized: "Fix what was heard"), text: $text)
                 // Corrections are often names, which autocorrect would undo.
                 .autocorrectionDisabled(editing != nil)
                 .focused(focused)
@@ -354,7 +354,7 @@ struct TypeToTranslateBar: View {
             .buttonStyle(.plain)
             .disabled(isEmpty)
             .opacity(isEmpty ? 0.4 : 1)
-            .accessibilityLabel(editing == nil ? "Translate" : "Save and translate again")
+            .accessibilityLabel(editing == nil ? String(localized: "Translate") : String(localized: "Save and translate again"))
             Button(action: close) {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .semibold))
@@ -364,7 +364,7 @@ struct TypeToTranslateBar: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.cancelAction)
-            .accessibilityLabel(editing == nil ? "Close text input" : "Cancel editing")
+            .accessibilityLabel(editing == nil ? String(localized: "Close text input") : String(localized: "Cancel editing"))
             .padding(.trailing, 6)
         }
         .glassEffect(.regular, in: .rect(cornerRadius: 22))
@@ -415,7 +415,7 @@ struct TypeToTranslateBar: View {
         .buttonStyle(.plain)
         .frame(width: 32, height: 32)
         .padding(.leading, 6)
-        .accessibilityLabel(readsPhoto ? "Reading photo" : "Translate a photo")
+        .accessibilityLabel(readsPhoto ? String(localized: "Reading photo") : String(localized: "Translate a photo"))
     }
 
     private var photoIcon: some View {
@@ -434,12 +434,12 @@ struct TypeToTranslateBar: View {
             guard let image = try await load() else { return }
             let text = try await TextRecognizer.text(in: image, languages: languages)
             guard !text.isEmpty else {
-                store.alert = "Lively couldn't find any text in that photo."
+                store.alert = String(localized: "Lively couldn't find any text in that photo.")
                 return
             }
             withAnimation(.snappy) { store.submitTyped(text, language: language) }
         } catch {
-            store.alert = "Lively couldn't read that photo."
+            store.alert = String(localized: "Lively couldn't read that photo.")
         }
     }
 
@@ -532,7 +532,7 @@ struct LanguagePairButton: View {
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .capsule)
         .accessibilityLabel("Change languages")
-        .accessibilityValue("\(first.englishName) and \(second?.englishName ?? "automatic")")
-        .help("Change languages")
+        .accessibilityValue(second.map { String(localized: "\(first.displayName) and \($0.displayName)") } ?? String(localized: "\(first.displayName) and automatic"))
+        .help(String(localized: "Change languages"))
     }
 }

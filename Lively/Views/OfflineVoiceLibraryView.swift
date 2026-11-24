@@ -34,7 +34,7 @@ struct OfflineVoiceLibraryView: View {
                 Picker("Language", selection: $selectedLanguage) {
                     Text("All languages").tag("all")
                     ForEach(NeuralVoiceCatalog.languages) { language in
-                        Text(language.name == language.nativeName ? language.name : "\(language.name) · \(language.nativeName)").tag(language.id)
+                        Text(language.pickerName).tag(language.id)
                     }
                 }
                 LabeledContent("Download", value: packs.statusText)
@@ -46,7 +46,7 @@ struct OfflineVoiceLibraryView: View {
                 } else if packs.status == .checking || packs.status == .deleting {
                     ProgressView(packs.statusText)
                 } else if !packs.isReady || packs.status == .failed {
-                    Button(packs.status == .failed ? "Retry voice download" : "Download voice pack") {
+                    Button(packs.status == .failed ? String(localized: "Retry voice download") : String(localized: "Download voice pack")) {
                         // A failed update still has the previous pack to replace.
                         packs.download(beforeRemovingPrevious: onBeforeDelete)
                     }
@@ -76,9 +76,9 @@ struct OfflineVoiceLibraryView: View {
 
             ForEach(filteredLanguages) { language in
                 Section {
-                    ForEach(filteredVoices(language)) { voice in voiceRow(voice) }
+                    ForEach(language.voices(matching: query)) { voice in voiceRow(voice) }
                 } header: {
-                    Text(language.name == language.nativeName ? language.name : "\(language.name) · \(language.nativeName)")
+                    Text(language.pickerName)
                 }
             }
             if filteredLanguages.isEmpty {
@@ -150,22 +150,12 @@ struct OfflineVoiceLibraryView: View {
             }
             .buttonStyle(.borderless)
             .disabled(!packs.isReady || packs.isBusy)
-            .accessibilityLabel(previewingID == voice.id ? "Stop preview" : "Preview \(voice.name) in \(voice.languageName)")
+            .accessibilityLabel(previewingID == voice.id ? String(localized: "Stop preview") : String(localized: "Preview \(voice.name) in \(voice.languageName)"))
         }
     }
 
     private var filteredLanguages: [NeuralVoiceLanguage] {
-        NeuralVoiceCatalog.languages.filter { (selectedLanguage == "all" || $0.id == selectedLanguage) && !filteredVoices($0).isEmpty }
-    }
-    private func filteredVoices(_ language: NeuralVoiceLanguage) -> [NeuralVoice] {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty || language.name.localizedStandardContains(query) || language.nativeName.localizedStandardContains(query) {
-            return language.voices
-        }
-        return language.voices.filter {
-            $0.name.localizedStandardContains(query) || $0.id.localizedStandardContains(query)
-                || ($0.accent?.localizedStandardContains(query) ?? false)
-        }
+        NeuralVoiceCatalog.languages.filter { (selectedLanguage == "all" || $0.id == selectedLanguage) && !$0.voices(matching: query).isEmpty }
     }
 
     private func preview(_ voice: NeuralVoice) {
@@ -196,6 +186,6 @@ struct OfflineVoiceLibraryView: View {
         onStopPreview()
     }
     private func bytes(_ count: Int64) -> String {
-        count > 0 ? ByteCountFormatter.string(fromByteCount: count, countStyle: .file) : "about 92 MB"
+        count > 0 ? ByteCountFormatter.string(fromByteCount: count, countStyle: .file) : String(localized: "about 92 MB")
     }
 }

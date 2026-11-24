@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "Lively 會讀取您拍攝照片中的文字，以便進行翻譯。";
+"NSLocationWhenInUseUsageDescription" = "Lively 會查詢您所在國家，以便為您選擇當地語言。";
+"NSMicrophoneUsageDescription" = "Lively 會監聽您的對話，以便即時轉錄與翻譯。";
+"NSMotionUsageDescription" = "當您轉動或將手機遞給他人時，Lively 會短暫顯示麥克風正在監聽。";
+"NSSpeechRecognitionUsageDescription" = "當無法連線至語音服務時，Lively 會在裝置上進行轉錄。";

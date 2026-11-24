@@ -21,15 +21,20 @@ struct Language: Hashable, Identifiable, RawRepresentable, Sendable {
         Locale(identifier: "en").localizedString(forLanguageCode: rawValue) ?? rawValue
     }
 
+    /// Language name in the app’s interface language.
+    var displayName: String { Locale.current.localizedString(forLanguageCode: rawValue) ?? englishName }
+
     /// Name of the language written in that language, e.g. "Español".
     var nativeName: String {
         guard let name = locale.localizedString(forLanguageCode: rawValue) else { return englishName }
         return name.prefix(1).uppercased(with: locale) + name.dropFirst()
     }
 
-    /// "Spanish · Español", or just "English" when the names match.
+    var hasDistinctDisplayName: Bool { displayName.localizedCaseInsensitiveCompare(nativeName) != .orderedSame }
+
+    /// The localized and native names, without repeating the same name.
     var pickerName: String {
-        englishName == nativeName ? englishName : "\(englishName) · \(nativeName)"
+        hasDistinctDisplayName ? "\(displayName) · \(nativeName)" : nativeName
     }
 
     var locale: Locale { Locale(identifier: self == .chinese ? "zh-Hans" : rawValue) }
@@ -142,8 +147,8 @@ enum ChineseScript: String, CaseIterable, Identifiable, Sendable {
     case simplified, traditional
 
     var id: String { rawValue }
-    /// English first, for whoever is setting Lively up.
-    var label: String { self == .simplified ? "Simplified 简体" : "Traditional 繁體" }
+    /// Shown in the interface language.
+    var label: String { self == .simplified ? String(localized: "Simplified 简体") : String(localized: "Traditional 繁體") }
     var promptName: String { self == .simplified ? "Simplified Chinese" : "Traditional Chinese" }
 
     /// Rewrites Simplified Chinese in this script, for engines that only
@@ -163,9 +168,9 @@ enum Latency: Int, CaseIterable, Identifiable, Sendable {
     var id: Int { rawValue }
     var label: String {
         switch self {
-        case .fastest: "Fastest"
-        case .balanced: "Balanced"
-        case .accurate: "Accurate"
+        case .fastest: String(localized: "Fastest")
+        case .balanced: String(localized: "Balanced")
+        case .accurate: String(localized: "Accurate")
         }
     }
     var milliseconds: Int { rawValue }

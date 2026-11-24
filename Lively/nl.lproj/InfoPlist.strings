@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "Lilly leest de tekst in foto's die je maakt om deze te vertalen.";
+"NSLocationWhenInUseUsageDescription" = "Lilly zoekt het land waarin je je bevindt om de lokale taal voor je te kiezen.";
+"NSMicrophoneUsageDescription" = "Lively luistert naar je gesprek om het live te transcriberen en te vertalen.";
+"NSMotionUsageDescription" = "Lively merkt op wanneer je de telefoon draait of overhandigt om kort aan te geven dat de microfoon luistert.";
+"NSSpeechRecognitionUsageDescription" = "Lively transcribeert lokaal als het geen verbinding kan maken met een spraakdienst.";

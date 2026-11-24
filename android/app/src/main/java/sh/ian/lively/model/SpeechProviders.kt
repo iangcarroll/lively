@@ -1,5 +1,6 @@
 package sh.ian.lively.model
 
+import sh.ian.lively.R
 import kotlinx.coroutines.CoroutineScope
 import sh.ian.lively.net.AutomaticSonioxTranscriber
 import sh.ian.lively.net.FallbackTranslator
@@ -18,18 +19,18 @@ object SpeechProviders {
     fun sonioxCredential(hasBroker: Boolean) = if (hasBroker) {
         ProviderCredential(
             id = "soniox-api-key",
-            name = "Soniox API key (optional)",
-            help = "Lively gets short-lived Soniox keys from its key service. For development, a key from console.soniox.com overrides it.",
+            nameRes = R.string.soniox_api_key_optional,
+            helpRes = R.string.soniox_optional_key_help,
             isOptional = true,
         )
     } else {
-        ProviderCredential(id = "soniox-api-key", name = "Soniox API key", help = "Create a key at console.soniox.com.")
+        ProviderCredential(id = "soniox-api-key", nameRes = R.string.soniox_api_key, helpRes = R.string.create_a_key_at_console_soniox_com)
     }
 
     val mistralCredential = ProviderCredential(
         id = "mistral-api-key",
-        name = "Mistral API key",
-        help = "Create a key at console.mistral.ai.",
+        nameRes = R.string.mistral_api_key,
+        helpRes = R.string.create_a_key_at_console_mistral_ai,
     )
 
     /**
@@ -47,7 +48,7 @@ object SpeechProviders {
             SpeechProvider(
                 id = SONIOX_ID,
                 name = "Soniox",
-                summary = "Soniox stt-rt-v6 transcribes and translates both ways in one stream, for the lowest latency.",
+                summaryRes = R.string.soniox_engine_summary,
                 credentials = listOf(soniox),
                 options = emptySet(),
                 languages = Language.SONIOX,
@@ -85,7 +86,7 @@ object SpeechProviders {
             SpeechProvider(
                 id = VOXTRAL_ID,
                 name = "Voxtral + Mistral",
-                summary = "Voxtral Realtime transcribes and detects turns; a Mistral chat model translates each turn.",
+                summaryRes = R.string.voxtral_engine_summary,
                 credentials = listOf(mistralCredential),
                 options = setOf(ProviderOption.SPEED, ProviderOption.TRANSLATION_MODEL),
                 languages = Language.VOXTRAL,

@@ -14,6 +14,8 @@ nonisolated struct AddressLanguage: Hashable, Identifiable, Sendable {
         }
     }
 
+    var displayName: String { Locale.current.localizedString(forIdentifier: code) ?? englishName }
+
     var nativeName: String {
         switch code {
         case "zh-Hans": "简体中文"
@@ -27,7 +29,7 @@ nonisolated struct AddressLanguage: Hashable, Identifiable, Sendable {
             .filter { $0.count == 2 && $0 != "zh" }
         codes += ["zh-Hans", "zh-Hant"]
         return Set(codes).map { AddressLanguage(code: $0) }
-            .sorted { $0.englishName.localizedStandardCompare($1.englishName) == .orderedAscending }
+            .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     }()
 
     static func matching(_ code: String) -> AddressLanguage {
@@ -61,11 +63,11 @@ nonisolated enum AddressLookupError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unavailable: "Address lookup is unavailable right now. Try again."
-        case .network: "Connect to the internet to look up an address."
-        case .rateLimited: "Address lookup is busy. Wait a moment, then try again."
-        case .missingAddress: "An address in this language wasn’t available for this place. Try another language or a more specific address."
-        case .expiredSelection: "Search again to choose this place."
+        case .unavailable: String(localized: "Address lookup is unavailable right now. Try again.")
+        case .network: String(localized: "Connect to the internet to look up an address.")
+        case .rateLimited: String(localized: "Address lookup is busy. Wait a moment, then try again.")
+        case .missingAddress: String(localized: "An address in this language wasn’t available for this place. Try another language or a more specific address.")
+        case .expiredSelection: String(localized: "Search again to choose this place.")
         }
     }
 }

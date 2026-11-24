@@ -1,5 +1,7 @@
 package sh.ian.lively.net
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -225,7 +227,7 @@ class SonioxTranscriber(
     /** Audio can start at handshake, even when the server omits the reconnect offer. */
     override val readyWhenOpen = true
 
-    override val rejectedKeyMessage = "Your Soniox API key was rejected. Check it in Settings."
+    override val rejectedKeyMessage = modelString(R.string.soniox_key_rejected) { "Your Soniox API key was rejected. Check it in Settings." }
 
     /**
      * Soniox replies about every 0.12 s while audio flows, and within 1.1 s
@@ -259,9 +261,9 @@ class SonioxTranscriber(
         if (config.credential !is Credential.Broker) return SocketSignal.Fail(rejectedKeyMessage)
         rejectedTemporaryKeys += 1
         if (rejectedTemporaryKeys >= 3) {
-            return SocketSignal.Fail("Soniox is rejecting Lively's temporary keys. Try again in a few minutes.")
+            return SocketSignal.Fail(modelString(R.string.soniox_temporary_key_rejection) { "Soniox is rejecting Lively's temporary keys. Try again in a few minutes." })
         }
-        return SocketSignal.Retry("Temporary key rejected")
+        return SocketSignal.Retry(modelString(R.string.temporary_key_rejected) { "Temporary key rejected" })
     }
 
     override fun sessionDidReset(stream: SocketStream) {
@@ -282,11 +284,11 @@ class SonioxTranscriber(
         val json = message.jsonObject ?: return SocketSignal.None
 
         json.int("error_code")?.let { code ->
-            val text = json.string("error_message") ?: "Soniox error $code"
+            val text = json.string("error_message") ?: modelString(R.string.soniox_error_value, code) { "Soniox error $code" }
             return when (code) {
                 401, 403 -> keyRejected()
-                402 -> SocketSignal.Fail("Your Soniox balance or budget is used up.")
-                400 -> SocketSignal.Fail("Soniox rejected the request: $text")
+                402 -> SocketSignal.Fail(modelString(R.string.your_soniox_balance_or_budget_is_used_up) { "Your Soniox balance or budget is used up." })
+                400 -> SocketSignal.Fail(modelString(R.string.soniox_rejected_the_request_value, text) { "Soniox rejected the request: $text" })
                 // Too many sessions or requests: back off for longer.
                 429 -> SocketSignal.Retry(text, throttled = true)
                 // 408, 413 (session too long), 5xx: start a fresh session.
@@ -306,7 +308,7 @@ class SonioxTranscriber(
         }
 
         // The server closes after `finished`; we only stop on purpose, so reconnect.
-        if (json.bool("finished") == true) return SocketSignal.Retry("Session finished")
+        if (json.bool("finished") == true) return SocketSignal.Retry(modelString(R.string.session_finished) { "Session finished" })
         return if (endedUtterance) SocketSignal.Boundary else SocketSignal.None
     }
 

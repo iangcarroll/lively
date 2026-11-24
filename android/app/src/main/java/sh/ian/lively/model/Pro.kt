@@ -1,5 +1,7 @@
 package sh.ian.lively.model
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import android.app.Activity
 import android.content.Context
 import androidx.compose.runtime.getValue
@@ -150,7 +152,7 @@ class Pro(
         store = if (products.billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
             StoreState.Unavailable(unavailableMessage(products.billingResult))
         } else if (details.isEmpty()) {
-            StoreState.Unavailable("Lively Pro isn't available from Google Play on this device yet.")
+            StoreState.Unavailable(modelString(R.string.pro_unavailable) { "Lively Pro isn't available from Google Play on this device yet." })
         } else {
             StoreState.Ready(offers(details))
         }
@@ -217,7 +219,7 @@ class Pro(
             val yearly = phase.billingPeriod == "P1Y"
             Offer(
                 productID = product.productId,
-                title = if (yearly) "Yearly" else "Monthly",
+                title = if (yearly) modelString(R.string.yearly) { "Yearly" } else modelString(R.string.monthly) { "Monthly" },
                 price = phase.formattedPrice,
                 period = if (yearly) "year" else "month",
                 badge = if (yearly && monthly != null) savingBadge(phase.priceAmountMicros, monthly) else null,
@@ -229,10 +231,10 @@ class Pro(
 
     private fun unavailableMessage(result: BillingResult) = when (result.responseCode) {
         BillingClient.BillingResponseCode.BILLING_UNAVAILABLE ->
-            "Google Play Billing isn't available. Sign in to the Play Store on this device to subscribe."
+            modelString(R.string.billing_unavailable) { "Google Play Billing isn't available. Sign in to the Play Store on this device to subscribe." }
         BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE, BillingClient.BillingResponseCode.NETWORK_ERROR ->
             UNREACHABLE
-        else -> "Lively Pro isn't available from Google Play on this device yet."
+        else -> modelString(R.string.pro_unavailable) { "Lively Pro isn't available from Google Play on this device yet." }
     }
 
     companion object {
@@ -241,7 +243,7 @@ class Pro(
 
         /** How long the plans screen waits for Google Play before saying it can't be reached. */
         private const val LOADING_TIMEOUT_MS = 10_000L
-        private const val UNREACHABLE = "Couldn't reach Google Play. Check your connection and try again."
+        private val UNREACHABLE get() = modelString(R.string.play_store_unreachable) { "Couldn't reach Google Play. Check your connection and try again." }
 
         /**
          * What a year saves against twelve months, e.g. "Save 33%". The
@@ -253,13 +255,13 @@ class Pro(
             val twelveMonths = monthlyMicros * 12
             if (yearlyMicros >= twelveMonths) return null
             val saving = ((twelveMonths - yearlyMicros) * 100 / twelveMonths).toInt()
-            return if (saving >= 5) "Save $saving%" else null
+            return if (saving >= 5) modelString(R.string.save_value, saving) { "Save $saving%" } else null
         }
 
         /** `Config/Lively.storekit`'s local test prices, for demo mode. */
-        private val DEMO_OFFERS = listOf(
-            Offer("sh.ian.lively.pro.yearly", "Yearly", "$39.99", "year", savingBadge(39_990_000, 4_990_000), null, null),
-            Offer("sh.ian.lively.pro.monthly", "Monthly", "$4.99", "month", null, null, null),
+        private val DEMO_OFFERS get() = listOf(
+            Offer("sh.ian.lively.pro.yearly", modelString(R.string.yearly) { "Yearly" }, "$39.99", "year", savingBadge(39_990_000, 4_990_000), null, null),
+            Offer("sh.ian.lively.pro.monthly", modelString(R.string.monthly) { "Monthly" }, "$4.99", "month", null, null, null),
         )
     }
 }

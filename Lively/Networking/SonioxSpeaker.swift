@@ -148,10 +148,10 @@ final class SonioxSpeaker {
                 case 401, 403:
                     // Temporary keys expire; a key from Settings won't get better.
                     guard case .broker = credential else {
-                        throw SpeakError.fatal("Your Soniox API key was rejected for speech. Check it in Settings.")
+                        throw SpeakError.fatal(String(localized: "Your Soniox API key was rejected for speech. Check it in Settings."))
                     }
                     throw SpeakError.reconnect
-                case 402: throw SpeakError.fatal("Your Soniox balance or budget is used up.")
+                case 402: throw SpeakError.fatal(String(localized: "Your Soniox balance or budget is used up."))
                 default:
                     // This sentence failed; `terminated` follows on a live connection.
                     if stream == nil { throw SpeakError.reconnect }

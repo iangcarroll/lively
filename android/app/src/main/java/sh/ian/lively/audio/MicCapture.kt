@@ -1,5 +1,7 @@
 package sh.ian.lively.audio
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -66,7 +68,7 @@ class MicCapture {
             return
         }
         val minBuffer = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        if (minBuffer <= 0) throw IOException("No microphone is available.")
+        if (minBuffer <= 0) throw IOException(modelString(R.string.no_microphone_is_available) { "No microphone is available." })
         val record = AudioRecord.Builder()
             // Tuned for speech recognition: no echo cancellation or noise gating
             // that would clip the person across the table.
@@ -82,17 +84,17 @@ class MicCapture {
             .build()
         if (record.state != AudioRecord.STATE_INITIALIZED) {
             record.release()
-            throw IOException("No microphone is available.")
+            throw IOException(modelString(R.string.no_microphone_is_available) { "No microphone is available." })
         }
         try {
             record.startRecording()
         } catch (e: IllegalStateException) {
             record.release()
-            throw IOException("The microphone is in use by another app.")
+            throw IOException(modelString(R.string.the_microphone_is_in_use_by_another_app) { "The microphone is in use by another app." })
         }
         if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
             record.release()
-            throw IOException("The microphone is in use by another app.")
+            throw IOException(modelString(R.string.the_microphone_is_in_use_by_another_app) { "The microphone is in use by another app." })
         }
         record.registerAudioRecordingCallback(Executors.newSingleThreadExecutor(), recordingCallback)
         this.record = record

@@ -1,5 +1,8 @@
 package sh.ian.lively.ui
 
+import sh.ian.lively.R
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedContent
@@ -118,11 +121,12 @@ fun LanguageTag(
     /** Set where the tag opens the languages sheet; it then gets a chevron. */
     onChangeLanguages: (() -> Unit)? = null,
 ) {
+    val resources = LocalResources.current
     val ink = language.ink(pair)
     val description = when {
         !showsIcon -> language.nativeName
-        spoken -> "Spoken in ${language.nativeName}"
-        else -> "Translated to ${language.nativeName}"
+        spoken -> stringResource(R.string.spoken_in_value, language.nativeName)
+        else -> stringResource(R.string.translated_to_value, language.nativeName)
     }
     if (onChangeLanguages != null) {
         // The capsule is small; the space around it is part of the button.
@@ -130,7 +134,7 @@ fun LanguageTag(
             modifier
                 .clip(RoundedCornerShape(20.dp))
                 .clickable(onClick = onChangeLanguages, role = Role.Button)
-                .clearAndSetSemantics { contentDescription = "Change languages" }
+                .clearAndSetSemantics { contentDescription = resources.getString(R.string.change_languages) }
                 .padding(14.dp),
         ) {
             LanguageCapsule(language.tag, ink, spoken, showsIcon, chevron = true, Modifier)
@@ -178,6 +182,7 @@ fun LanguagePairButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val resources = LocalResources.current
     Layout(
         content = {
             Surface(
@@ -185,8 +190,8 @@ fun LanguagePairButton(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.semantics {
-                    contentDescription = "Change languages"
-                    stateDescription = "${first.englishName} and ${second?.englishName ?: "automatic"}"
+                    contentDescription = resources.getString(R.string.change_languages)
+                    stateDescription = second?.let { resources.getString(R.string.languages_and, first.displayName, it.displayName) } ?: resources.getString(R.string.language_and_automatic, first.displayName)
                 },
             ) {
                 Row(
@@ -197,7 +202,7 @@ fun LanguagePairButton(
                     Text(first.tag, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = first.ink(pair), maxLines = 1)
                     Icon(Icons.Rounded.SwapHoriz, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                     Text(
-                        second?.tag ?: "Auto",
+                        second?.tag ?: stringResource(R.string.auto),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = second?.ink(pair) ?: MaterialTheme.colorScheme.onSurfaceVariant,
@@ -205,7 +210,7 @@ fun LanguagePairButton(
                     )
                 }
             }
-            TonalIconButton(Icons.Rounded.Translate, "Change languages", onClick)
+            TonalIconButton(Icons.Rounded.Translate, stringResource(R.string.change_languages), onClick)
         },
         modifier = modifier,
     ) { measurables, constraints ->
@@ -226,6 +231,7 @@ fun LanguagePairButton(
 /** Three pulsing dots shown while text is on its way. */
 @Composable
 fun TypingDots(color: Color, modifier: Modifier = Modifier, dotSize: Dp = 6.dp) {
+    val resources = LocalResources.current
     val transition = rememberInfiniteTransition(label = "dots")
     val t by transition.animateFloat(
         initialValue = 0f,
@@ -234,7 +240,7 @@ fun TypingDots(color: Color, modifier: Modifier = Modifier, dotSize: Dp = 6.dp) 
         label = "phase",
     )
     Row(
-        modifier.semantics { contentDescription = "Working" },
+        modifier.semantics { contentDescription = resources.getString(R.string.working) },
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -272,6 +278,7 @@ fun MicButton(
     onHoldStart: () -> Unit = {},
     onHoldEnd: () -> Unit = {},
 ) {
+    val resources = LocalResources.current
     val view = LocalView.current
     // The primary action, so it's the accent color at rest too; listening
     // adds the stop icon and the ring.
@@ -344,7 +351,7 @@ fun MicButton(
             modifier = Modifier
                 .size(size)
                 .scale(pressScale)
-                .semantics { contentDescription = if (isListening) "Stop listening" else "Start listening" },
+                .semantics { contentDescription = if (isListening) resources.getString(R.string.stop_listening) else resources.getString(R.string.start_listening) },
         ) {
             Box(contentAlignment = Alignment.Center) {
                 AnimatedContent(
@@ -429,9 +436,9 @@ fun TranscriptListeningStatus(
             if (store.isAutomaticLanguageMode) {
                 val partner = store.detectedPartnerLanguage
                 when {
-                    !store.isOnline -> Line("Automatic detection needs internet", secondary)
+                    !store.isOnline -> Line(stringResource(R.string.automatic_detection_needs_internet), secondary)
                     partner != null -> Prompt(partner, partner.ink(pair))
-                    else -> Line(if (isListening) "Listening for another language" else "Other language · Automatic", secondary)
+                    else -> Line(if (isListening) stringResource(R.string.listening_for_another_language) else stringResource(R.string.other_language_automatic), secondary)
                 }
             } else {
                 Prompt(pair.second, pair.second.ink(pair))
@@ -450,17 +457,17 @@ fun StatusPill(
 ) {
     val colors = Lively.colors
     val label = when (status) {
-        ConnectionStatus.Idle -> "Ready"
-        ConnectionStatus.Connecting -> "Connecting…"
-        ConnectionStatus.Live -> "Listening"
-        ConnectionStatus.Reconnecting -> "Reconnecting…"
-        ConnectionStatus.Offline -> if (isListening) "Offline · holding audio" else "Offline"
-        is ConnectionStatus.Failed -> "Needs attention"
+        ConnectionStatus.Idle -> stringResource(R.string.ready)
+        ConnectionStatus.Connecting -> stringResource(R.string.connecting)
+        ConnectionStatus.Live -> stringResource(R.string.listening)
+        ConnectionStatus.Reconnecting -> stringResource(R.string.reconnecting)
+        ConnectionStatus.Offline -> if (isListening) stringResource(R.string.offline_holding_audio) else stringResource(R.string.offline)
+        is ConnectionStatus.Failed -> stringResource(R.string.needs_attention)
     }
     val shortLabel = when (status) {
-        ConnectionStatus.Offline -> "Offline"
-        ConnectionStatus.Reconnecting -> "Reconnecting"
-        ConnectionStatus.Connecting -> "Connecting"
+        ConnectionStatus.Offline -> stringResource(R.string.offline)
+        ConnectionStatus.Reconnecting -> stringResource(R.string.reconnecting_short)
+        ConnectionStatus.Connecting -> stringResource(R.string.connecting_short)
         else -> label
     }
     val dot = when (status) {
@@ -547,7 +554,7 @@ fun SpeakAloudMenuItem(store: ConversationStore, onDone: () -> Unit) {
     if (!store.canSpeakTranslations) return
     val on = store.speaksTranslations
     DropdownMenuItem(
-        text = { Text("Speak translations") },
+        text = { Text(stringResource(R.string.speak_translations)) },
         leadingIcon = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, null) },
         trailingIcon = { Checkbox(checked = on, onCheckedChange = null) },
         onClick = {
@@ -568,7 +575,7 @@ fun SpeakAloudButton(store: ConversationStore, size: Dp = 48.dp) {
     val view = LocalView.current
     TonalIconButton(
         if (on) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff,
-        if (on) "Stop speaking translations aloud" else "Speak translations aloud",
+        if (on) stringResource(R.string.stop_speaking_translations_aloud) else stringResource(R.string.speak_translations_aloud),
         onClick = {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
             store.setSpeaksTranslations(!on)
@@ -634,7 +641,7 @@ fun PillButton(
 @Composable
 fun BackButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = LocalContentColor.current)
+        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back), tint = LocalContentColor.current)
     }
 }
 

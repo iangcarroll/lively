@@ -1,5 +1,7 @@
 package sh.ian.lively.net
 
+import sh.ian.lively.R
+import sh.ian.lively.support.modelString
 import android.os.SystemClock
 import android.util.Base64
 import kotlinx.coroutines.CancellationException
@@ -99,7 +101,7 @@ class SonioxSpeaker(
                 } catch (e: FatalException) {
                     queue.clear()
                     closeConnection()
-                    onError(e.message ?: "Speech failed.")
+                    onError(e.message ?: modelString(R.string.speech_failed) { "Speech failed." })
                     break
                 } catch (e: Exception) {
                     closeConnection()
@@ -131,7 +133,7 @@ class SonioxSpeaker(
             put("text", line.text)
             put("text_end", true)
         }
-        if (!connection.socket.send(config.toString()) || !connection.socket.send(text.toString())) throw IOException("Socket closed")
+        if (!connection.socket.send(config.toString()) || !connection.socket.send(text.toString())) throw IOException(modelString(R.string.socket_closed) { "Socket closed" })
 
         for (message in connection.messages) {
             val json = runCatching { Json.parseToJsonElement(message) as? JsonObject }.getOrNull() ?: continue
@@ -143,11 +145,11 @@ class SonioxSpeaker(
                     401, 403 -> {
                         // Temporary keys expire; a key from Settings won't get better.
                         if (credential !is Credential.Broker) {
-                            throw FatalException("Your Soniox API key was rejected for speech. Check it in Settings.")
+                            throw FatalException(modelString(R.string.soniox_speech_key_rejected) { "Your Soniox API key was rejected for speech. Check it in Settings." })
                         }
                         throw ReconnectException()
                     }
-                    402 -> throw FatalException("Your Soniox balance or budget is used up.")
+                    402 -> throw FatalException(modelString(R.string.your_soniox_balance_or_budget_is_used_up) { "Your Soniox balance or budget is used up." })
                     // This sentence failed; `terminated` follows on a live connection.
                     else -> if (stream == null) throw ReconnectException() else continue
                 }
@@ -157,7 +159,7 @@ class SonioxSpeaker(
             if ((json["terminated"] as? JsonPrimitive)?.booleanOrNull == true) return
         }
         // The channel closes when the socket does.
-        throw IOException("Socket closed")
+        throw IOException(modelString(R.string.socket_closed) { "Socket closed" })
     }
 
     private suspend fun connected(): Connection {
@@ -170,7 +172,7 @@ class SonioxSpeaker(
             is Credential.Broker -> try {
                 credential.provider.takeSpeechKey().let { it.value to it.websocketURL }
             } catch (e: SocketSetupException) {
-                throw FatalException(e.message ?: "Lively's key service turned down the request.")
+                throw FatalException(e.message ?: modelString(R.string.livelys_key_service_turned_down_the_request) { "Lively's key service turned down the request." })
             }
         }
         val messages = Channel<String>(Channel.UNLIMITED)
