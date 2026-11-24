@@ -73,7 +73,7 @@ class Handler(socketserver.StreamRequestHandler):
             if path == "retry-timeout" or (path == "retry-paused" and attempt == 1):
                 self.event(event="retry")
                 return
-            if path not in ("handshake", "no-ready"):
+            if path not in ("handshake", "no-ready", "soniox", "resume?opaque=1"):
                 self.event(event="ready")
             markers = []
             configured = False
@@ -105,9 +105,38 @@ class Handler(socketserver.StreamRequestHandler):
                     events["events"].append(("pcm", marker))
                     events["received_at"].append(time.time())
                     markers.append(marker)
-                    self.event(event="audio", marker=marker)
+                    if path == "soniox" and marker == 1_000:
+                        self.event(event="audio", marker=marker, seq=1)
+                    elif path == "resume?opaque=1":
+                        self.event(event="audio", marker=marker, seq=2 + len(markers))
+                    elif path != "soniox":
+                        self.event(event="audio", marker=marker)
                 elif opcode == 1:
                     text = data.decode()
+                    if path == "soniox" and not configured:
+                        assert json.loads(text)["enable_reconnect"]
+                        assert headers["authorization"] == f"Bearer test-{attempt}"
+                        configured = True
+                        self.event(type="reconnect", reconnect_token="first",
+                                   reconnect_url=f"ws://{headers['host']}/resume?opaque=1")
+                        continue
+                    if path == "resume?opaque=1" and not configured:
+                        assert headers["authorization"] == "Bearer test-1"
+                        token, seq = ("first", 1) if attempt <= 2 else ("rotated", 5)
+                        assert json.loads(text) == {"type": "reconnect", "reconnect_token": token, "last_seq": seq}
+                        if attempt == 1:
+                            return  # Transport drops before acknowledging. Retry the same token.
+                        if attempt == 3:
+                            self.event(error_code=400, error_type="reconnect_failed")
+                            return
+                        configured = True
+                        self.event(type="reconnected", reconnect_token="rotated", last_request=1)
+                        for _ in range(2):
+                            self.event(event="audio", marker=1_500, seq=2)
+                        continue
+                    if path == "resume?opaque=1" and text == "finalize":
+                        events["events"].append(("finalize", None))
+                        continue
                     if text == "configure":
                         if configured:
                             raise ValueError("Repeated opening configuration")
@@ -138,7 +167,8 @@ def run_variant(work, source, name, expected_pass):
     subprocess.run(["xcrun", "swiftc", "-swift-version", "6", "-default-isolation", "MainActor",
                     "-parse-as-library", "-module-cache-path", str(work / "modules"),
                     str(ROOT / "Lively/Model/Language.swift"),
-                    str(ROOT / "Lively/Networking/SpeechEngine.swift"), str(socket_source),
+                    str(ROOT / "Lively/Networking/SpeechEngine.swift"),
+                    str(ROOT / "Lively/Networking/SonioxReconnect.swift"), str(socket_source),
                     str(Path(__file__).with_name("SocketLifecycleRegression.swift")),
                     "-o", str(binary)], check=True, timeout=90)
     with WebSocketServer() as server:
@@ -169,7 +199,9 @@ def run_variant(work, source, name, expected_pass):
         if stream["path"] == path or stream["path"].startswith(path + "/")
     )
     expected_bounded = [0 if index % 3 == 0 else 4_000 + index for index in range(250, 1_000)]
-    wire_ok = (connections.count("warm") == 1 and connections.count("eof") == 3
+    native_replay = [stream["events"] for stream in wire if stream["path"] == "resume?opaque=1"]
+    wire_ok = (native_replay == [[], [("pcm", 2_000), ("pcm", 3_000), ("finalize", None), ("pcm", 4_000)], []]
+               and connections.count("warm") == 1 and connections.count("eof") == 3
                and connections.count("handshake") == 1 and connections.count("prewarm") == 1
                and connections.count("no-ready") == 1 and "stopped" not in connections and eof_ordered
                and pcm_streams("suspend") == [[0, 4_000, 0], [0, 4_000, 0, 0, 5_000, 6_000, 0]]
@@ -212,10 +244,10 @@ def main():
              "stop()\n            schedulePauseDrainDeadline()"),
             ("rapid-eof-resume-discards-final", "isResumingAfterDrain = true\n            schedulePauseDrainDeadline()",
              "start()\n            schedulePauseDrainDeadline()"),
-            ("path-loss-discards-unfinalized-pcm", "hedgeTask?.cancel()\n                dropStandby()\n                tearDownPrimary(keepingAudio: true)",
-             "hedgeTask?.cancel()\n                dropStandby()\n                tearDownPrimary(keepingAudio: false)"),
-            ("offline-primary-keeps-uploading", "hedgeTask?.cancel()\n                dropStandby()\n                tearDownPrimary(keepingAudio: true)",
-             "hedgeTask?.cancel()\n                dropStandby()"),
+            ("path-loss-discards-unfinalized-pcm", "else {\n                    tearDownPrimary(keepingAudio: true)\n                }",
+             "else {\n                    tearDownPrimary(keepingAudio: false)\n                }"),
+            ("offline-primary-keeps-uploading", "else {\n                    tearDownPrimary(keepingAudio: true)\n                }",
+             "else {}"),
             ("paused-path-restore-reconnects", "else if isRunning, !isPaused, primary == nil || status == .reconnecting {",
              "else if isRunning, primary == nil || status == .reconnecting {"),
             ("no-primary-resume-discards-backlog", "guard let primary else {\n            connect()\n            return\n        }",

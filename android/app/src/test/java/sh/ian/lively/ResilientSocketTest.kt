@@ -49,7 +49,7 @@ class ResilientSocketTest {
     private val sockets = mutableListOf<ResilientSocket>()
 
     /** The server's end of one WebSocket. Audio frames are logged by their marker. */
-    private class Session(val path: String) : WebSocketListener() {
+    private class Session(val path: String, val authorization: String?) : WebSocketListener() {
         val frames = CopyOnWriteArrayList<String>()
         @Volatile var socket: WebSocket? = null
 
@@ -71,18 +71,22 @@ class ResilientSocketTest {
         val keepsWarm: Boolean = true,
         val sides: Boolean = false,
         val tracksFinalized: Boolean = false,
+        val nativeReconnect: Boolean = false,
     ) : SocketDialect {
         val requests = mutableListOf<SocketStream>()
         val opened = mutableListOf<SocketStream>()
+        val responses = mutableListOf<Pair<SocketStream, String>>()
+        val resets = mutableListOf<SocketStream>()
         val ended = mutableListOf<SocketStream>()
         /** Chunks the server says it finalized, by stream. */
         val finalized = mutableMapOf<Int, Int>()
 
         override suspend fun makeRequest(stream: SocketStream): Request {
             requests += stream
-            return Request.Builder().url(server.url("/${if (stream.isCatchUp) "catchup" else "primary"}/${stream.id}")).build()
+            return Request.Builder().url(server.url("/${if (stream.isCatchUp) "catchup" else "primary"}/${stream.id}"))
+                .header("Authorization", "Bearer test-${requests.size}").build()
         }
-        override fun openingMessages() = listOf(WsMessage.Text("configure"))
+        override fun openingMessages() = listOf(WsMessage.Text(if (nativeReconnect) """{"enable_reconnect":true}""" else "configure"))
         override fun audioMessage(chunk: ByteArray) = WsMessage.Binary(chunk)
         override val endOfAudioMessage = WsMessage.Text("")
         override val readyWhenOpen = false
@@ -92,12 +96,13 @@ class ResilientSocketTest {
         override val supportsSideStreams get() = sides
         override val reportsFinalizedAudio get() = tracksFinalized
         override fun finalizedAudio(stream: SocketStream) = (finalized[stream.id] ?: 0) * 0.08
-        override fun sessionDidReset(stream: SocketStream) {}
+        override fun sessionDidReset(stream: SocketStream) { resets += stream }
         override fun sessionDidOpen(stream: SocketStream) { opened += stream }
         override fun sideStreamDidEnd(stream: SocketStream) { ended += stream }
 
         override fun receive(message: WsMessage, stream: SocketStream): SocketSignal {
             val event = (message as WsMessage.Text).text
+            responses += stream to event
             return when {
                 event == "ready" -> SocketSignal.Ready
                 event == "finished" -> SocketSignal.Retry("Session finished")
@@ -117,7 +122,7 @@ class ResilientSocketTest {
                 val path = request.url.encodedPath
                 val refused = if (path.startsWith("/catchup")) refusedCatchUps else refusedPrimaries
                 if (refused.getAndUpdate { maxOf(0, it - 1) } > 0) return MockResponse.Builder().code(503).build()
-                val session = Session(path)
+                val session = Session(request.url.encodedPath + (request.url.encodedQuery?.let { "?$it" } ?: ""), request.headers["Authorization"])
                 sessions += session
                 return MockResponse.Builder().webSocketUpgrade(session).build()
             }
@@ -187,6 +192,74 @@ class ResilientSocketTest {
         session.send("ready")
         await("the first session is live") { socket.status == SpeechEngineStatus.Live }
         return socket to session
+    }
+
+    @Test fun reconnectRecoversAcrossTransportLossAndReplaysOnlyUnacceptedRequests() {
+        val dialect = Dialect(sides = true, tracksFinalized = true, nativeReconnect = true)
+        val socket = socket(dialect)
+        socket.start()
+        val first = session(0)
+        val url = server.url("/resume?opaque=1").toString().replaceFirst("http:", "ws:")
+        first.send("""{"type":"reconnect","reconnect_token":"first","reconnect_url":"$url"}""")
+        await("stream ready") { socket.status == SpeechEngineStatus.Live }
+        socket.send(pcm(1_000))
+        await("first PCM") { first.audio == listOf(1_000) }
+        val firstResult = """{"seq":1,"tokens":[]}"""
+        first.send(firstResult)
+        await("first result delivered") { dialect.responses.size == 1 }
+
+        advance(5_000)
+        val ping = """{"type":"ping","id":1}"""
+        await("application ping numbers prior requests") { first.frames.last() == ping }
+        first.send("""{"type":"pong","id":1}""")
+        settle()
+        socket.send(pcm(2_000))
+        socket.networkAvailable = false
+        socket.send(pcm(3_000))
+        socket.pause()
+        socket.resume()
+        socket.send(pcm(4_000))
+        socket.networkAvailable = true
+
+        val attempt = session(1)
+        val handshake = """{"type":"reconnect","reconnect_token":"first","last_seq":1}"""
+        await("reconnect handshake goes first") { attempt.frames == listOf(handshake) }
+        assertEquals("/resume?opaque=1", attempt.path)
+        assertEquals(first.authorization, attempt.authorization)
+        // The first attempt never answers. No audio, opening config or ping may pass.
+        advance(5_000)
+        advance(300)
+        val resumed = session(2)
+        await("unanswered attempt reuses token") { resumed.frames == listOf(handshake) }
+        assertEquals(listOf(handshake), attempt.frames.toList())
+        resumed.send("""{"type":"reconnected","reconnect_token":"rotated","last_request":1}""")
+        await("replay includes the exact suffix and pause boundary") {
+            resumed.frames == listOf(handshake, "2000", "3000", "finalize", "4000")
+        }
+        val missed = """{"seq":2,"tokens":[]}"""
+        resumed.send(missed)
+        resumed.send(missed)
+        settle()
+        assertEquals(listOf(firstResult, missed), dialect.responses.map { it.second })
+        assertEquals(dialect.opened, dialect.responses.map { it.first }.distinct())
+        assertTrue(dialect.resets.isEmpty())
+        assertEquals(1, dialect.requests.size)
+
+        // A silent connection fails when the second scheduled ping finds no pong.
+        advance(5_000)
+        await("ping counts requests across both connections") { resumed.frames.last() == """{"type":"ping","id":5}""" }
+        advance(5_000)
+        val refused = session(3)
+        await("rotated token and latest sequence used") {
+            refused.frames == listOf("""{"type":"reconnect","reconnect_token":"rotated","last_seq":2}""")
+        }
+        refused.send("""{"error_code":400,"error_type":"reconnect_failed"}""")
+        await("old parser reset on refusal") { dialect.resets == dialect.opened }
+        advance(400)
+        val fresh = session(4)
+        assertEquals("Bearer test-2", fresh.authorization)
+        fresh.send("ready")
+        await("ordinary stream ready after fallback") { socket.status == SpeechEngineStatus.Live }
     }
 
     // region Pause and resume

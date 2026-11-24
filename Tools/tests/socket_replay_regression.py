@@ -193,6 +193,7 @@ def compile_variant(work, name, source):
                     "-parse-as-library", "-module-cache-path", str(work / "modules"),
                     str(ROOT / "Lively/Model/Language.swift"),
                     str(ROOT / "Lively/Networking/SpeechEngine.swift"),
+                    str(ROOT / "Lively/Networking/SonioxReconnect.swift"),
                     str(ROOT / "Lively/Networking/HybridSpeechEngine.swift"), str(swift),
                     str(Path(__file__).with_name("SocketReplayRegression.swift")), "-o", str(binary)],
                    check=True, timeout=90)

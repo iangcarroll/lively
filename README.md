@@ -64,8 +64,10 @@ connects or retries,
 audio waits in a bounded buffer; the app does not substitute a fixed-language
 recognizer. A warm Soniox session is reused when listening resumes. Stopping
 listening lets accepted audio finish processing, including audio captured before
-the connection was ready. After connection loss, Soniox can also replay sent audio
-that the service has not finalized. Voxtral retains unsent queued audio; it does
+the connection was ready. After a short connection loss, Lively resumes the same Soniox stream. It receives
+missed transcript updates and resends audio and controls from the first request
+Soniox missed. If the stream cannot resume, Lively opens a fresh session and
+replays retained speech past the last finalized audio position. Voxtral retains unsent queued audio; it does
 not report finalized audio positions, so already-sent speech cannot be recovered
 with the same guarantee.
 
@@ -548,9 +550,9 @@ On a bad network (all engines, via `ResilientSocket`):
 
 - Audio keeps recording while the socket is down, with up to 60 s held in a
   backlog that is replayed on reconnect.
-- Soniox reports how much audio it has finalized, so audio sent but not yet
-  finalized when a session drops goes back in the backlog and is sent again:
-  words in flight at the moment of a dropout aren't lost.
+- Soniox offers a 20 s reconnect window. Lively keeps the original regional key
+  for that stream and checks delivery with an application ping every 5 s.
+  [Soniox stream reconnect](https://docs.soniox.com/stt/rt/stream-reconnect)
 - Once onboarding is done, a session opens as the app launches and is held
   with keepalives, so the first tap on the mic is live at once. It closes
   after 60 s if nobody starts listening.

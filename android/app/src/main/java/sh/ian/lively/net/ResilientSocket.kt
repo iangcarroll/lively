@@ -9,6 +9,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -160,7 +163,8 @@ data class SocketStream(val id: Int, val isCatchUp: Boolean)
  *   speech isn't stuck behind it (Soniox works through a burst at only about
  *   1.15× real time). Dialects without side streams replay the retained
  *   speech on the primary before new live audio.
- * - When the network changes, a second socket opens on the new network and
+ * - Soniox resumes the same stream across network changes and short transport losses.
+ *   When no reconnect is offered, a second socket opens on the new network and
  *   audio moves to it at the next utterance boundary (make-before-break).
  * - Audio the server hasn't finalized is kept until it is. When a session
  *   drops, that audio goes back in the backlog and is sent again, so words
@@ -248,12 +252,15 @@ class ResilientSocket(
                 reconnectJob = null
                 hedgeJob?.cancel()
                 dropStandby()
-                tearDownPrimary(keepingAudio = true)
+                val live = primary
+                if (live?.reconnect?.request != null) suspendStream(live)
+                else tearDownPrimary(keepingAudio = true)
                 side.toList().forEach(::closeSide)
                 if (isRunning && isPaused) schedulePauseDrainDeadline()
                 if (isRunning) status = SpeechEngineStatus.Reconnecting
             } else if (isRunning && !isPaused && (primary == null || status == SpeechEngineStatus.Reconnecting)) {
-                connect()
+                val live = primary
+                if (live != null && live.isSuspended) retryResume(live) else connect()
             }
             resumeCatchUpRetries()
         }
@@ -313,10 +320,7 @@ class ResilientSocket(
         }
     }
 
-    /**
-     * The device moved to a different network. Opens a socket on the new
-     * network before letting go of the old one.
-     */
+    /** Move a resumable stream to the new network, or prepare a fresh standby. */
     fun networkPathChanged() {
         // A paused session finds out from its pings if the old network died.
         if (!isRunning || isPaused || !networkAvailable) return
@@ -327,6 +331,10 @@ class ResilientSocket(
                 failures = 0
                 connect()
             }
+            return
+        }
+        if (primary.reconnect?.request != null) {
+            if (!primary.isSuspended) suspendStream(primary)
             return
         }
         if (!dialect.supportsSideStreams || standby != null) return
@@ -349,6 +357,7 @@ class ResilientSocket(
         val primary = primary
         if (primary != null && primary.isReady && !primary.isEnding) {
             finishPausedAudio(primary)
+            if (!networkAvailable) schedulePauseDrainDeadline()
         } else {
             schedulePauseDrainDeadline()
         }
@@ -394,7 +403,7 @@ class ResilientSocket(
             while (isActive) {
                 delay(KEEPALIVE_INTERVAL_MS)
                 if (primary.isClosed) return@launch
-                primary.send(message)
+                if (primary.reconnect?.request == null) primary.send(message)
             }
         }
     }
@@ -419,6 +428,10 @@ class ResilientSocket(
             return
         }
         // A prewarmed session still connecting: audio waits in the backlog.
+        if (primary.isSuspended) {
+            if (networkAvailable && primary.socket == null) retryResume(primary)
+            return
+        }
         if (!primary.isReady) return
         debugLog("resumed stream ${primary.stream.id}")
         status = SpeechEngineStatus.Live
@@ -437,6 +450,9 @@ class ResilientSocket(
     /** One WebSocket and the jobs that serve it. */
     private inner class Connection(val stream: SocketStream) {
         var socket: WebSocket? = null
+        var reconnect: SonioxReconnect? = null
+        val isSuspended get() = reconnect?.deadline != null
+        var sentBeforeDrop = 0
         var response: Response? = null
         val jobs = mutableListOf<Job>()
         var isReady = false
@@ -462,20 +478,31 @@ class ResilientSocket(
         val createdAt = now()
 
         fun send(message: WsMessage) {
+            reconnect?.record(message)
+            if (!isSuspended) write(message)
+        }
+
+        fun write(message: WsMessage) {
             if (isBlackholed) return
             val socket = socket ?: return
-            when (message) {
+            val queued = when (message) {
                 is WsMessage.Text -> socket.send(message.text)
                 is WsMessage.Binary -> socket.send(message.bytes.toByteString())
+            }
+            if (!queued) scope.launch {
+                if (this@Connection.socket === socket) connectionFailed(this@Connection, SocketSignal.Retry("Send failed"))
             }
         }
 
         fun close() {
             isClosed = true
+            disconnect(normal = true)
+        }
+
+        fun disconnect(normal: Boolean) {
             jobs.forEach { it.cancel() }
             jobs.clear()
-            socket?.close(1000, null)
-            socket?.cancel()
+            if (!normal || socket?.close(1000, null) != true) socket?.cancel()
             socket = null
         }
     }
@@ -545,22 +572,24 @@ class ResilientSocket(
     }
 
     private fun start(connection: Connection, request: Request) {
+        val resuming = connection.isSuspended
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 scope.launch {
-                    if (connection.isClosed || !dialect.readyWhenOpen) return@launch
+                    if (connection.socket !== webSocket || resuming || connection.isReady || !dialect.readyWhenOpen) return@launch
                     debugLog("stream ${connection.stream.id} opened after ${now() - connection.createdAt} ms")
                     received(connection, SocketSignal.Ready)
                 }
             }
 
-            override fun onMessage(webSocket: WebSocket, text: String) = deliver(WsMessage.Text(text))
+            override fun onMessage(webSocket: WebSocket, text: String) = deliver(webSocket, WsMessage.Text(text))
 
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) = deliver(WsMessage.Binary(bytes.toByteArray()))
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) = deliver(webSocket, WsMessage.Binary(bytes.toByteArray()))
 
-            private fun deliver(message: WsMessage) {
+            private fun deliver(webSocket: WebSocket, message: WsMessage) {
                 scope.launch {
-                    if (connection.isClosed || isBlackholed) return@launch
+                    if (connection.socket !== webSocket || isBlackholed) return@launch
+                    if (handleReconnectMessage(connection, message)) return@launch
                     connection.awaitingReplySince = null
                     val signal = dialect.receive(message, connection.stream)
                     confirmAudio(connection)
@@ -569,15 +598,14 @@ class ResilientSocket(
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                webSocket.close(1000, null)
                 scope.launch {
-                    if (!connection.isClosed) connectionFailed(connection, SocketSignal.Retry("Closed by server ($code)"))
+                    if (connection.socket === webSocket) connectionFailed(connection, SocketSignal.Retry("Closed by server ($code)"))
                 }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 scope.launch {
-                    if (connection.isClosed) return@launch
+                    if (connection.socket !== webSocket) return@launch
                     connection.response = response
                     connectionFailed(connection, SocketSignal.Retry(t.message ?: "Connection failed"))
                 }
@@ -586,12 +614,22 @@ class ResilientSocket(
         val socket = client.newWebSocket(request, listener)
         connection.socket = socket
         // OkHttp holds frames sent before the handshake and sends them once it's done.
-        dialect.openingMessages().forEach(connection::send)
+        if (resuming) {
+            connection.write(checkNotNull(connection.reconnect).handshake())
+        } else {
+            val opening = dialect.openingMessages()
+            if ((opening.firstOrNull()?.jsonObject?.get("enable_reconnect") as? JsonPrimitive)?.booleanOrNull == true) {
+                connection.reconnect = SonioxReconnect(request, MAX_BACKLOG)
+            }
+            opening.forEach(connection::write)
+        }
 
-        if (dialect.readyWhenOpen) {
+        if (resuming || dialect.readyWhenOpen) {
             connection.jobs += scope.launch {
                 delay(HANDSHAKE_TIMEOUT_MS)
-                if (!connection.isClosed && !connection.isReady) connectionFailed(connection, SocketSignal.Retry("Handshake timed out"))
+                if (connection.socket === socket && (!connection.isReady || connection.isSuspended)) {
+                    connectionFailed(connection, SocketSignal.Retry("Handshake timed out"))
+                }
             }
         }
 
@@ -601,12 +639,124 @@ class ResilientSocket(
                     delay(250)
                     if (connection.isClosed) return@launch
                     val since = connection.awaitingReplySince
-                    if (since != null && now() - since > timeout) {
+                    if (!connection.isSuspended && since != null && now() - since > timeout) {
                         connectionFailed(connection, SocketSignal.Retry("No reply from the server"))
                         return@launch
                     }
                 }
             }
+        }
+    }
+
+    // endregion
+
+    // region Soniox stream reconnect
+
+    private fun handleReconnectMessage(connection: Connection, message: WsMessage): Boolean {
+        val state = connection.reconnect ?: return false
+        val json = message.jsonObject ?: return false
+        val type = (json["type"] as? JsonPrimitive)?.content
+        if (connection.isSuspended) {
+            val replay = if (type == "reconnected") state.acceptResume(json, connection.sentBeforeDrop) else null
+            if (replay == null) {
+                abandonResume(connection)
+                return true
+            }
+            replay.forEach(connection::write)
+            connection.awaitingReplySince = if (replay.isEmpty() || isPaused) null else now()
+            startSonioxPings(connection)
+            if (connection === primary) status = SpeechEngineStatus.Live
+            return true
+        }
+        if (type == "reconnect") {
+            if (state.acceptOffer(json)) {
+                startSonioxPings(connection)
+                if (!connection.isReady) received(connection, SocketSignal.Ready)
+            } else {
+                connection.reconnect = null
+            }
+            return true
+        }
+        if (type == "pong") {
+            state.pong((json["id"] as? JsonPrimitive)?.intOrNull)
+            return true
+        }
+        if ((json["error_type"] as? JsonPrimitive)?.content == "connection_replaced") {
+            abandonResume(connection)
+            return true
+        }
+        if (state.request == null) {
+            // A server can accept the start request without offering reconnect.
+            connection.reconnect = null
+        } else {
+            val seq = (json["seq"] as? JsonPrimitive)?.intOrNull ?: return false
+            if (seq <= state.lastSequence) return true
+            if (seq != state.lastSequence + 1) {
+                suspendStream(connection)
+                return true
+            }
+            state.lastSequence = seq
+        }
+        return false
+    }
+
+    private fun startSonioxPings(connection: Connection) {
+        connection.jobs += scope.launch {
+            while (isActive) {
+                delay(5_000)
+                val state = connection.reconnect ?: return@launch
+                val ping = state.ping()
+                if (ping == null) {
+                    suspendStream(connection)
+                    return@launch
+                }
+                connection.write(ping)
+            }
+        }
+    }
+
+    /** Keep the logical stream, parser and ordered outbox through a transport loss. */
+    private fun suspendStream(connection: Connection) {
+        val state = connection.reconnect ?: return
+        val retrying = connection.isSuspended
+        if (!retrying) {
+            state.deadline = now() + 20_000
+            connection.sentBeforeDrop = state.requestCount
+        }
+        connection.disconnect(normal = false)
+        if (connection === primary) {
+            hedgeJob?.cancel()
+            dropStandby()
+            status = SpeechEngineStatus.Reconnecting
+        }
+        if (!networkAvailable) return
+        if (retrying) {
+            connection.jobs += scope.launch {
+                delay(300)
+                retryResume(connection)
+            }
+        } else {
+            retryResume(connection)
+        }
+    }
+
+    private fun retryResume(connection: Connection) {
+        if (connection.isClosed || !networkAvailable || connection.socket != null) return
+        val state = connection.reconnect ?: return
+        val deadline = state.deadline ?: return
+        val request = state.request ?: return
+        if (now() >= deadline) abandonResume(connection) else start(connection, request)
+    }
+
+    private fun abandonResume(connection: Connection) {
+        connection.reconnect = null
+        when (connection) {
+            primary -> {
+                tearDownPrimary(keepingAudio = true)
+                handleFailure()
+            }
+            standby -> dropStandby()
+            else -> closeSide(connection)
         }
     }
 
@@ -641,6 +791,11 @@ class ResilientSocket(
 
     private fun connectionFailed(connection: Connection, signal: SocketSignal) {
         if (signal is SocketSignal.Retry) debugLog("stream ${connection.stream.id} failed: ${signal.reason}")
+        if (connection.reconnect?.request != null && signal is SocketSignal.Retry) {
+            if (connection.isSuspended && connection.response?.code in 400..499) abandonResume(connection)
+            else suspendStream(connection)
+            return
+        }
         if (!connection.isReady) dialect.connectFailed(connection.stream)
         when {
             connection === primary -> handlePrimary(signal)

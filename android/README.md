@@ -18,12 +18,11 @@ broker, account and Pro allowance:
   foldables, tablets, landscape, Chromebooks).
 - Soniox through the key broker by default, or Voxtral + Mistral with your own
   key. Keys entered in Settings are encrypted with an Android Keystore key.
-- Region probing, a spare key, reconnects with backlog replay (including
-  audio Soniox hadn't finalized when the session dropped), catch-up
-  sessions after a dropout, make-before-break handover when the network
-  changes, a warm session for a quick resume, and one opened at launch so
-  the first tap on the mic is live at once. All of it is a port of the
-  Swift code, file by file (see the table below).
+- Soniox resumes the same stream after a brief network drop or interface
+  change, recovers missed results, and resends the audio and controls the server
+  missed. If resume is unavailable, Lively uses a fresh regional key and the
+  existing backlog and catch-up sessions. A warm connection keeps the first
+  tap on the mic fast.
 - Tap the mic to start and stop, or hold it to listen only while it's
   pressed, as on iOS.
   The listening reminder fades five seconds after listening goes live and

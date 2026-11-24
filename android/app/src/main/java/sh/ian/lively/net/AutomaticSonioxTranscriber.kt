@@ -130,6 +130,7 @@ class AutomaticSonioxTranscriber(
         WsMessage.json(
             buildJsonObject {
                 put("model", config.model)
+                put("enable_reconnect", true)
                 put("audio_format", "pcm_s16le")
                 put("sample_rate", MicCapture.SAMPLE_RATE)
                 put("num_channels", 1)
@@ -150,7 +151,7 @@ class AutomaticSonioxTranscriber(
     /** An empty text frame ends the stream; an empty binary frame wouldn't. */
     override val endOfAudioMessage = WsMessage.Text("")
 
-    /** Soniox only replies when it has tokens, so there's no session ack. */
+    /** Audio can start at handshake, even when the server omits the reconnect offer. */
     override val readyWhenOpen = true
 
     override val rejectedKeyMessage = "Your Soniox API key was rejected. Check it in Settings."
