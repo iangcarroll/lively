@@ -1,6 +1,6 @@
 # Lively iOS acquisition plan
 
-**Updated November 22, 2026 (Pacific).** All five US Apple Ads Search Results campaigns are **running**. All eight ad groups are enabled. The **US$1,000 total cap** includes the initial language-pair test. The five campaigns share a stop time of **December 6 at 8:00 a.m. Pacific**. [Apple Ads dashboard](https://app-ads.apple.com/cm/app/25739240/report)
+**Updated November 23, 2026 (Pacific).** All five US Apple Ads Search Results campaigns are **running**. All eight ad groups are enabled. The **US$1,000 total cap** includes the initial language-pair test. The five campaigns share a stop time of **December 6 at 8:00 a.m. Pacific**. [Apple Ads dashboard](https://app-ads.apple.com/cm/app/25739240/report)
 
 ## November 23–December 6 priorities
 
@@ -29,7 +29,7 @@ Prioritize English-speaking US travelers who need to ask a real question and und
 | US product pages | Apple approved all four custom pages and the **Live transcript vs. offline voices** product page optimization test. The four custom ads are enabled in the groups shown below. [Product pages in App Store Connect](https://appstoreconnect.apple.com/apps/6835590432/distribution/productpages) |
 | Localization | The public iOS interface, onboarding and 0.1.2 store listing are in English. Japanese and Traditional Chinese listing copy and screenshots are prepared for a later storefront launch. [Storefront PR](https://github.com/iangcarroll/lively/pull/18) · [Localized assets](https://github.com/iangcarroll/lively/tree/main/AppStore/localizations) |
 
-## First delivery check
+## Paid delivery checks
 
 **November 22, 2026, around 4:30 p.m. Pacific**, roughly 22 hours after launch. All five campaigns showed Running. The figures below cover the launch through the check, including the partial November 23 UTC reporting day. Apple Ads reporting can lag by three hours. [Campaign dashboard](https://app-ads.apple.com/cm/app/25739240/report)
 
@@ -42,6 +42,8 @@ Prioritize English-speaking US travelers who need to ask a real question and und
 Discovery’s **Broad** group received the impression on the bid keyword **speech translation**. The production attribution report had **0 attributed installs and 0 first-paid Pro subscriptions** across launch cohorts. With no taps, cost per install and tap-to-install conversion are undefined. There is too little delivery to judge a keyword, product page or paywall. [Discovery report](https://app-ads.apple.com/cm/app/25739240/report/campaign/2145166598) · [Pro attribution definitions](https://github.com/iangcarroll/lively/blob/main/Server/key-broker/README.md#apple-ads-keyword-conversions)
 
 The November 22 evening eligibility check found all five campaigns, eight ad groups and 20 bid keywords running. Delivery still totaled one impression. There were no CPA caps or audience restrictions beyond the US storefront and compatible devices. The exact negatives were confined to Discovery. Apple’s US keyword tool rated 14 of 20 terms at 1/5 for popularity, including five of the six language-pair terms. Both **voice translator** and **live translator** scored 3/5. Apple suggested a US$2.76 starting bid when creating an ad group in either Category or Language pair. Our corresponding bids are US$1.00 and US$1.10. Apple gave no keyword-specific bid recommendation or reason for a lost auction. Allow 24–48 hours for new campaigns to gather data. [Campaign dashboard](https://app-ads.apple.com/cm/app/25739240/report) · [Apple’s delivery guidance](https://ads.apple.com/app-store/help/reporting/0007-tips-for-solving-performance-issues)
+
+**November 23, around 4:20 p.m. Pacific**, roughly 46 hours after launch. All five campaigns were running. Cumulative delivery reached **9 impressions, 1 tap, US$0.67 spent and 0 installs**. Discovery’s Search Match group generated all eight additional impressions and the first tap. Apple had no search-term row for that group. Discovery Broad still had one impression and zero taps. The four exact-match campaigns had zero impressions. The production staff report showed zero ad-attributed installs and zero subsequent first-paid Pro subscriptions. This check includes the partial November 24 UTC reporting day. [Discovery report](https://app-ads.apple.com/cm/app/25739240/report/campaign/2145166598) · [Lively staff overview](https://admin-lively.cautela.hk/overview)
 
 ## App Store search and creative
 
@@ -63,7 +65,9 @@ At **7:13 p.m. Pacific on November 22 (03:13 UTC November 23)**, we added the tw
 | Face-to-face conversations | conversation, interpreter | **conversation**, **interpreter** | Use this page for demos of two people sharing a phone. |
 | Offline travel translation | offline, travel | **offline**, **travel** | Show the advance download and a supported language pair working in airplane mode. |
 
-When November 22 UTC becomes available, add it as the last complete pre-change day. November 23 UTC contains time both before and after assignment. Compare the first seven full days (November 24–30 UTC) and the first fourteen (November 24–December 7 UTC) with the pre-change baseline once Apple reports them. Record the corresponding Apple Ads results for the Japanese and Chinese ad groups alongside each window.
+**Final full pre-change day, November 22 UTC.** Both the Japanese and Chinese pages still showed insufficient data for US App Store Search impressions, views, first-time downloads and conversion. Across all territories and sources, Lively recorded one first-time download that day and ten since launch. The app-wide totals through November 22 were 297 impressions, 37 product page views and one redownload. [App Store Connect Analytics](https://appstoreconnect.apple.com/apps/6835590432/analytics/overview)
+
+November 23 UTC contains time both before and after assignment. Compare the first seven full days (November 24–30 UTC) and the first fourteen (November 24–December 7 UTC) with the pre-change baseline once Apple reports them. Record the corresponding Apple Ads results for the Japanese and Chinese ad groups alongside each window.
 
 Keep **Lively: Live Translator** for this test. DigitalSail’s similarly named US app has about 23,000 ratings. Give travelers a reason to choose Lively in the subtitle and the first screenshot. At the next metadata revision, consider the English subtitle **Talk face to face on one phone**. Use the 100-character keyword field for relevant terms missing from the name and subtitle. Try specific phrases such as “offline Japanese translator” in guides first, then use actual search and download data to choose terms for the next listing revision. Omit third-party brands such as AirPods. Test Cantonese speech end to end before targeting it. Traditional Chinese text output alone establishes script support. [Competitor’s US listing](https://apps.apple.com/us/app/live-translator-ai-translate/id6740606431) · [Apple’s metadata guidance](https://developer.apple.com/app-store/product-page/) · [Lively’s listing](https://apps.apple.com/us/app/lively-live-translator/id6835590432)
 
