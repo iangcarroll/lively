@@ -14,6 +14,7 @@ final class LocalDialect: SocketDialect {
     let tracksFinalized: Bool
     let supportsSideStreams: Bool
     var nativeReconnect: Bool { endpoint.lastPathComponent == "soniox" }
+    var receivedHeartbeat = false
     var resets = 0
     var requests = 0
     var opened = 0
@@ -61,6 +62,9 @@ final class LocalDialect: SocketDialect {
         guard let value = message.jsonObject, let event = value["event"] as? String else { return .none }
         switch event {
         case "ready": return .ready
+        case "heartbeat":
+            receivedHeartbeat = true
+            return .none
         case "audio":
             let marker = value["marker"] as! Int
             audio.append(marker)
@@ -120,6 +124,11 @@ struct SocketLifecycleRegression {
         guard CommandLine.arguments.count == 2, let base = URL(string: CommandLine.arguments[1]) else {
             fatalError("Pass local WebSocket base URL")
         }
+
+        let early = LocalDialect(base.appendingPathComponent("early-ready"), keepsWarm: true,
+                                 readyAtHandshake: true)
+        let earlySocket = ResilientSocket(dialect: early)
+        earlySocket.start()
 
         let native = LocalDialect(base.appendingPathComponent("soniox"), keepsWarm: true,
                                   readyAtHandshake: true, tracksFinalized: true)
@@ -404,6 +413,9 @@ struct SocketLifecycleRegression {
         check(eofLoss.finals[0] == [0, 4_000, 0, 0, 7_000, 0, 8_000],
               "EOF path recovery preserves every accepted interval once without leaking a stale final response")
         eofLossSocket.stop()
+        check(early.opened == 1 && early.receivedHeartbeat,
+              "readiness from the receive task preserves the transport heartbeat")
+        earlySocket.stop()
         print("PASS: real WebSocket socket lifecycle (\(assertions) assertions)")
     }
 }

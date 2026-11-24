@@ -578,13 +578,15 @@ final class ResilientSocket {
             if readyWhenOpen && !resuming {
                 let opened = await opens.waitForOpen(socket, timeout: .seconds(5))
                 guard let self, let connection, connection.socket === socket else { return }
-                guard opened else {
-                    self.connection(connection, failed: .retry("Handshake timed out"))
-                    return
+                // A Soniox offer can win the race with the open delegate.
+                if !connection.isReady {
+                    guard opened else {
+                        self.connection(connection, failed: .retry("Handshake timed out"))
+                        return
+                    }
+                    self.debugLog("stream \(connection.stream.id) opened after \(connection.createdAt.duration(to: .now))")
+                    self.connection(connection, received: .ready)
                 }
-                if connection.isReady { return }
-                self.debugLog("stream \(connection.stream.id) opened after \(connection.createdAt.duration(to: .now))")
-                self.connection(connection, received: .ready)
             }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(4))
