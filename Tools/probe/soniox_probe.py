@@ -1,4 +1,4 @@
-"""Benchmarks Soniox stt-rt-v5 two-way translation (one stream, EN<->ZH) on the
+"""Benchmarks Soniox stt-rt-v6 two-way translation (one stream, EN<->ZH) on the
 scripted conversation, with the same config Lively's SonioxTranscriber sends.
 
     python soniox_probe.py
@@ -48,7 +48,7 @@ async def run(endpoint_delay_ms):
     connect_started = time.monotonic()
     ws = await websockets.connect(URL, additional_headers={"Authorization": f"Bearer {key}"}, max_size=None)
     await ws.send(json.dumps({
-        "model": "stt-rt-v5",
+        "model": "stt-rt-v6",
         "audio_format": "pcm_s16le",
         "sample_rate": rate,
         "num_channels": 1,

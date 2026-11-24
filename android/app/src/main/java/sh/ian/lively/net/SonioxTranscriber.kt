@@ -20,7 +20,7 @@ import sh.ian.lively.model.Language
 import sh.ian.lively.model.LanguagePair
 
 /**
- * Streams microphone audio to Soniox `stt-rt-v5` with two-way translation:
+ * Streams microphone audio to Soniox `stt-rt-v6` with two-way translation:
  * one stream transcribes whichever language is spoken and translates it into
  * the other, so no separate [TranslationService] is needed.
  *
@@ -42,7 +42,7 @@ class SonioxTranscriber(
     data class Configuration(
         val credential: Credential,
         val languages: LanguagePair,
-        val model: String = "stt-rt-v5",
+        val model: String = "stt-rt-v6",
         /** How long Soniox waits before declaring an endpoint (500–3000 ms). */
         val maxEndpointDelayMs: Int = 1000,
     )

@@ -49,11 +49,11 @@ Settings are stored in the Keychain.
 
 | Engine | How it works | Key |
 |---|---|---|
-| **Soniox** (default) | `stt-rt-v5`: Automatic uses `one_way` incoming translation plus text translation for outgoing turns; Choose a pair uses native `two_way` translation | from the [key broker](#soniox-keys), or your own from console.soniox.com |
+| **Soniox** (default) | `stt-rt-v6`: Automatic uses `one_way` incoming translation plus text translation for outgoing turns; Choose a pair uses native `two_way` translation | from the [key broker](#soniox-keys), or your own from console.soniox.com |
 | **Voxtral + Mistral** | `voxtral-mini-transcribe-realtime-3` transcribes and detects turns, then a Mistral chat model translates each turn | console.mistral.ai |
 | **On-device** (iOS/macOS) | Apple's Speech and Translation frameworks run on this device. No key, and no audio leaves the device | none |
 
-Soniox won the earlier [selected-pair benchmark](Tools/probe/RESULTS.md), which
+Soniox v5 won the earlier [selected-pair benchmark](Tools/probe/RESULTS.md), which
 used the native paired path. That result does not measure the new Automatic
 mode's outgoing text-translation latency; Automatic has not been benchmarked
 against that path.
@@ -444,7 +444,7 @@ xcodebuild test -project Lively.xcodeproj -scheme Lively -destination 'platform=
 | Typed lines: DeepSeek through the broker, falling back to on-device translation | `Networking/Translator.swift` |
 | Photos: text read on the device with Vision, then translated as a typed line | `Support/TextRecognizer.swift` |
 | Soniox Automatic: persistent one-way incoming stream, source lanes and optional targets | `Networking/AutomaticSonioxTranscriber.swift` |
-| Soniox paired: WebSocket to `stt-rt-v5` with native two-way translation and endpoint detection | `Networking/SonioxTranscriber.swift` |
+| Soniox paired: WebSocket to `stt-rt-v6` with native two-way translation and endpoint detection | `Networking/SonioxTranscriber.swift` |
 | Soniox: temporary keys from the broker, with one spare kept ready | `Networking/SonioxKeyProvider.swift` |
 | Soniox: picks the region (US or Japan) with the shortest round trip | `Networking/RegionProber.swift` |
 | Key broker: Cloudflare Worker that mints temporary Soniox keys and translates text | `Server/key-broker/` |
