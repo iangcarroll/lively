@@ -1,6 +1,6 @@
 import Foundation
 
-/// Streams microphone audio to Soniox `stt-rt-v5` with two-way translation:
+/// Streams microphone audio to Soniox `stt-rt-v6` with two-way translation:
 /// one stream transcribes whichever language is spoken and translates it into
 /// the other, so no separate `TranslationService` is needed.
 ///
@@ -16,7 +16,7 @@ final class SonioxTranscriber: SpeechEngine, SocketDialect {
 
     struct Configuration {
         var credential: Credential
-        var model = "stt-rt-v5"
+        var model = "stt-rt-v6"
         var languages: LanguagePair
         /// How long Soniox waits before declaring an endpoint (500–3000 ms).
         var maxEndpointDelayMs = 1000
@@ -720,7 +720,7 @@ extension SpeechProvider {
         id: "soniox",
         name: "Soniox",
         summary:
-            "Soniox stt-rt-v5 transcribes and translates both ways in one stream, for the lowest latency.",
+            "Soniox stt-rt-v6 transcribes and translates both ways in one stream, for the lowest latency.",
         credentials: [.soniox],
         options: [],
         languages: Language.soniox,

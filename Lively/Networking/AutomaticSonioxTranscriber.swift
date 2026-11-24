@@ -5,7 +5,7 @@ final class AutomaticSonioxTranscriber: SpeechEngine, SocketDialect {
 
     struct Configuration {
         var credential: Credential
-        var model = "stt-rt-v5"
+        var model = "stt-rt-v6"
         var listenerLanguage: Language
         /// How long Soniox waits before declaring an endpoint (500–3000 ms).
         var maxEndpointDelayMs = 1000

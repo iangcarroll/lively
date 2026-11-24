@@ -47,7 +47,7 @@ object SpeechProviders {
             SpeechProvider(
                 id = SONIOX_ID,
                 name = "Soniox",
-                summary = "Soniox stt-rt-v5 transcribes and translates both ways in one stream, for the lowest latency.",
+                summary = "Soniox stt-rt-v6 transcribes and translates both ways in one stream, for the lowest latency.",
                 credentials = listOf(soniox),
                 options = emptySet(),
                 languages = Language.SONIOX,
