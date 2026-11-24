@@ -14,7 +14,7 @@ import sh.ian.lively.model.Filler
 import sh.ian.lively.model.Language
 
 /**
- * Streams microphone audio to Soniox `stt-rt-v5` without naming the
+ * Streams microphone audio to Soniox `stt-rt-v6` without naming the
  * languages: it identifies whichever language is spoken and translates it
  * one way, into the listener's. What the listener says is reported without
  * a translation, for the store to translate once it knows the other language.
@@ -27,7 +27,7 @@ class AutomaticSonioxTranscriber(
     data class Configuration(
         val credential: SonioxTranscriber.Credential,
         val listenerLanguage: Language,
-        val model: String = "stt-rt-v5",
+        val model: String = "stt-rt-v6",
         /** How long Soniox waits before declaring an endpoint (500–3000 ms). */
         val maxEndpointDelayMs: Int = 1000,
     )

@@ -1,4 +1,4 @@
-"""Simulates a network dropout mid-conversation against Soniox stt-rt-v5 and
+"""Simulates a network dropout mid-conversation against Soniox stt-rt-v6 and
 compares how ResilientSocket recovers held audio (ASIA_LATENCY.md §6.3).
 
     python dropout_probe.py [drop_at_s] [drop_for_s]     # default 11.5 9
@@ -94,7 +94,7 @@ class Session:
     async def connect(self):
         self.ws = await websockets.connect(URL, additional_headers={"Authorization": f"Bearer {self.key}"}, max_size=None)
         await self.ws.send(json.dumps({
-            "model": "stt-rt-v5",
+            "model": "stt-rt-v6",
             "audio_format": "pcm_s16le",
             "sample_rate": self.rate,
             "num_channels": 1,
