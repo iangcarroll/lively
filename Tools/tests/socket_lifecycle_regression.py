@@ -98,6 +98,8 @@ class Handler(socketserver.StreamRequestHandler):
                     return
                 if opcode == 9:
                     self.frame(10, data)
+                    if path == "early-ready":
+                        self.event(event="heartbeat")
                 elif opcode == 2:
                     if not configured:
                         raise ValueError("PCM arrived before opening configuration")
@@ -162,7 +164,14 @@ def run_variant(work, source, name, expected_pass):
     if expected_pass:
         print("Socket source SHA256: " + hashlib.sha256(source.encode()).hexdigest(), flush=True)
     socket_source = work / (name + "-socket.swift")
-    socket_source.write_text(source)
+    # Exercise the ordering where the receive task marks a socket ready before
+    # the open watcher resumes. Delay only this fixture's open notification.
+    notification = "let opened = await opens.waitForOpen(socket, timeout: .seconds(5))"
+    assert source.count(notification) == 1
+    socket_source.write_text(source.replace(notification, notification + """
+                if request.url?.lastPathComponent == "early-ready" {
+                    try? await Task.sleep(for: .milliseconds(750))
+                }"""))
     binary = work / name
     subprocess.run(["xcrun", "swiftc", "-swift-version", "6", "-default-isolation", "MainActor",
                     "-parse-as-library", "-module-cache-path", str(work / "modules"),
